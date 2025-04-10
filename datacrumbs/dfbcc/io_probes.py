@@ -20,6 +20,18 @@ class IOProbes:
         if generate_probes:
             self.regex_functions = set()
             self.probes = []
+            exit_cmd_key_file_check = """
+                            int* fd_ptr = latest_fd.lookup(&id);
+                            if (fd_ptr != 0 ) {
+                                struct file_t file_key = {};
+                                file_key.id = id;
+                                file_key.fd = *fd_ptr;
+                                u64* hash_ptr = fd_hash.lookup(&file_key);
+                                if (hash_ptr != 0) {
+                                    stats_key->file_hash = *hash_ptr; 
+                                }
+                            }
+                            """
             self.probes.append(
                 BCCProbes(
                     ProbeType.SYSTEM,
@@ -68,18 +80,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "write",                        
@@ -94,18 +95,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "close",
@@ -116,18 +106,7 @@ class IOProbes:
                             entry_cmd="""
                             latest_fd.update(&id,&fd);
                             """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function("copy_file_range"),
                         self.get_bcc_function("execve"),
@@ -146,18 +125,7 @@ class IOProbes:
                             entry_cmd="""
                             latest_fd.update(&id,&fd);
                             """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "fdatasync",
@@ -168,18 +136,7 @@ class IOProbes:
                             entry_cmd="""
                             latest_fd.update(&id,&fd);
                             """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "flock",
@@ -190,18 +147,7 @@ class IOProbes:
                             entry_cmd="""
                             latest_fd.update(&id,&fd);
                             """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function("fsopen"),
                         self.get_bcc_function("fstatfs"),
@@ -214,18 +160,7 @@ class IOProbes:
                             entry_cmd="""
                             latest_fd.update(&id,&fd);
                             """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "ftruncate",
@@ -236,18 +171,7 @@ class IOProbes:
                             entry_cmd="""
                             latest_fd.update(&id,&fd);
                             """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function("io_pgetevents"),
                         self.get_bcc_function(
@@ -259,18 +183,7 @@ class IOProbes:
                             entry_cmd="""
                             latest_fd.update(&id,&fd);
                             """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function("memfd_create"),
                         self.get_bcc_function("migrate_pages"),
@@ -290,18 +203,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "preadv",                        
@@ -316,18 +218,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "preadv2",                        
@@ -342,18 +233,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "pwrite64",                        
@@ -368,18 +248,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key="exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "pwritev",                        
@@ -394,18 +263,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "pwritev2",                        
@@ -420,18 +278,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "readahead",                        
@@ -446,18 +293,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "readlinkat"
@@ -475,18 +311,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "renameat"
@@ -512,18 +337,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="""
-                            int* fd_ptr = latest_fd.lookup(&id);
-                            if (fd_ptr != 0 ) {
-                                struct file_t file_key = {};
-                                file_key.id = id;
-                                file_key.fd = *fd_ptr;
-                                u64* hash_ptr = fd_hash.lookup(&file_key);
-                                if (hash_ptr != 0) {
-                                    stats_key->file_hash = *hash_ptr; 
-                                }
-                            }
-                            """,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                     ])),
                 )
