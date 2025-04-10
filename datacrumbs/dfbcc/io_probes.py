@@ -2,7 +2,6 @@ from typing import *
 import re
 import json
 from tqdm import tqdm
-import json
 from bcc import BPF
 from datacrumbs.dfbcc.collector import BCCCollector
 from datacrumbs.dfbcc.probes import BCCFunctions, BCCProbes
