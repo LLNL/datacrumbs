@@ -29,7 +29,7 @@ class UserProbes:
                 reader = CorpusReader(link)
                 symbols_dict = reader.get_symbols()
                 symbols_dict = {k: v for k, v in symbols_dict.items() if v.get("type") == "FUNC"}
-                symbols = reader.get_symbols().keys()
+                symbols = symbols_dict.keys()
                 for symbol in tqdm(symbols, desc=f"User symbols for {key}"):
                     if (symbol or symbol != "") and pattern.match(symbol):
                         probe.functions.append(BCCFunctions(symbol))
