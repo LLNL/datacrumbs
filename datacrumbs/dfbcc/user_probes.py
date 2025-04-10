@@ -1,6 +1,7 @@
 from typing import *
 import os
 import re
+import json
 from bcc import BPF
 from tqdm import tqdm
 from datacrumbs.dfbcc.collector import BCCCollector
@@ -13,30 +14,43 @@ class UserProbes:
     config: ConfigurationManager
     probes: List[BCCProbes]
 
-    def __init__(self) -> None:
+    def __init__(self, generate_probes=False) -> None:
         self.config = ConfigurationManager.get_instance()
-        self.probes = []
-        num_symbols = 0
-        for key, obj in self.config.user_libraries.items():
-            probe = BCCProbes(ProbeType.USER, key, [])
-            if "regex" not in obj:
-                pattern = re.compile(".*")
-            else:
-                pattern = re.compile(obj["regex"])
-            link = obj["link"]
-            symbols = (
-                os.popen(f"nm {link} | grep \" T \" | awk {{'print $3'}}")
-                .read()
-                .strip()
-                .split("\n")
-            )
-            for symbol in tqdm(symbols, desc=f"User symbols for {key}"):
-                if (symbol or symbol != "") and pattern.match(symbol):
-                    probe.functions.append(BCCFunctions(symbol))
-                    num_symbols += 1
-                    self.config.tool_logger.debug(f"Adding Probe function {symbol} from {key}")
-            self.probes.append(probe)
-        self.config.tool_logger.info(f"Added {num_symbols} User probes")
+        if generate_probes:
+            self.probes = []
+            num_symbols = 0
+            for key, obj in self.config.user_libraries.items():
+                probe = BCCProbes(ProbeType.USER, key, [])
+                if "regex" not in obj:
+                    pattern = re.compile(".*")
+                else:
+                    pattern = re.compile(obj["regex"])
+                link = obj["link"]
+                symbols = (
+                    os.popen(f"nm {link} | grep \" T \" | awk {{'print $3'}}")
+                    .read()
+                    .strip()
+                    .split("\n")
+                )
+                for symbol in tqdm(symbols, desc=f"User symbols for {key}"):
+                    if (symbol or symbol != "") and pattern.match(symbol):
+                        probe.functions.append(BCCFunctions(symbol))
+                        num_symbols += 1
+                        self.config.tool_logger.debug(f"Adding Probe function {symbol} from {key}")
+                self.probes.append(probe)
+            probes_file = self.config.user_probes_file
+            with open(probes_file, "w") as f:
+                json.dump([probe.to_dict() for probe in self.probes], f)
+            self.config.tool_logger.info(f"Probes generated and saved to {probes_file}")
+        else:
+            try:
+                probes_file = self.config.user_probes_file
+                with open(probes_file, "r") as f:
+                    loaded_probes = json.load(f)
+                    self.probes = [BCCProbes.from_dict(probe) for probe in loaded_probes]
+                self.config.tool_logger.info(f"Probes loaded from {probes_file}")
+            except FileNotFoundError:
+                self.config.tool_logger.error(f"Probes file {probes_file} not found")
 
     def collector_fn(self, collector: BCCCollector, category_fn_map, count: int):
         bpf_text = ""
@@ -61,7 +75,7 @@ class UserProbes:
 
         return (bpf_text, category_fn_map, count)
 
-    def attach_probes(self, bpf: BPF, collector: BCCCollector) -> None:
+    def attach_probes(self, bpf: BPF) -> None:
         self.config.tool_logger.info("Attaching probe for User Probes")
         for probe in tqdm(self.probes, "attach User probes"):
             for fn in tqdm(probe.functions, "attach User functions"):

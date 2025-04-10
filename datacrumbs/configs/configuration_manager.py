@@ -24,6 +24,7 @@ class ConfigurationManager:
     profile_file: str
     mode: Mode = Mode.PROFILE
     trace_type: TraceType = TraceType.PERF
+    io_probes_file: str
 
     @staticmethod
     def get_instance():
@@ -52,6 +53,9 @@ class ConfigurationManager:
 
     def derive(self):
         self.function_file = f"{self.project_root}/datacrumbs/configs/function.json"
+        self.io_probes_file = f"{self.project_root}/datacrumbs/data/io_probes_file.json"
+        self.user_probes_file = f"{self.project_root}/datacrumbs/data/user_probes_file.json"
+        self.category_fn_map = f"{self.project_root}/datacrumbs/data/category_fn_map.json"
         
     def load(self, config: DictConfig):
         if "name" in config:
