@@ -26,7 +26,9 @@ class UserProbes:
                 else:
                     pattern = re.compile(obj["regex"])
                 link = obj["link"]
-                reader = CorpusReader(link)            
+                reader = CorpusReader(link)
+                symbols_dict = reader.get_symbols()
+                symbols_dict = {k: v for k, v in symbols_dict.items() if v.get("type") == "FUNC"}
                 symbols = reader.get_symbols().keys()
                 for symbol in tqdm(symbols, desc=f"User symbols for {key}"):
                     if (symbol or symbol != "") and pattern.match(symbol):
