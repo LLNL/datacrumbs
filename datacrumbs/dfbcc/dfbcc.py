@@ -1,4 +1,5 @@
 from time import sleep
+import os
 import ctypes
 from ctypes import *
 from typing import *
@@ -19,12 +20,14 @@ from datacrumbs.dfbcc.profile_header import BCCProfileHeader
 from datacrumbs.dfbcc.trace_header import BCCTraceHeader
 from datacrumbs.dfbcc.io_probes import IOProbes
 from datacrumbs.dfbcc.user_probes import UserProbes
+from datacrumbs.dfbcc.probes import BCCFunctions, BCCProbes
 from datacrumbs.configs.configuration_manager import ConfigurationManager
 from datacrumbs.common.data_structure import DFEvent, Filename, DFTraceEvent
 from datacrumbs.common.enumerations import Mode, TraceType
 from datacrumbs.common.utils import *
 from datacrumbs.common.constants import *
 from datacrumbs.writer.perfetto import PerfettoWriter
+import json
 
 def copy(dst, src):
     """Copies the contents of src to dst"""
@@ -44,9 +47,11 @@ class BCCMain:
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=16)
         self.futures = []
         self.index = 0
+        self.filename = f"{self.config.mode.value}.c"
+        self.category_fn_map_file = self.config.category_fn_map
         pass
 
-    def load(self) -> any:
+    def build(self) -> any:
         app_connector = BCCApplicationConnector()
         bpf_text = ""
         if self.config.mode == Mode.PROFILE:
@@ -56,32 +61,53 @@ class BCCMain:
             collector = BCCTraceCollector()
             bpf_text += str(BCCTraceHeader())
         bpf_text += str(app_connector)
-        io_probes = IOProbes()
+        io_probes = IOProbes(generate_probes=True)
         count = 0
         probe_text, self.category_fn_map, count = io_probes.collector_fn(
             collector, self.category_fn_map, count
         )
         bpf_text += probe_text
-        user_probes = UserProbes()
+        user_probes = UserProbes(generate_probes=True)
         probe_text, self.category_fn_map, count = user_probes.collector_fn(
             collector, self.category_fn_map, count
         )
+        
+        # Store self.category_fn_map into a JSON file
+        with open(self.category_fn_map_file, "w") as json_file:
+            json.dump({key: (value[0], value[1].to_dict()) for key, value in self.category_fn_map.items()}, json_file, indent=4)
         bpf_text += probe_text
         # bpf_text += str(collector)
         bpf_text = bpf_text.replace(
             "INTERVAL_RANGE", str(int(self.config.interval_sec * 1e9))
         )
         self.config.tool_logger.debug(f"Compiled Program is \n{bpf_text}")
-        file = f"{self.config.mode.value}.c"
-        f = open(f"{file}", "w")
+        
+        f = open(f"{self.filename}", "w")
         f.write(bpf_text)
         f.close()
-        self.config.tool_logger.info(f"Wrote program into {file}")
+        self.config.tool_logger.info(f"Wrote program into {self.filename}")
+        return self
+    
+    def load(self):
+        if os.path.exists(self.category_fn_map_file):
+            with open(self.category_fn_map_file, "r") as json_file:
+                self.category_fn_map = {key: (value[0], BCCFunctions.from_dict(value[1])) for key, value in json.load(json_file).items()}
+            self.config.tool_logger.info(f"Loaded category function map from {self.category_fn_map_file}")
+        else:
+            raise FileNotFoundError(f"The file {self.category_fn_map_file} does not exist.")
+        if not os.path.exists(self.filename):
+            raise FileNotFoundError(f"The file {self.filename} does not exist.")
+        with open(self.filename, "r") as file:
+            bpf_text = file.read()
+        app_connector = BCCApplicationConnector()
+        io_probes = IOProbes()
+        user_probes = UserProbes()
+        self.config.tool_logger.info(f"Read program from {self.filename}")
         self.bpf = BPF(text=bpf_text, debug=0)
         self.config.tool_logger.info(f"Loaded program into BCC")
         app_connector.attach_probe(self.bpf)
-        io_probes.attach_probes(self.bpf, collector)
-        user_probes.attach_probes(self.bpf, collector)
+        io_probes.attach_probes(self.bpf)
+        user_probes.attach_probes(self.bpf)
         matched = self.bpf.num_open_kprobes()
         self.config.tool_logger.info(f"{matched} functions matched")
         return self
@@ -347,7 +373,7 @@ class BCCMain:
         event = DFEvent()
         event.id = index
         c_event = ctypes.cast(data, ctypes.POINTER(DFTraceEvent)).contents
-        event_tuple = self.category_fn_map[c_event.event_id]
+        event_tuple = self.category_fn_map[str(c_event.event_id)]
         event.cat = event_tuple[0]
         function_probe = event_tuple[1]
         event.args = {}

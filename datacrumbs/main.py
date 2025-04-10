@@ -17,7 +17,14 @@ class Datacrumbs:
         self.config = ConfigurationManager.get_instance().load(cfg)
 
     def initialize(self) -> None:
-        self.bcc = BCCMain().load()
+        self.bcc = BCCMain()
+    
+    def build(self) -> None:
+        self.bcc.build()
+    
+    
+    def load(self) -> None:
+        self.bcc.load()
 
     def run(self) -> None:
         self.bcc.run()
@@ -27,17 +34,23 @@ class Datacrumbs:
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
-def main(cfg: DictConfig) -> int:
+def build(cfg: DictConfig) -> int:
     """
     The main method to start the profiler runtime.
     """
     profiler = Datacrumbs(cfg["module"])
     profiler.initialize()
+    profiler.build()
+    return ProfilerStatus.SUCCESS
+
+@hydra.main(version_base=None, config_path="configs", config_name="config")
+def run(cfg: DictConfig) -> int:
+    """
+    The main method to start the profiler runtime.
+    """
+    profiler = Datacrumbs(cfg["module"])
+    profiler.initialize()
+    profiler.load()
     profiler.run()
     profiler.finalize()
     return ProfilerStatus.SUCCESS
-
-
-if __name__ == "__main__":
-    status: int = main()
-    exit(status)

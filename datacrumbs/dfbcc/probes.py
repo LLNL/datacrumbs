@@ -1,6 +1,6 @@
 from typing import *
 import ctypes
-
+import json
 from datacrumbs.common.enumerations import ProbeType
 from datacrumbs.common.data_structure import DFEvent, Filename, DFTraceEvent
 
@@ -67,6 +67,32 @@ class BCCFunctions:
         return f"{self.name}"
     def __repr__(self):
         return f"{self.name}"
+
+    def to_dict(self) -> Dict:
+        return {
+            "name": self.name,
+            "regex": self.regex,
+            "entry_struct": self.entry_struct,
+            "exit_struct": self.exit_struct,
+            "entry_cmd": self.entry_cmd,
+            "exit_cmd_stats": self.exit_cmd_stats,
+            "exit_cmd_key": self.exit_cmd_key,
+            "entry_args": self.entry_args,
+        }
+
+    @staticmethod
+    def from_dict(data: Dict) -> "BCCFunctions":
+        return BCCFunctions(
+            name=data["name"],
+            regex=data.get("regex"),
+            entry_struct=data.get("entry_struct", []),
+            exit_struct=data.get("exit_struct", []),
+            entry_cmd=data.get("entry_cmd", ""),
+            exit_cmd_stats=data.get("exit_cmd_stats", ""),
+            exit_cmd_key=data.get("exit_cmd_key", ""),
+            entry_args=data.get("entry_args", ""),
+        )
+    
     def get_class(self):
         array = []
         for entry in self.entry_struct:
@@ -98,7 +124,7 @@ class BCCFunctions:
         class ProbeEventype(DFTraceEvent):
             _fields_ = array
         return ProbeEventype
-        
+
 
 
 class BCCProbes:
@@ -112,3 +138,21 @@ class BCCProbes:
         self.type = type
         self.category = category
         self.functions = functions
+    
+    def to_dict(self) -> Dict:
+        return {
+            "type": self.type.name,
+            "category": self.category,
+            "functions": [func.to_dict() for func in self.functions],
+        }
+
+    @staticmethod
+    def from_dict(data: Dict) -> "BCCProbes":
+        functions = [
+            BCCFunctions.from_dict(func) for func in data.get("functions", [])
+        ]
+        return BCCProbes(
+            type=ProbeType[data["type"]],
+            category=data["category"],
+            functions=functions,
+        )
