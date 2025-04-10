@@ -8,7 +8,7 @@ from datacrumbs.dfbcc.collector import BCCCollector
 from datacrumbs.dfbcc.probes import BCCFunctions, BCCProbes
 from datacrumbs.common.enumerations import ProbeType
 from datacrumbs.configs.configuration_manager import ConfigurationManager
-
+from datacrumbs.dfbcc.elf import CorpusReader
 
 class UserProbes:
     config: ConfigurationManager
@@ -26,12 +26,8 @@ class UserProbes:
                 else:
                     pattern = re.compile(obj["regex"])
                 link = obj["link"]
-                symbols = (
-                    os.popen(f"nm {link} | grep \" T \" | awk {{'print $3'}}")
-                    .read()
-                    .strip()
-                    .split("\n")
-                )
+                reader = CorpusReader(link)            
+                symbols = reader.get_symbols().keys()
                 for symbol in tqdm(symbols, desc=f"User symbols for {key}"):
                     if (symbol or symbol != "") and pattern.match(symbol):
                         probe.functions.append(BCCFunctions(symbol))
