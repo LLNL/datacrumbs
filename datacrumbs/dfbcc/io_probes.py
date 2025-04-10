@@ -248,7 +248,7 @@ class IOProbes:
                             exit_cmd_stats="""
                                     stats->size_sum += PT_REGS_RC(ctx);
                                     """,
-                            exit_cmd_key="exit_cmd_key_file_check,
+                            exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
                             "pwritev",                        
