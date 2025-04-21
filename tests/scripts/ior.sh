@@ -4,189 +4,78 @@ echo $SCRIPT_DIR
 TEST_DIR=$(dirname $SCRIPT_DIR)
 PROJECT_DIR=$(dirname $TEST_DIR)
 PARENT_DIR=$(dirname $PROJECT_DIR)
-#IOR_INSTALL_DIR=/opt/spack/opt/spack/linux-ubuntu22.04-icelake/gcc-11.4.0/ior-4.0.0-arszr4x4i7xuua4opbyx73oqq7tlzljo
-IOR_INSTALL_DIR=$(spack location -i ior@4.0.0%gcc@11.4.0)
-DATACRUMBS_SO=${PROJECT_DIR}/build/libdatacrumbs.so
-
 DATA_DIR=${PROJECT_DIR}/build/data
 DROP_CACHES=1
 mkdir -p $DATA_DIR
 rm -rf $DATA_DIR/*
-BLOCK=8g
-# for ts in 256k; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#   configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 10 -d 10 -t=${ts}"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#   sleep 10
-#   if [ "$DROP_CACHES" -eq "1" ];
-#   then
-#     echo "Clean Cache"
-#     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#   fi
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#   sleep 10
-#   rm -rf $DATA_DIR/*
-# done
+BLOCK=$1
+if [ -z "$1" ]; then
+  BLOCK=8g
+fi
+TRANSFER_SIZE=$2
+if [ -z "$2" ]; then
+  TRANSFER_SIZE=1m
+fi
+TOOL=$3
+if [ -z "$3" ]; then
+  TOOL=DATACRUMBS
+fi
+if [ "$TOOL" == "DATACRUMBS" ]; then
+  LD_PRELOAD_ARG="LD_PRELOAD=${PROJECT_DIR}/build/libdatacrumbs.so"
+elif [ "$TOOL" == "DARSHAN" ]; then
+  LD_PRELOAD_ARG="LD_PRELOAD=$DARSHAN_DIR/lib/libdarshan.so"
+elif [ "$TOOL" == "DARSHAN-DXT" ]; then
+  LD_PRELOAD_ARG="LD_PRELOAD=$DARSHAN_DIR/lib/libdarshan.so"
+  export DARSHAN_ENABLE_DXT=1
+else
+  echo "Unknown tool"
+  exit 1
+fi
+INTERFACE=$4
+if [ -z "$4" ]; then
+  INTERFACE=POSIX
+fi
+DIRECTIO=$5
+if [ -z "$5" ]; then
+  DIRECTIO=0
+fi
+if [ "$DIRECTIO" -eq "1" ]; then
+  echo "Direct IO"
+  export FLAGS="-o O_DIRECT=1"
+else
+  echo "Buffered IO"
+  export FLAGS=""
+fi
+FPP=$6
+if [ -z "$6" ]; then
+  FPP=0
+fi
+if [ "$FPP" -eq "1" ]; then
+  echo "FPP"
+  export FLAGS="${FLAGS} -F"
+else
+  echo "Collective IO"
+  export FLAGS="${FLAGS} -c"
+fi
 
-# for ts in 256k; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#   configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 10 -d 10 -t=${ts} -O useO_DIRECT=1"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#   sleep 10
-#   if [ "$DROP_CACHES" -eq "1" ];
-#   then
-#     echo "Clean Cache"
-#     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#   fi
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#   sleep 10
-#   rm -rf $DATA_DIR/*
-# done
-
-# for ts in 256k; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#   configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 10 -d 10 -t=${ts} -e -Y"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#   sleep 10
-#   if [ "$DROP_CACHES" -eq "1" ];
-#   then
-#     echo "Clean Cache"
-#     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#   fi
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#   sleep 10
-#   rm -rf $DATA_DIR/*
-# done
-
-# for ts in 256k; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#   configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 10 -d 10 -t=${ts} -P"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#   sleep 10
-#   if [ "$DROP_CACHES" -eq "1" ];
-#   then
-#     echo "Clean Cache"
-#     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#   fi
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#   sleep 10
-#   rm -rf $DATA_DIR/*
-# done
-
-# for DROP_CACHES in 0 1; do
-#   for ts in 256k; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#     configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 10 -d 10 -t=${ts} -a MPIIO"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k"
-#     LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#     sleep 10
-#     if [ "$DROP_CACHES" -eq "1" ];
-#     then
-#       echo "Clean Cache"
-#       sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#     fi
-#     echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#     LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#     sleep 10
-#     rm -rf $DATA_DIR/*
-#   done
-# done
-
-# for DROP_CACHES in 0 1; do
-#   for ts in 256k; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#     configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 10 -d 10 -t=${ts} -a MPIIO -c"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k"
-#     LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#     sleep 10
-#     if [ "$DROP_CACHES" -eq "1" ];
-#     then
-#       echo "Clean Cache"
-#       sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#     fi
-#     echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#     LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#     sleep 10
-#     rm -rf $DATA_DIR/*
-#   done
-# done
-
-# for ts in 256k; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#   configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 10 -d 10 -t=${ts} -Z -z"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#   sleep 10
-#   if [ "$DROP_CACHES" -eq "1" ];
-#   then
-#     echo "Clean Cache"
-#     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#   fi
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#   sleep 10
-#   rm -rf $DATA_DIR/*
-# done
-
-# for ts in 256k; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#   configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 10 -d 10 -t=${ts} -Z -z"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#   sleep 10
-#   if [ "$DROP_CACHES" -eq "1" ];
-#   then
-#     echo "Clean Cache"
-#     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#   fi
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#   sleep 10
-#   rm -rf $DATA_DIR/*
-# done
-# for ts in 512m; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#   configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 1 -d 10 -t=${ts}"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#   sleep 10
-#   if [ "$DROP_CACHES" -eq "1" ];
-#   then
-#     echo "Clean Cache"
-#     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#   fi
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#   sleep 10
-#   rm -rf $DATA_DIR/*
-# done
-for ts in 512m; do # 4k 16k 64k 256k 1m 4m 16m 64m
-  configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 1 -d 10 -t=${ts} -a HDF5"
+for i in {1..10}; do
+  echo "Iteration $i"
+  configuration="-o=${DATA_DIR}/test.bat-${TRANSFER_SIZE} -m -b=${BLOCK} -i 1 -d 10 -t=${TRANSFER_SIZE} -a ${INTERFACE} $FLAGS"
   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w"
-  LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w
-  # sleep 10
-  # if [ "$DROP_CACHES" -eq "1" ];
-  # then
-  #   echo "Clean Cache"
-  #   sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-  # fi
-  # echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-  # LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-  # sleep 10
-  # rm -rf $DATA_DIR/*
+  start_time=$(date +%s)
+  mpirun -n 24 $LD_PRELOAD_ARG ${IOR_DIR}/bin/ior ${configuration} -w
+  end_time=$(date +%s)
+  elapsed_time=$((end_time - start_time))
+  echo "Time taken for write iteration:$i: ${elapsed_time} seconds"
+  sleep 10
+  if [ "$DROP_CACHES" -eq "1" ];
+  then
+    echo "Clean Cache"
+    sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
+  fi
+  echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
+  start_time=$(date +%s)
+  mpirun -n 24 $LD_PRELOAD_ARG ${IOR_DIR}/bin/ior ${configuration} -r
+  elapsed_time=$((end_time - start_time))
+  echo "Time taken for read iteration:$i: ${elapsed_time} seconds"
 done
-
-# for ts in 256k; do # 4k 16k 64k 256k 1m 4m 16m 64m
-#   configuration="-o=${DATA_DIR}/test.bat-${ts} -F -m -b=${BLOCK} -i 10 -d 10 -t=${ts} -a HDF5 -c"
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -w -k
-#   sleep 10
-#   if [ "$DROP_CACHES" -eq "1" ];
-#   then
-#     echo "Clean Cache"
-#     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
-#   fi
-#   echo "Running ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r"
-#   LD_PRELOAD=$DATACRUMBS_SO ${IOR_INSTALL_DIR}/bin/ior ${configuration} -r
-#   sleep 10
-#   rm -rf $DATA_DIR/*
-# done
