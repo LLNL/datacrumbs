@@ -34,7 +34,15 @@ do
   $cmd
   if [ "$CLEAN_PAGE_CACHE" -eq "1" ]; then
     echo "Cleaning Cache"
+    sudo sh -c "/usr/bin/echo 1 > /proc/sys/vm/drop_caches"
+  elif [ "$CLEAN_PAGE_CACHE" -eq "2" ]; then
+    echo "Cleaning inode Caches"
+    sudo sh -c "/usr/bin/echo 2 > /proc/sys/vm/drop_caches"
+  elif [ "$CLEAN_PAGE_CACHE" -eq "3" ]; then
+    echo "Cleaning All Caches"
     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
+  else
+    echo "Not cleaning cache"
   fi
   sleep 5
   cmd="mpirun -np ${PROC} --use-hwthread-cpus -x LD_PRELOAD=${DATACRUMBS_SO} ${PROJECT_DIR}/build/tests/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 1 ${DIRECTIO}"
