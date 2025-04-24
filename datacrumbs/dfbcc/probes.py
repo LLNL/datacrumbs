@@ -15,6 +15,7 @@ class BCCFunctions:
     entry_args: str
     entry_struct_str: str
     exit_struct_str: str
+    custom: bool
 
     def __init__(
         self,
@@ -37,6 +38,10 @@ class BCCFunctions:
         self.entry_args = entry_args
         self.entry_struct_str = self.get_str_from_args(entry_struct)
         self.exit_struct_str = self.get_str_from_args(exit_struct)
+        if self.entry_struct_str == "" and self.exit_struct_str == "":
+            self.custom = False
+        else:
+            self.custom = True
         
     def get_str_from_args(self, args):
         args_str = ""
@@ -78,6 +83,7 @@ class BCCFunctions:
             "exit_cmd_stats": self.exit_cmd_stats,
             "exit_cmd_key": self.exit_cmd_key,
             "entry_args": self.entry_args,
+            "custom": self.custom,
         }
 
     @staticmethod
