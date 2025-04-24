@@ -61,13 +61,13 @@ class BCCMain:
             collector = BCCTraceCollector()
             bpf_text += str(BCCTraceHeader())
         bpf_text += str(app_connector)
-        io_probes = IOProbes(generate_probes=True)
+        io_probes = IOProbes(generate_probes=self.config.generate_probes)
         count = 0
         probe_text, self.category_fn_map, count = io_probes.collector_fn(
             collector, self.category_fn_map, count
         )
         bpf_text += probe_text
-        user_probes = UserProbes(generate_probes=True)
+        user_probes = UserProbes(generate_probes=self.config.generate_probes)
         probe_text, self.category_fn_map, count = user_probes.collector_fn(
             collector, self.category_fn_map, count
         )
