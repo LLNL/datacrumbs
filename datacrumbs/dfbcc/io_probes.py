@@ -410,7 +410,7 @@ class IOProbes:
             #self.probes.extend(self.get_bcc_functions(b".*llseek.*"))
             self.probes.extend(self.get_bcc_functions(b".*file.*"))
             self.probes.extend(self.get_bcc_functions(b".*block.*"))
-                self.config.tool_logger.info(f"Added {len(self.regex_functions)} I/O probes")
+            self.config.tool_logger.info(f"Added {len(self.regex_functions)} I/O probes")
             io_probes_file = self.config.io_probes_file
             with open(io_probes_file, "w") as f:
                 json.dump([probe.to_dict() for probe in self.probes], f)
