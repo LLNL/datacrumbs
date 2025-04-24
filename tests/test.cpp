@@ -38,7 +38,7 @@ std::string gen_random(const int len) {
 
   return tmp_s;
 }
-int test_open_perm(char *filename, int flag, int perm) {
+int test_open_perm(const char *filename, int flag, int perm) {
   int fd = open(filename, flag, perm);
   if (fd == -1) {
     perror("open");
@@ -46,7 +46,7 @@ int test_open_perm(char *filename, int flag, int perm) {
   }
   return fd;
 }
-int test_open(char *filename, int flag) {
+int test_open(const char *filename, int flag) {
   int fd = open(filename, flag, 0777);
   if (fd == -1) {
     perror("open");
@@ -62,7 +62,7 @@ int test_read(int fd, char *buf, int size) {
   }
   return bytes;
 }
-int test_write(int fd, char *buf, int size) {
+int test_write(int fd, const char *buf, int size) {
   int bytes = write(fd, buf, size);
   if (bytes == -1) {
     perror("write");
