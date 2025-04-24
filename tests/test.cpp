@@ -38,7 +38,14 @@ std::string gen_random(const int len) {
 
   return tmp_s;
 }
-
+int test_open_perm(char *filename, int flag, int perm) {
+  int fd = open(filename, flag, perm);
+  if (fd == -1) {
+    perror("open");
+    return -1;
+  }
+  return fd;
+}
 int test_open(char *filename, int flag) {
   int fd = open(filename, flag, 0777);
   if (fd == -1) {
@@ -119,19 +126,19 @@ int main(int argc, char *argv[]) {
       if (direct_io_flag == 1) {
         flag = O_WRONLY | O_CREAT | O_TRUNC | O_DIRECT;
       }
-      fd = open(filename.c_str(), flag, 0777);
+      fd = test_open_perm(filename.c_str(), flag, 0777);
     } else if (test_flag == 1) {
       int flag = O_RDONLY;
       if (direct_io_flag == 1) {
         flag = O_RDONLY | O_DIRECT;
       }
-      fd = open(filename.c_str(), flag);
+      fd = test_open(filename.c_str(), flag);
     } else {
       int flag = O_RDWR | O_CREAT | O_TRUNC;
       if (direct_io_flag == 1) {
         flag = O_RDWR | O_CREAT | O_TRUNC | O_DIRECT;
       }
-      fd = open(filename.c_str(), flag, 0777);
+      fd = test_open_perm(filename.c_str(), flag, 0777);
     }
     
     open_timer.pauseTime();
@@ -151,7 +158,7 @@ int main(int argc, char *argv[]) {
       }
       if (test_flag == 0 || test_flag == 2) {
         write_timer.resumeTime();
-        assert(write(fd, data.c_str(), ts) == ts);
+        assert(test_write(fd, data.c_str(), ts) == ts);
         write_timer.pauseTime();
       }
 
@@ -160,7 +167,7 @@ int main(int argc, char *argv[]) {
             printf("Sleeping for fseek for %d for step %d of %d\n", sleep_time, op_idx, ops);
             sleep(sleep_time);
         }
-        lseek(fd, (off_t)op_idx * ts, SEEK_SET);
+        test_lseek(fd, (off_t)op_idx * ts, SEEK_SET);
       }
       if (test_flag == 1 || test_flag == 2) {
         if (sleep_time > 0) {
@@ -168,7 +175,7 @@ int main(int argc, char *argv[]) {
             sleep(sleep_time);
         }
         read_timer.resumeTime();
-        auto read_bytes = read(fd, read_data, ts);
+        auto read_bytes = test_read(fd, read_data, ts);
         read_timer.pauseTime();
       }
     }
@@ -177,7 +184,7 @@ int main(int argc, char *argv[]) {
       sleep(sleep_time);
     }
     close_timer.resumeTime();
-    close(fd);
+    test_close(fd);
     close_timer.pauseTime();
   }
   free(read_data);
