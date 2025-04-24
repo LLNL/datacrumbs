@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
   Timer write_timer = Timer();
   Timer read_timer = Timer();
   Timer close_timer = Timer();
-  int sleep_time = 0;
+  int sleep_time = 5;
   for (int file_idx = 0; file_idx < files; ++file_idx) {
 
     std::string filename = dir + "/file_" + std::to_string(file_idx) + "_" +
