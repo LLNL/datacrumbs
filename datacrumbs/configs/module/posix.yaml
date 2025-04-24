@@ -4,7 +4,7 @@ mode: trace
 file: trace-posix.pfw
 user:
   - name: app1
-    link: /home/cc/datacrumbs/build/tests/df_tracer_test
+    link: /opt/datacrumbs/build/tests/df_tracer_test
     regex: .*
 
 profile:
@@ -12,4 +12,4 @@ profile:
 
 trace:
   args: 1
-  type: ring_buffer # ring_buffer
+  type: ring_buffer # ring_buffer perf
