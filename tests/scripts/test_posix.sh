@@ -29,7 +29,7 @@ fi
 for TSKB in $((1*1024)); #1 4 16 64 256 1024 4096 16384 65536 262144
 do
   TS=$((TSKB * 1024))
-  cmd="mpirun -np ${PROC} --use-hwthread-cpus -x ${PROJECT_DIR}/build/tests/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 0 ${DIRECTIO}"
+  cmd="${PROJECT_DIR}/build/tests/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 0 ${DIRECTIO}"
   echo $cmd
   $cmd
   if [ "$CLEAN_PAGE_CACHE" -eq "1" ]; then

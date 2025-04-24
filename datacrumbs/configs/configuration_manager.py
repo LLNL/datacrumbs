@@ -25,6 +25,7 @@ class ConfigurationManager:
     mode: Mode = Mode.PROFILE
     trace_type: TraceType = TraceType.PERF
     io_probes_file: str
+    use_function_file: bool = False
 
     @staticmethod
     def get_instance():
@@ -66,6 +67,8 @@ class ConfigurationManager:
                 self.install_dir = os.path.join(self.project_root, self.install_dir)
         if "file" in config:
             self.profile_file = config["file"]
+        if "fn_file" in config:
+            self.profile_file = config["fn_file"]
         if "mode" in config:
             self.mode = Mode.get_enum(config["mode"])
             self.tool_logger.debug(f'yaml mode {config["mode"]} set conf value {self.mode}')

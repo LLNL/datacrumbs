@@ -38,6 +38,56 @@ std::string gen_random(const int len) {
 
   return tmp_s;
 }
+
+int test_open(char *filename, int flag) {
+  int fd = open(filename, flag, 0777);
+  if (fd == -1) {
+    perror("open");
+    return -1;
+  }
+  return fd;
+}
+int test_read(int fd, char *buf, int size) {
+  int bytes = read(fd, buf, size);
+  if (bytes == -1) {
+    perror("read");
+    return -1;
+  }
+  return bytes;
+}
+int test_write(int fd, char *buf, int size) {
+  int bytes = write(fd, buf, size);
+  if (bytes == -1) {
+    perror("write");
+    return -1;
+  }
+  return bytes;
+}
+int test_close(int fd) {
+  int ret = close(fd);
+  if (ret == -1) {
+    perror("close");
+    return -1;
+  }
+  return ret;
+}
+int test_lseek(int fd, off_t offset, int whence) {
+  int ret = lseek(fd, offset, whence);
+  if (ret == -1) {
+    perror("lseek");
+    return -1;
+  }
+  return ret;
+}
+int test_fsync(int fd) {
+  int ret = fsync(fd);
+  if (ret == -1) {
+    perror("fsync");
+    return -1;
+  }
+  return ret;
+}
+
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   int my_rank, comm_size;
@@ -75,7 +125,7 @@ int main(int argc, char *argv[]) {
       if (direct_io_flag == 1) {
         flag = O_RDONLY | O_DIRECT;
       }
-      fd = open(filename.c_str(), flag, 0777);
+      fd = open(filename.c_str(), flag);
     } else {
       int flag = O_RDWR | O_CREAT | O_TRUNC;
       if (direct_io_flag == 1) {
@@ -85,7 +135,10 @@ int main(int argc, char *argv[]) {
     }
     
     open_timer.pauseTime();
-    assert(fd != -1);
+    if (fd == -1) {
+      fprintf(stderr, "Error opening file:%s %s (errno: %d)\n", filename.c_str(), strerror(errno), errno);
+      assert(fd != -1);
+    }
     if (sleep_time > 0) {
       printf("Sleeping for %d\n", sleep_time);
       sleep(sleep_time);

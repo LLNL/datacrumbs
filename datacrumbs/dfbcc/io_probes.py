@@ -396,15 +396,32 @@ class IOProbes:
                     ])),
                 )
             )
-            
-            with open(self.config.function_file) as json_file:
-                kernel_functions = json.load(json_file)
-                for cat, functions in kernel_functions.items():
-                    fn_list = []
-                    for fn in functions:
-                        fn_list.append(self.get_bcc_function(fn))
-                    self.probes.append(BCCProbes(ProbeType.KERNEL, cat, fn_list))
-            self.config.tool_logger.info(f"Added {len(self.regex_functions)} I/O probes")
+            if self.config.use_function_file:
+                self.config.tool_logger.info(
+                    f"Using function file {self.config.function_file} to load functions"
+                )
+                with open(self.config.function_file) as json_file:
+                    kernel_functions = json.load(json_file)
+                    for cat, functions in kernel_functions.items():
+                        fn_list = []
+                        for fn in functions:
+                            fn_list.append(self.get_bcc_function(fn))
+                        self.probes.append(BCCProbes(ProbeType.KERNEL, cat, fn_list))
+            else:
+                self.probes.extend(self.get_bcc_functions(b".*page.*"))
+                #self.probes.extend(self.get_bcc_functions(b".*lru.*"))
+                #self.probes.extend(self.get_bcc_functions(b".*swap.*"))
+                #self.probes.extend(self.get_bcc_functions(b".*buffer.*"))
+                #self.probes.extend(self.get_bcc_functions(b".*nr.*"))
+                #self.probes.extend(self.get_bcc_functions(b".*map.*"))
+                self.probes.extend(self.get_bcc_functions(b".*bio.*"))
+                self.probes.extend(self.get_bcc_functions(b".*aio.*"))
+                self.probes.extend(self.get_bcc_functions(b".*ext4.*"))
+                self.probes.extend(self.get_bcc_functions(b".*vfs.*"))
+                #self.probes.extend(self.get_bcc_functions(b".*llseek.*"))
+                self.probes.extend(self.get_bcc_functions(b".*file.*"))
+                self.probes.extend(self.get_bcc_functions(b".*block.*"))
+                self.config.tool_logger.info(f"Added {len(self.regex_functions)} I/O probes")
             io_probes_file = self.config.io_probes_file
             with open(io_probes_file, "w") as f:
                 json.dump([probe.to_dict() for probe in self.probes], f)
