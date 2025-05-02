@@ -35,6 +35,16 @@ cmake ..
 make -j
 ```
 
+## Python Dependencies
+
+- psutil==5.8
+- tqdm
+- pyelftools
+
+## Other dependencies
+
+- clang-format
+
 ## Build dependency for datacrumbs
 
 ```bash
