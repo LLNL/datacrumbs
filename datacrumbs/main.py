@@ -1,7 +1,3 @@
-# External Imports
-import hydra
-from omegaconf import DictConfig
-
 # Internal Imports
 from datacrumbs.dfbcc.dfbcc import BCCMain
 from datacrumbs.common.status import ProfilerStatus
@@ -13,8 +9,8 @@ class Datacrumbs:
     Datacrumbs Class
     """
 
-    def __init__(self, cfg: DictConfig) -> None:
-        self.config = ConfigurationManager.get_instance().load(cfg)
+    def __init__(self) -> None:
+        self.config = ConfigurationManager.get_instance().load_and_override()
 
     def initialize(self) -> None:
         self.bcc = BCCMain()
@@ -33,22 +29,21 @@ class Datacrumbs:
         self.config.tool_logger.info("Detaching...")
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="config")
-def build(cfg: DictConfig) -> int:
+
+def build() -> int:
     """
     The main method to start the profiler runtime.
-    """
-    profiler = Datacrumbs(cfg["module"])
+    """    
+    profiler = Datacrumbs()
     profiler.initialize()
     profiler.build()
     return ProfilerStatus.SUCCESS
 
-@hydra.main(version_base=None, config_path="configs", config_name="config")
-def run(cfg: DictConfig) -> int:
+def run() -> int:
     """
     The main method to start the profiler runtime.
     """
-    profiler = Datacrumbs(cfg["module"])
+    profiler = Datacrumbs()
     profiler.initialize()
     profiler.load()
     profiler.run()
