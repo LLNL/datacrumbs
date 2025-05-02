@@ -1,6 +1,3 @@
-hydra-core>=1.2.0
-psutil>=6.0.0
+psutil==5.8
 tqdm
-python-intervals
 pyelftools
-py3compat

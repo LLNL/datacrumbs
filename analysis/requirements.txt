@@ -13,3 +13,4 @@ tqdm
 scikit-learn
 seaborn
 jsonlines
+python-intervals

@@ -26,7 +26,6 @@ class ElftoolsWrapper(object):
         )
         from elftools.dwarf import descriptions as dwarf
         from elftools.dwarf import locationlists as locationlists
-        import py3compat as py3compat
         from elftools.common import exceptions as exceptions
 
         self.dynamic = dynamic
@@ -37,7 +36,6 @@ class ElftoolsWrapper(object):
         self.constants = constants
         self.dwarf = dwarf
         self.locationlists = locationlists
-        self.py3compat = py3compat
         self.exceptions = exceptions
 
 

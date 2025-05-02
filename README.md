@@ -35,23 +35,43 @@ cmake ..
 make -j
 ```
 
-## Build dependency for profiler
+## Build dependency for datacrumbs
 
 ```bash
 sudo pip install -r requirements.txt
 ```
 
-## Running the code
-
-The profiler tool need to run as root
+## arguments for datacrumbs tools are
 
 ```bash
-sudo su
-export PYTHONPATH=<PATH to datacrumbs>
-cd <PATH to datacrumbs Root>
-python3 datacrumbs/main.py
+usage: initialize_tool [-h] [--module MODULE] [--install_dir INSTALL_DIR] [--file FILE] [--generate_probes] [--mode {PROFILE,TRACE}] [--interval_sec INTERVAL_SEC] [--trace_type {PERF,RING_BUFFER}]
+
+Configuration Manager
+
+options:
+  -h, --help            show this help message and exit
+  --module MODULE       Module name. That is picked from datacrumbs/configs/module
+  --install_dir INSTALL_DIR
+                        Installation directory
+  --file FILE           Profile file
+  --generate_probes     Generate probes
+  --mode {PROFILE,TRACE}
+                        Mode of operation
+  --interval_sec INTERVAL_SEC
+                        Interval in seconds for profiling
+  --trace_type {PERF,RING_BUFFER}
+                        Type of trac
 ```
-Once the profiler is loaded, it will wait for applictaions to connect.
+
+## Initialize the code
+
+The initialization where we do not need to generate probes or are using existing probes.
+
+```bash
+./initialize_tool 
+```
+
+## Run the tool
 
 ### Environment variable to consider
 
@@ -66,6 +86,15 @@ Increase probe limit within BCC
 export BCC_PROBE_LIMIT=1048576
 ```
 
+The profiler tool need to run as root
+
+```bash
+sudo su
+./run_tool
+```
+Once the profiler is loaded, it will wait for applictaions to connect.
+
+
 ## Running the test
 
 Once the profiler has started u can run the application code.
@@ -73,7 +102,7 @@ Once the profiler has started u can run the application code.
 ```bash
 cd <PATH to datacrumbs Root>
 cd tests/scripts
-./run.sh
+./test_posix.sh
 ```
 
 ## Checking the profiler output.
@@ -81,7 +110,7 @@ cd tests/scripts
 The profiler output is created in the directory where the profiler runs.
 
 ```bash
-cc@ebpf:~/datacrumbs$ head -n 5 profile.pfw 
+cc@ebpf:~/datacrumbs$ head -n 5 datacrumbs.pfw 
 [
 {"pid": 30545, "tid": 30545, "name": "__libc_malloc [libc.so.6]", "cat": "[libc.so.6]", "ph": "C", "ts": 0.0, "args": {"count": 21, "time": 0.000198116}}
 {"pid": 30545, "tid": 30545, "name": "cfree [libc.so.6]", "cat": "[libc.so.6]", "ph": "C", "ts": 0.0, "args": {"count": 2, "time": 1.9788e-05}}
