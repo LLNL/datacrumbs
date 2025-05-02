@@ -4,3 +4,4 @@ tqdm
 python-intervals
 pyelftools
 py3compat
+clang-format

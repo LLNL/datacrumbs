@@ -384,15 +384,11 @@ class IOProbes:
                         self.get_bcc_function("fsync"),
                         self.get_bcc_function("fdatasync"),
                         self.get_bcc_function("fcntl"),
-                        self.get_bcc_function("malloc"),
-                        self.get_bcc_function("calloc"),
-                        self.get_bcc_function("realloc"),
                         self.get_bcc_function("posix_memalign"),
                         self.get_bcc_function("valloc"),
                         self.get_bcc_function("memalign"),
                         self.get_bcc_function("pvalloc"),
                         self.get_bcc_function("aligned_alloc"),
-                        self.get_bcc_function("free"),
                     ])),
                 )
             )
@@ -432,9 +428,15 @@ class IOProbes:
             for fn in probe.functions:
                 count = count + 1
                 if ProbeType.SYSTEM == probe.type:
-                    text = collector.sys_functions
+                    if fn.custom:
+                        text = collector.custom_sys_functions
+                    else:
+                        text = collector.generic_sys_functions
                 else:
-                    text = collector.functions
+                    if fn.custom:
+                        text = collector.custom_functions
+                    else:
+                        text = collector.generic_functions
                 text = text.replace("DFCAT", probe.category)
                 text = text.replace("DFFUNCTION", fn.name)
                 text = text.replace("DFEVENTID", str(count))

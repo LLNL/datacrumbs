@@ -56,9 +56,15 @@ class UserProbes:
             for fn in probe.functions:
                 count = count + 1
                 if ProbeType.SYSTEM == probe.type:
-                    text = collector.sys_functions
+                    if fn.custom:
+                        text = collector.custom_sys_functions
+                    else:
+                        text = collector.generic_sys_functions
                 else:
-                    text = collector.functions
+                    if fn.custom:
+                        text = collector.custom_functions
+                    else:
+                        text = collector.generic_functions
                 text = text.replace("DFCAT", probe.category)
                 text = text.replace("DFFUNCTION", fn.name)
                 text = text.replace("DFEVENTID", str(count))
