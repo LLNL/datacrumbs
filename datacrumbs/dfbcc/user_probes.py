@@ -28,7 +28,8 @@ class UserProbes:
                 link = obj["link"]
                 reader = CorpusReader(link)
                 symbols_dict = reader.get_symbols()
-                symbols_dict = {k: v for k, v in symbols_dict.items() if v.get("type") == "FUNC"}
+                self.config.tool_logger.info(f"{symbols_dict}")
+                symbols_dict = {k: v for k, v in symbols_dict.items() if v.get("type") == "FUNC" and v.get("defined") != "UND" and v.get("binding") != "WEAK"}
                 symbols = symbols_dict.keys()
                 for symbol in tqdm(symbols, desc=f"User symbols for {key}"):
                     if (symbol or symbol != "") and pattern.match(symbol):
