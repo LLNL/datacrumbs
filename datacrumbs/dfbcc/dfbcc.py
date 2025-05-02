@@ -61,6 +61,7 @@ class BCCMain:
             collector = BCCTraceCollector()
             bpf_text += str(BCCTraceHeader())
         bpf_text += str(app_connector)
+        bpf_text += str(collector)
         io_probes = IOProbes(generate_probes=self.config.generate_probes)
         count = 0
         probe_text, self.category_fn_map, count = io_probes.collector_fn(
@@ -85,6 +86,11 @@ class BCCMain:
         f = open(f"{self.filename}", "w")
         f.write(bpf_text)
         f.close()
+        # Format the C code using clang-format
+        formatted_filename = f"{self.filename}.formatted"
+        os.system(f"clang-format -i {self.filename}")
+        os.rename(self.filename, formatted_filename)
+        os.rename(formatted_filename, self.filename)
         self.config.tool_logger.info(f"Wrote program into {self.filename}")
         return self
     
@@ -329,6 +335,7 @@ class BCCMain:
         event_tuple = self.category_fn_map[c_event.event_id]
         event.cat = event_tuple[0]
         function_probe = event_tuple[1]
+        # self.config.tool_logger.info(f"{c_event.ip} IP processed for {function_probe.name}")
         event.args = {}
         event.pid = ctypes.c_uint32(c_event.id).value
         event.tid = ctypes.c_uint32(c_event.id >> 32).value
@@ -376,6 +383,7 @@ class BCCMain:
         event_tuple = self.category_fn_map[str(c_event.event_id)]
         event.cat = event_tuple[0]
         function_probe = event_tuple[1]
+        # self.config.tool_logger.info(f"{c_event.ip} IP processed for {function_probe.name}")
         event.args = {}
         event.pid = ctypes.c_uint32(c_event.id).value
         event.tid = ctypes.c_uint32(c_event.id >> 32).value

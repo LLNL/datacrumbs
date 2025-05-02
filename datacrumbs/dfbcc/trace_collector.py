@@ -14,7 +14,7 @@ class BCCTraceCollector(BCCCollector):
             struct DFCAT_DFFUNCTION_event_t *stats_key = &stats_key_v;
             stats_key->id = id;
             stats_key->event_id = DFEVENTID;
-            stats_key->ip = DFEVENTID;
+            stats_key->ip = PT_REGS_IP(ctx);
         """
         
         self.stats_value_create = """            
@@ -31,7 +31,6 @@ class BCCTraceCollector(BCCCollector):
             self.stats_submit = """
                 events.ringbuf_output(&stats_key_v, sizeof(struct DFCAT_DFFUNCTION_event_t), 0);
             """
-        
         self.event_specific_struct = """
             struct DFCAT_DFFUNCTION_event_t {                                                       
             u64 id;
@@ -45,8 +44,34 @@ class BCCTraceCollector(BCCCollector):
         """
         self.stats_clean = """
         """
+        self.common_generic_functions = self.common_generic_functions.replace(
+            "DFCAPTUREEVENTKEY", self.stats_key_create
+        ).replace(
+            "DFCAPTUREEVENTVALUE", self.stats_value_create
+        ).replace(
+            "DFSUBMITEVENT", self.stats_submit
+        ).replace(
+            "DFEVENTSTRUCT", ""
+        ).replace(
+            "DFEXITSTATSCLEAN", self.stats_clean
+        ).replace(
+            "DFCAT_DFFUNCTION", "general"
+        ).replace(
+            "DFEVENTID", "event_id"
+        )
+        self.generic_sys_functions = self.generic_sys_functions.replace(
+            "DFCAPTUREEVENTKEY", self.stats_key_create
+        ).replace(
+            "DFCAPTUREEVENTVALUE", self.stats_value_create
+        ).replace(
+            "DFSUBMITEVENT", self.stats_submit
+        ).replace(
+            "DFEVENTSTRUCT", ""
+        ).replace(
+            "DFEXITSTATSCLEAN", self.stats_clean
+        )
         
-        self.sys_functions = self.sys_functions.replace(
+        self.custom_sys_functions = self.custom_sys_functions.replace(
             "DFCAPTUREEVENTKEY", self.stats_key_create
         ).replace(
             "DFCAPTUREEVENTVALUE", self.stats_value_create
@@ -57,8 +82,18 @@ class BCCTraceCollector(BCCCollector):
         ).replace(
             "DFEXITSTATSCLEAN", self.stats_clean
         )
-        
-        self.functions = self.functions.replace(
+        self.generic_functions = self.generic_functions.replace(
+            "DFCAPTUREEVENTKEY", self.stats_key_create
+        ).replace(
+            "DFCAPTUREEVENTVALUE", self.stats_value_create
+        ).replace(
+            "DFSUBMITEVENT", self.stats_submit
+        ).replace(
+            "DFEVENTSTRUCT", ""
+        ).replace(
+            "DFEXITSTATSCLEAN", self.stats_clean
+        )
+        self.custom_functions = self.custom_functions.replace(
             "DFCAPTUREEVENTKEY", self.stats_key_create
         ).replace(
             "DFCAPTUREEVENTVALUE", self.stats_value_create
@@ -69,3 +104,6 @@ class BCCTraceCollector(BCCCollector):
         ).replace(
             "DFEXITSTATSCLEAN", self.stats_clean
         )
+
+    def __str__(self) -> str:
+        return self.common_generic_functions

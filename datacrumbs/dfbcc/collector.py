@@ -29,8 +29,48 @@ class BCCCollector(ABC):
             if (fn == 0) return 0; // missed entry
         """
         
+        self.common_generic_functions = """
+            static int generic_entry(struct pt_regs *ctx, u64 event_id) {
+                DFFILTERPID
+                DFFNENTRY
+                return 0;
+            }
+            static int generic_exit(struct pt_regs *ctx, u64 event_id) {
+                DFFILTERPID
+                DFFNLOOKUP            
+                DFCAPTUREEVENTKEY
+                DFCAPTUREEVENTVALUE
+                DFSUBMITEVENT
+                DFEXITSTATSCLEAN
+                return 0;
+            }
+        """.replace(
+            "DFFILTERPID", self.filter_pid
+        ).replace(
+            "DFFNENTRY", self.capture_entry_fn
+        ).replace(
+            "DFFNLOOKUP", self.lookup_fn
+        ).replace(
+            "DFEVENTID", "event_id"
+        )
         
-        self.sys_functions = """
+        self.generic_sys_functions = """
+            int syscall__trace_entry_DFFUNCTION(struct pt_regs *ctx) {
+                return generic_entry(ctx, DFEVENTID);
+            }
+            int sys__trace_exit_DFFUNCTION(struct pt_regs *ctx) {
+                return generic_exit(ctx, DFEVENTID);
+            }
+        """.replace(
+            "DFFILTERPID", self.filter_pid
+        ).replace(
+            "DFFNENTRY", self.capture_entry_fn
+        ).replace(
+            "DFFNLOOKUP", self.lookup_fn
+        )
+        
+        
+        self.custom_sys_functions = """
         DFEVENTSTRUCT
         int syscall__trace_entry_DFFUNCTION(struct pt_regs *ctx DFENTRYARGS) {
             DFFILTERPID
@@ -57,7 +97,23 @@ class BCCCollector(ABC):
         ).replace(
             "DFFNLOOKUP", self.lookup_fn
         )
-        self.functions = """
+        
+        self.generic_functions = """
+            int trace_DFCAT_DFFUNCTION_entry(struct pt_regs *ctx) {
+                return generic_entry(ctx, DFEVENTID);
+            }
+            int trace_DFCAT_DFFUNCTION_exit(struct pt_regs *ctx) {
+                return generic_exit(ctx, DFEVENTID);
+            }
+        """.replace(
+            "DFFILTERPID", self.filter_pid
+        ).replace(
+            "DFFNENTRY", self.capture_entry_fn
+        ).replace(
+            "DFFNLOOKUP", self.lookup_fn
+        )
+        
+        self.custom_functions = """
         
         DFEVENTSTRUCT
         
