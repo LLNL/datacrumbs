@@ -79,7 +79,7 @@ class ConfigurationManager:
         """
 
         parser = argparse.ArgumentParser(description="Configuration Manager")
-        parser.add_argument("--module", type=str, help="Module name.  That is picked from datacrumbs/configs/module")
+        parser.add_argument("--module", type=str, help="Module name.  That is picked from datacrumbs/configs/module", default="default")
         parser.add_argument("--install_dir", type=str, default=os.path.join(self.project_root, "build"), help="Installation directory (default: project_root/build)")
         parser.add_argument("--mode", type=str, choices=[e.value for e in Mode], default=Mode.TRACE.value, help="Mode of operation")
         parser.add_argument(
@@ -140,6 +140,26 @@ class ConfigurationManager:
         for key, value in config_values.items():
             self.tool_logger.info(f"{key}: {value}")
     
+    def validate_config(self):
+        """
+        Validate that all required configuration variables are set and not None.
+        """
+        required_fields = [
+            "module",
+            "install_dir",
+            "profile_file",
+            "mode",
+            "interval_sec",
+            "trace_type",
+            "io_probes_file",
+            "function_file",
+            "user_probes_file",
+            "category_fn_map",
+        ]
+        for field in required_fields:
+            if getattr(self, field, None) is None:
+                raise ValueError(f"Configuration validation failed: '{field}' is not set.")
+        self.tool_logger.info("Configuration validation passed successfully.")
     def load_and_override(self):
         """
         Load configuration from a YAML file and override it with command-line arguments.
@@ -153,30 +173,12 @@ class ConfigurationManager:
         try:
             os.remove(args.log_file)
         except OSError:
-            pass
+            pass        
         self.tool_logger = self.setup_logger("tool", args.log_file, "%(asctime)s [%(levelname)s]: %(message)s in %(pathname)s:%(lineno)d", level=args.log_level)
+        self.validate_config()
         self.tool_logger.info("Configuration loaded and overridden successfully.")
         self.pretty_print_config()
-        def validate_config(self):
-            """
-            Validate that all required configuration variables are set and not None.
-            """
-            required_fields = [
-                "module",
-                "install_dir",
-                "profile_file",
-                "mode",
-                "interval_sec",
-                "trace_type",
-                "io_probes_file",
-                "function_file",
-                "user_probes_file",
-                "category_fn_map",
-            ]
-            for field in required_fields:
-                if getattr(self, field, None) is None:
-                    raise ValueError(f"Configuration validation failed: '{field}' is not set.")
-            self.tool_logger.info("Configuration validation passed successfully.")
+        return self
     
     def load(self, config):
         if "name" in config:
