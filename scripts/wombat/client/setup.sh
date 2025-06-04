@@ -19,8 +19,4 @@ spack load gcc@13.2.0
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Activating datacrumbs environment"
 source ${DATACRUMBS_INSTALL_DIR}/bin/activate
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Setting ulimit and BCC_PROBE_LIMIT"
-ulimit -n 1048576
-export BCC_PROBE_LIMIT=1048576
-
 echo "$(date '+%Y-%m-%d %H:%M:%S') - setup.sh completed"

@@ -75,3 +75,23 @@ popd
 popd
 cp -r ${BCC_HOME}/build/src/python/bcc-python3/bcc/* ${DATACRUMBS_INSTALL_DIR}/lib/python3.12/site-packages/bcc/
 ```
+
+## Running the tool
+
+### Starting Server
+
+```bash
+export DATACRUMBS_DIR=/proj/csc671/proj_shared/datacrumbs
+source ${DATACRUMBS_DIR}/scripts/wombat/server/setup.sh
+source ${DATACRUMBS_DIR}/scripts/wombat/server/init.sh
+source ${DATACRUMBS_DIR}/scripts/wombat/server/run.sh
+```
+
+### Running Simple Test
+
+```bash
+export DATACRUMBS_DIR=/proj/csc671/proj_shared/datacrumbs
+export DATACRUMBS_INSTALL_DIR=/proj/csc671/proj_shared/datacrumbs/install
+source ${DATACRUMBS_DIR}/scripts/wombat/client/setup.sh
+source ${DATACRUMBS_DIR}/scripts/wombat/client/tests/test_posix.sh
+```
