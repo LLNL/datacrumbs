@@ -49,6 +49,7 @@ __pycache__
 venv
 .venv
 dependency
+install 
 
 # Data
 *.pfw
