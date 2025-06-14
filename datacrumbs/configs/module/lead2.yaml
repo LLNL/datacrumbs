@@ -3,9 +3,15 @@ install_dir: /proj/csc671/proj_shared/datacrumbs/install
 mode: trace
 file: logs/wombat-trace.pfw
 system:
+  - name: sys
+    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/syscalls.h
+    regex: ^(?!__).*
   - name: os_page_cache
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/pagemap.h
-    regex: .*
+    regex: ^(?!__).*
+  - name: swap
+    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
+    regex: ^(?!__).*
   # - name: vfs
   #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fs.h
   #   regex: .*
@@ -24,9 +30,9 @@ system:
   # - name: aio
   #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/aio.h
   #   regex: .*
-  # - name: mm
-  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/mm.h
-  #   regex: .*
+  - name: mm
+    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/mm.h
+    regex: ^(?!__).*
 # io:
 #   - name: libc
 #     link: /usr/lib64/libc.so.6
@@ -40,7 +46,7 @@ system:
 user:
   - name: test_posix
     link: /home/haridev/datacrumbs/install/libexec/datacrumbs/bin/df_tracer_test
-    regex: .*
+    regex: ^(?!__).*
 profile:
   interval_sec: 0.0001
 

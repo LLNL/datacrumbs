@@ -142,7 +142,7 @@ class ConfigurationManager:
         }
         self.tool_logger.info("Final Configuration Values:")
         for key, value in config_values.items():
-            self.tool_logger.info(f"{key}: {value}")
+            self.tool_logger.info(f"\t{key}: {value}")
     
     def validate_config(self):
         """

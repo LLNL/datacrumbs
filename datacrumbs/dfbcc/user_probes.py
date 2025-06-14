@@ -37,7 +37,7 @@ class UserProbes:
                 self.probes.append(probe)
             probes_file = self.config.user_probes_file
             with open(probes_file, "w") as f:
-                json.dump([probe.to_dict() for probe in self.probes], f)
+                json.dump([probe.to_dict() for probe in self.probes], f, separators=(",", ":"))
             self.config.tool_logger.info(f"Probes generated and saved to {probes_file}")
         else:
             try:

@@ -32,6 +32,8 @@ class IOProbes:
                                 }
                             }
                             """
+            functions_added = set()
+            
             self.probes.append(
                 BCCProbes(
                     ProbeType.SYSTEM,
@@ -41,13 +43,13 @@ class IOProbes:
                             "openat",
                             entry_struct=[("uint64", "file_hash")],
                             entry_args=", int dfd, const char *filename, int flags",
-                            entry_cmd="""
+                            entry_cmd=r"""
                             struct filename_t fname_i;
                             u64 filename_len = sizeof(fname_i.fname);
                             int len = bpf_probe_read_user_str(&fname_i.fname, filename_len, filename);
-                            //fname_i.fname[len-1] = '\\0';
+                            //fname_i.fname[len-1] = '\0';
                             u64 filehash = get_hash(fname_i.fname, filename_len);
-                            bpf_trace_printk(\"Hash value is %d for filename \%s\",filehash,filename);
+                            bpf_trace_printk("Hash value is %d for filename %s",filehash,filename);
                             file_hash.update(&filehash, &fname_i);
                             latest_hash.update(&key, &filehash);
                             """,
@@ -108,14 +110,6 @@ class IOProbes:
                             """,
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
-                        self.get_bcc_function("copy_file_range"),
-                        self.get_bcc_function("execve"),
-                        self.get_bcc_function("execveat"),
-                        self.get_bcc_function("exit"),
-                        self.get_bcc_function(
-                            "faccessat"
-                        ),
-                        self.get_bcc_function("fcntl"),
                         self.get_bcc_function(
                             "fallocate",
                             entry_struct=[("uint64", "file_hash")],
@@ -149,8 +143,6 @@ class IOProbes:
                             """,
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
-                        self.get_bcc_function("fsopen"),
-                        self.get_bcc_function("fstatfs"),
                         self.get_bcc_function(
                             "fsync",
                             entry_struct=[("uint64", "file_hash")],
@@ -173,7 +165,6 @@ class IOProbes:
                             """,
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
-                        self.get_bcc_function("io_pgetevents"),
                         self.get_bcc_function(
                             "lseek",
                             entry_struct=[("uint64", "file_hash")],
@@ -185,11 +176,6 @@ class IOProbes:
                             """,
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
-                        self.get_bcc_function("memfd_create"),
-                        self.get_bcc_function("migrate_pages"),
-                        self.get_bcc_function("mlock"),
-                        self.get_bcc_function("mmap"),
-                        self.get_bcc_function("msync"),
                         self.get_bcc_function(
                             "pread64",                        
                             entry_struct=[("uint64", "file_hash")],                        
@@ -314,17 +300,6 @@ class IOProbes:
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
-                            "renameat"
-                        ),
-                        self.get_bcc_function(
-                            "renameat2"
-                        ),
-                        self.get_bcc_function("statfs"),
-                        self.get_bcc_function("statx"),
-                        self.get_bcc_function("sync"),
-                        self.get_bcc_function("sync_file_range"),
-                        self.get_bcc_function("syncfs"),
-                        self.get_bcc_function(
                             "writev",                        
                             entry_struct=[("uint64", "file_hash")],                        
                             exit_struct=[("uint64", "size_sum")],
@@ -342,13 +317,17 @@ class IOProbes:
                     ])),
                 )
             )
-            
+            for fn in self.probes[-1].functions:
+                if fn.name not in functions_added:
+                    functions_added.add(fn.name)
             for name, value in self.config.system_io_headers.items():
                 probe = BCCProbes(ProbeType.KERNEL, name, [])
                 functions = Functions(value["header"], value["regex"])
                 function_names = functions.get_function_names()
                 for fname in tqdm(function_names, desc=f"System I/O headers for {name}"):
-                    probe.functions.append(BCCFunctions(fname))
+                    if fname not in functions_added:
+                        probe.functions.append(BCCFunctions(fname))
+                        functions_added.add(fname)
                 self.probes.append(probe)
                 self.config.tool_logger.info(f"Added {len(probe.functions)} for system I/O probes: {name}")
                 
@@ -365,16 +344,17 @@ class IOProbes:
                 symbols = symbols_dict.keys()
                 for symbol in tqdm(symbols, desc=f"User symbols for {name}"):
                     if (symbol or symbol != "") and pattern.match(symbol):
-                        probe.functions.append(BCCFunctions(symbol))
-                        self.config.tool_logger.debug(f"Adding Probe function {symbol} from {name}")
+                        if fname not in functions_added:
+                            probe.functions.append(BCCFunctions(symbol))
+                            functions_added.add(fname)
+                            self.config.tool_logger.debug(f"Adding Probe function {symbol} from {name}")
                 self.probes.append(probe)
                 self.config.tool_logger.info(f"Added {len(probe.functions)} for I/O probes: {name}")
-            
-            total_functions = sum(len(probe.functions) for probe in self.probes)            
-            self.config.tool_logger.info(f"Added {total_functions} I/O probes")
+                    
+            self.config.tool_logger.info(f"Added {len(functions_added)} I/O probes")
             io_probes_file = self.config.io_probes_file
             with open(io_probes_file, "w") as f:
-                json.dump([probe.to_dict() for probe in self.probes], f)
+                json.dump([probe.to_dict() for probe in self.probes], f, separators=(",", ":"))
             self.config.tool_logger.info(f"Probes generated and saved to {io_probes_file}")
         else:
             try:
@@ -429,7 +409,7 @@ class IOProbes:
                 self.config.tool_logger.debug(f"Adding {line.decode()} to probe")
                 self.regex_functions.add(line.decode())
                 value = BPF.ksym(BPF.ksymname(line), show_module=True).decode()
-                value = list(filter(None, re.split('\]|\[| ', value)))
+                value = list(filter(None, re.split(r'\]|\[| ', value)))
                 function_name = value[0]
                 module = value[1]
                 if self.is_function_valid(function_name):

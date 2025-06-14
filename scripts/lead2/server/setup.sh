@@ -17,8 +17,8 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - Loading Spack packages"
 spack load llvm@19.1.7 hdf5@1.14.5 ior@4.0.0 openmpi@5.0.7 cmake@3.26.5
 spack load gcc@11.5.0
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Setting ulimit and BCC_PROBE_LIMIT"
-ulimit -n 1048576
-export BCC_PROBE_LIMIT=1048576
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Setting BCC_PROBE_LIMIT"
+# ulimit -n 1048576
+export BCC_PROBE_LIMIT=128000
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - setup.sh completed"

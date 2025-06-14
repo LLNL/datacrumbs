@@ -10,15 +10,20 @@ class Functions:
     def get_function_names(self):
         # Read the header file
         index = clang.cindex.Index.create()
-        tu = index.parse(self.header_file)
+        tu = index.parse(self.header_file, args=['-D__KERNEL__'],)
         functions = []
-        for node in tu.cursor.walk_preorder():
+        def visit(node):
+            # print(f"Visiting node: {node.spelling} ({node.kind})")
             if node.kind == clang.cindex.CursorKind.FUNCTION_DECL:
-                func_name = node.spelling
-                if self.regex is not None:
-                    if not re.match(self.regex, func_name):
-                        continue
+                if node.is_definition() or node.location.file and node.location.file.name == self.header_file:
+                    func_name = node.spelling
+                    if self.regex is not None:
+                        if not re.match(self.regex, func_name):
+                            return
                 functions.append(func_name)
+            for child in node.get_children():
+                visit(child)
+        visit(tu.cursor)
         return functions
     
 if __name__ == "__main__":
