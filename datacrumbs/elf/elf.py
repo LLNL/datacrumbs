@@ -9,7 +9,7 @@ Entries can be added as they are needed.
 """
 
 import sys
-
+import argparse
 
 class ElftoolsWrapper(object):
     """Create a wrapper to elftools that we can share to expose subfunctions."""
@@ -27,6 +27,7 @@ class ElftoolsWrapper(object):
         from elftools.dwarf import descriptions as dwarf
         from elftools.dwarf import locationlists as locationlists
         from elftools.common import exceptions as exceptions
+
 
         self.dynamic = dynamic
         self.descriptions = descriptions
@@ -319,3 +320,23 @@ class CorpusReader(et.elffile.ELFFile):  # noqa
                     tags["soname"] = tag.soname
 
             return tags
+        
+def main():
+    parser = argparse.ArgumentParser(description="Test get_symbols from CorpusReader.")
+    parser.add_argument("elf_file", help="Path to ELF file")
+    args = parser.parse_args()
+
+    reader = CorpusReader(args.elf_file)
+    if reader.elffile is None:
+        print("Failed to open ELF file.")
+        return
+
+    symbols = reader.get_symbols()
+    for name, info in symbols.items():
+        print(f"Symbol: {name}")
+        for key, value in info.items():
+            print(f"  {key}: {value}")
+        print()
+
+if __name__ == "__main__":
+    main()

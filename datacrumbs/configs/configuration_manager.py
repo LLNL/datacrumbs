@@ -17,6 +17,8 @@ class ConfigurationManager:
     project_root: str
     # Configuration variables
     user_libraries: Dict[str, str] = {}
+    io_libraries: Dict[str, str] = {}
+    system_io_headers: Dict[str, str] = {}
     interval_sec: float
     module: str = "default"
     install_dir: str
@@ -131,6 +133,8 @@ class ConfigurationManager:
             "interval_sec": self.interval_sec,
             "trace_type": self.trace_type.name if self.trace_type else None,
             "user_libraries": self.user_libraries,
+            "io_libraries": self.io_libraries,
+            "system_io_headers": self.system_io_headers,
             "io_probes_file": self.io_probes_file,
             "function_file": getattr(self, "function_file", None),
             "user_probes_file": getattr(self, "user_probes_file", None),
@@ -196,6 +200,12 @@ class ConfigurationManager:
         if "user" in config:
             for obj in config["user"]:
                 self.user_libraries[obj["name"]] = obj
+        if "io" in config:
+            for obj in config["io"]:
+                self.io_libraries[obj["name"]] = obj
+        if "system" in config:
+            for obj in config["system"]:
+                self.system_io_headers[obj["name"]] = obj
         if "profile" in config:
             if "interval_sec" in config["profile"]:
                 status, self.interval_sec = convert_or_fail(

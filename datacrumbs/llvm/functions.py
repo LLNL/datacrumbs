@@ -1,0 +1,38 @@
+import clang.cindex
+import sys
+import re
+
+class Functions:
+    def __init__(self, header_file, regex=None):
+        self.header_file = header_file
+        self.regex = regex
+
+    def get_function_names(self):
+        # Read the header file
+        index = clang.cindex.Index.create()
+        tu = index.parse(self.header_file)
+        functions = []
+        for node in tu.cursor.walk_preorder():
+            if node.kind == clang.cindex.CursorKind.FUNCTION_DECL:
+                func_name = node.spelling
+                if self.regex is not None:
+                    if not re.match(self.regex, func_name):
+                        continue
+                functions.append(func_name)
+        return functions
+    
+if __name__ == "__main__":
+
+    regex = None
+    if len(sys.argv) < 2:
+        print(f"Usage: {sys.argv[0]} <header_file> <regex>")
+        sys.exit(1)
+    if len(sys.argv) == 3:
+        regex = sys.argv[2]
+    header_file = sys.argv[1]
+    functions = Functions(header_file, regex)
+    function_names = functions.get_function_names()
+
+    print("Function names found:")
+    for name in function_names:
+        print(name)

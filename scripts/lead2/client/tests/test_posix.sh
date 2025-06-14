@@ -39,7 +39,7 @@ do
   if [ "$TEST_CASE" -eq "1" ] || [ "$TEST_CASE" -eq "2" ]; then
     sleep 5
     echo "$(date '+%Y-%m-%d %H:%M:%S') Starting read test: NUM_FILES=${NUM_FILES}, NUM_OPS=${NUM_OPS}, TS=${TS}, DATA_DIR=${DATA_DIR}, DIRECTIO=${DIRECTIO}"
-    cmd=( ${PROJECT_DIR}/libexec/datacrumbs/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 1 ${DIRECTIO})
+    cmd=( ${DATACRUMBS_INSTALL_DIR}/libexec/datacrumbs/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 1 ${DIRECTIO})
     echo "${cmd[@]}"
     LD_PRELOAD=${DATACRUMBS_SO} "${cmd[@]}"
     echo "$(date '+%Y-%m-%d %H:%M:%S') Finished read test"

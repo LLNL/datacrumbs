@@ -2,13 +2,12 @@ from typing import *
 import os
 import re
 import json
-from bcc import BPF
 from tqdm import tqdm
 from datacrumbs.dfbcc.collector import BCCCollector
 from datacrumbs.dfbcc.probes import BCCFunctions, BCCProbes
 from datacrumbs.common.enumerations import ProbeType
 from datacrumbs.configs.configuration_manager import ConfigurationManager
-from datacrumbs.dfbcc.elf import CorpusReader
+from datacrumbs.elf.elf import CorpusReader
 
 class UserProbes:
     config: ConfigurationManager
@@ -28,7 +27,6 @@ class UserProbes:
                 link = obj["link"]
                 reader = CorpusReader(link)
                 symbols_dict = reader.get_symbols()
-                self.config.tool_logger.info(f"{symbols_dict}")
                 symbols_dict = {k: v for k, v in symbols_dict.items() if v.get("type") == "FUNC" and v.get("defined") != "UND" and v.get("binding") != "WEAK"}
                 symbols = symbols_dict.keys()
                 for symbol in tqdm(symbols, desc=f"User symbols for {key}"):
@@ -80,7 +78,7 @@ class UserProbes:
 
         return (bpf_text, category_fn_map, count)
 
-    def attach_probes(self, bpf: BPF) -> None:
+    def attach_probes(self, bpf) -> None:
         self.config.tool_logger.info("Attaching probe for User Probes")
         for probe in tqdm(self.probes, "attach User probes"):
             for fn in tqdm(probe.functions, "attach User functions"):

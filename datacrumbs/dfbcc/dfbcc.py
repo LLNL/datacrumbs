@@ -8,9 +8,6 @@ import psutil
 import math
 import concurrent.futures
 from tqdm import tqdm
-# External Imports
-from bcc import BPF
-from bcc.utils import printb
 
 # Internal Imports
 from datacrumbs.dfbcc.app_connector import BCCApplicationConnector
@@ -95,6 +92,9 @@ class BCCMain:
         return self
     
     def load(self):
+        # External Imports
+        from bcc import BPF
+        from bcc.utils import printb
         if os.path.exists(self.category_fn_map_file):
             with open(self.category_fn_map_file, "r") as json_file:
                 self.category_fn_map = {key: (value[0], BCCFunctions.from_dict(value[1])) for key, value in json.load(json_file).items()}

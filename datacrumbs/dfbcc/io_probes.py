@@ -2,12 +2,12 @@ from typing import *
 import re
 import json
 from tqdm import tqdm
-from bcc import BPF
 from datacrumbs.dfbcc.collector import BCCCollector
 from datacrumbs.dfbcc.probes import BCCFunctions, BCCProbes
 from datacrumbs.common.enumerations import ProbeType
 from datacrumbs.configs.configuration_manager import ConfigurationManager
-
+from datacrumbs.elf.elf import CorpusReader
+from datacrumbs.llvm.functions import Functions
 
 class IOProbes:
     config: ConfigurationManager
@@ -342,71 +342,36 @@ class IOProbes:
                     ])),
                 )
             )
-            self.probes.append(
-                BCCProbes(
-                    ProbeType.USER,
-                    "c",
-                    list(filter(None, [
-                        self.get_bcc_function("fopen"),
-                        self.get_bcc_function("fopen64"),
-                        self.get_bcc_function("fclose"),
-                        self.get_bcc_function("fread"),
-                        self.get_bcc_function("fwrite"),
-                        self.get_bcc_function("ftell"),
-                        self.get_bcc_function("fseek"),
-                        self.get_bcc_function("open"),
-                        self.get_bcc_function("open64"),
-                        self.get_bcc_function("creat"),
-                        self.get_bcc_function("creat64"),
-                        self.get_bcc_function("close_range"),
-                        self.get_bcc_function("closefrom"),
-                        self.get_bcc_function("close"),
-                        self.get_bcc_function("read"),
-                        self.get_bcc_function("pread"),
-                        self.get_bcc_function("pread64"),
-                        self.get_bcc_function("write"),
-                        self.get_bcc_function("pwrite"),
-                        self.get_bcc_function("pwrite64"),
-                        self.get_bcc_function("lseek"),
-                        self.get_bcc_function("lseek64"),
-                        self.get_bcc_function("fdopen"),
-                        self.get_bcc_function("fileno"),
-                        self.get_bcc_function("fileno_unlocked"),
-                        self.get_bcc_function("mmap"),
-                        self.get_bcc_function("mmap64"),
-                        self.get_bcc_function("munmap"),
-                        self.get_bcc_function("msync"),
-                        self.get_bcc_function("mremap"),
-                        self.get_bcc_function("madvise"),
-                        self.get_bcc_function("shm_open"),
-                        self.get_bcc_function("shm_unlink"),
-                        self.get_bcc_function("memfd_create"),
-                        self.get_bcc_function("fsync"),
-                        self.get_bcc_function("fdatasync"),
-                        self.get_bcc_function("fcntl"),
-                        self.get_bcc_function("posix_memalign"),
-                        self.get_bcc_function("valloc"),
-                        self.get_bcc_function("memalign"),
-                        self.get_bcc_function("pvalloc"),
-                        self.get_bcc_function("aligned_alloc"),
-                    ])),
-                )
-            )
             
-            self.probes.extend(self.get_bcc_functions(b".*page.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*lru.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*swap.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*buffer.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*nr.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*map.*"))
-            self.probes.extend(self.get_bcc_functions(b".*bio.*"))
-            self.probes.extend(self.get_bcc_functions(b".*aio.*"))
-            self.probes.extend(self.get_bcc_functions(b".*ext4.*"))
-            self.probes.extend(self.get_bcc_functions(b".*vfs.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*llseek.*"))
-            self.probes.extend(self.get_bcc_functions(b".*file.*"))
-            self.probes.extend(self.get_bcc_functions(b".*block.*"))
-            self.config.tool_logger.info(f"Added {len(self.regex_functions)} I/O probes")
+            for name, value in self.config.system_io_headers.items():
+                probe = BCCProbes(ProbeType.KERNEL, name, [])
+                functions = Functions(value["header"], value["regex"])
+                function_names = functions.get_function_names()
+                for fname in tqdm(function_names, desc=f"System I/O headers for {name}"):
+                    probe.functions.append(BCCFunctions(fname))
+                self.probes.append(probe)
+                self.config.tool_logger.info(f"Added {len(probe.functions)} for system I/O probes: {name}")
+                
+            for name, value in self.config.io_libraries.items():
+                probe = BCCProbes(ProbeType.USER, name, [])
+                if "regex" not in value:
+                    pattern = re.compile(".*")
+                else:
+                    pattern = re.compile(value["regex"])
+                link = value["link"]
+                reader = CorpusReader(link)
+                symbols_dict = reader.get_symbols()
+                symbols_dict = {k: v for k, v in symbols_dict.items() if v.get("type") == "FUNC" and v.get("defined") != "UND" and v.get("binding") != "WEAK"}
+                symbols = symbols_dict.keys()
+                for symbol in tqdm(symbols, desc=f"User symbols for {name}"):
+                    if (symbol or symbol != "") and pattern.match(symbol):
+                        probe.functions.append(BCCFunctions(symbol))
+                        self.config.tool_logger.debug(f"Adding Probe function {symbol} from {name}")
+                self.probes.append(probe)
+                self.config.tool_logger.info(f"Added {len(probe.functions)} for I/O probes: {name}")
+            
+            total_functions = sum(len(probe.functions) for probe in self.probes)            
+            self.config.tool_logger.info(f"Added {total_functions} I/O probes")
             io_probes_file = self.config.io_probes_file
             with open(io_probes_file, "w") as f:
                 json.dump([probe.to_dict() for probe in self.probes], f)
@@ -454,6 +419,8 @@ class IOProbes:
         return  "." not in function_name and "$" not in function_name
 
     def get_bcc_functions(self, regex):
+        
+        from bcc import BPF
         matches = BPF.get_kprobe_functions(regex)
         probes = []
         bcc_list = {}
@@ -495,7 +462,7 @@ class IOProbes:
             return None
             
 
-    def attach_probes(self, bpf: BPF) -> None:
+    def attach_probes(self, bpf) -> None:
         self.config.tool_logger.info("Attaching I/O Probes")
         for probe in tqdm(self.probes, "attach I/O probes"):
             for fn in tqdm(probe.functions, "attach I/O functions"):

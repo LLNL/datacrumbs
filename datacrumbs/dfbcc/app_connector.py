@@ -1,4 +1,3 @@
-from bcc import BPF
 from datacrumbs.configs.configuration_manager import ConfigurationManager
 
 
@@ -34,7 +33,7 @@ class BCCApplicationConnector:
     def __str__(self) -> str:
         return self.functions
 
-    def attach_probe(self, bpf: BPF) -> None:
+    def attach_probe(self, bpf) -> None:
         self.config.tool_logger.info("Attaching probe for App Connector")
         bpf.add_module(f"{self.config.install_dir}/libdatacrumbs.so")
         bpf.attach_uprobe(

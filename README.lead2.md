@@ -65,7 +65,9 @@ spack view --verbose symlink ${DATACRUMBS_INSTALL_DIR} ior@4.0.0+hdf5 ^hdf5@1.14
 ### Starting Server
 
 ```bash
+sudo su
 
+export SPACK_DIR=/home/haridev/spack
 export DATACRUMBS_DIR=/home/haridev/datacrumbs
 export DATACRUMBS_INSTALL_DIR=/home/haridev/datacrumbs/install
 source ${DATACRUMBS_DIR}/scripts/lead2/server/setup.sh
@@ -76,6 +78,7 @@ source ${DATACRUMBS_DIR}/scripts/lead2/server/run.sh
 ### Running Simple Test
 
 ```bash
+export SPACK_DIR=/home/haridev/spack
 export DATACRUMBS_DIR=/home/haridev/datacrumbs
 export DATACRUMBS_INSTALL_DIR=/home/haridev/datacrumbs/install
 source ${DATACRUMBS_DIR}/scripts/wombat/client/setup.sh
