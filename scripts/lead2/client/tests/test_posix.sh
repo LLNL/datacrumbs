@@ -2,12 +2,12 @@
 
 DATACRUMBS_SO=${DATACRUMBS_INSTALL_DIR}/lib/libdatacrumbs.so
 echo "$(date '+%Y-%m-%d %H:%M:%S') DATACRUMBS_SO=${DATACRUMBS_SO}"
-DATA_DIR=${DATACRUMBS_DIR}/data
+DATA_DIR=/localdisk/haridev/data
 mkdir -p $DATA_DIR
 NUM_FILES=1
 NUM_OPS=$1
 if [ -z "$1" ]; then
-  NUM_OPS=1
+  NUM_OPS=128
 fi
 PROC=1
 DIRECTIO=0

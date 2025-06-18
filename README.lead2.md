@@ -62,6 +62,17 @@ spack view --verbose symlink ${DATACRUMBS_INSTALL_DIR} ior@4.0.0+hdf5 ^hdf5@1.14
 
 ## Running the tool
 
+### Generating Probes
+
+```bash
+export SPACK_DIR=/home/haridev/spack
+export DATACRUMBS_DIR=/home/haridev/datacrumbs
+export DATACRUMBS_INSTALL_DIR=/home/haridev/datacrumbs/install
+source ${DATACRUMBS_INSTALL_DIR}/bin/activate
+source ${DATACRUMBS_DIR}/scripts/lead2/server/setup.sh
+source ${DATACRUMBS_DIR}/scripts/lead2/server/init.sh -g
+```
+
 ### Starting Server
 
 ```bash

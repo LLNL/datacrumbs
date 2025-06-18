@@ -73,6 +73,7 @@ class BCCMain:
         # Store self.category_fn_map into a JSON file
         with open(self.category_fn_map_file, "w") as json_file:
             json.dump({key: (value[0], value[1].to_dict()) for key, value in self.category_fn_map.items()}, json_file, separators=(",", ":"))
+        self.config.tool_logger.info(f"Total functions probed: {len(self.category_fn_map)}")
         bpf_text += probe_text
         # bpf_text += str(collector)
         bpf_text = bpf_text.replace(

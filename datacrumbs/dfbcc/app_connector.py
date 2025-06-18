@@ -35,14 +35,14 @@ class BCCApplicationConnector:
 
     def attach_probe(self, bpf) -> None:
         self.config.tool_logger.info("Attaching probe for App Connector")
-        bpf.add_module(f"{self.config.install_dir}/libdatacrumbs.so")
+        bpf.add_module(f"{self.config.install_dir}/lib/libdatacrumbs.so")
         bpf.attach_uprobe(
-            name=f"{self.config.install_dir}/libdatacrumbs.so",
+            name=f"{self.config.install_dir}/lib/libdatacrumbs.so",
             sym="datacrumbs_start",
             fn_name="trace_datacrumbs_start",
         )
         bpf.attach_uprobe(
-            name=f"{self.config.install_dir}/libdatacrumbs.so",
+            name=f"{self.config.install_dir}/lib/libdatacrumbs.so",
             sym="datacrumbs_stop",
             fn_name="trace_datacrumbs_stop",
         )

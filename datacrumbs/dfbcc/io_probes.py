@@ -9,6 +9,29 @@ from datacrumbs.configs.configuration_manager import ConfigurationManager
 from datacrumbs.elf.elf import CorpusReader
 from datacrumbs.llvm.functions import Functions
 
+def is_function_valid(function_name):
+    return "." not in function_name and "$" not in function_name
+
+def get_bcc_functions(regex):        
+    from bcc import BPF
+    matches = BPF.get_kprobe_functions(regex)
+    functions = set()
+    for line in tqdm(matches, desc=f"Matching for {regex}"):
+        if is_function_valid(line.decode()):
+            functions.add(line.decode())
+    return functions
+
+def update_functions(filename, cat, functions):
+    with open(filename, "r") as f:
+        loaded_probes = json.load(f)
+        probes = [BCCProbes.from_dict(probe) for probe in loaded_probes]
+    probe = BCCProbes(ProbeType.KERNEL, cat, [])
+    for fname in functions:
+        probe.functions.append(BCCFunctions(fname))
+    probes.append(probe)
+    with open(filename, "w") as f:
+        json.dump([probe.to_dict() for probe in probes], f, separators=(",", ":"))
+
 class IOProbes:
     config: ConfigurationManager
     probes: List[BCCProbes]
@@ -321,20 +344,28 @@ class IOProbes:
                 if fn.name not in functions_added:
                     functions_added.add(fn.name)
             for name, value in self.config.system_io_headers.items():
+                if "regex" not in value:
+                    pattern = re.compile("^(?!__).*")
+                else:
+                    pattern = re.compile(value["regex"])
                 probe = BCCProbes(ProbeType.KERNEL, name, [])
-                functions = Functions(value["header"], value["regex"])
-                function_names = functions.get_function_names()
+                if "header" in value:
+                    functions = Functions(value["header"], pattern)
+                    function_names = functions.get_function_names()
+                else:
+                    function_names = get_bcc_functions(value["regex"])
                 for fname in tqdm(function_names, desc=f"System I/O headers for {name}"):
                     if fname not in functions_added:
                         probe.functions.append(BCCFunctions(fname))
                         functions_added.add(fname)
+                    
                 self.probes.append(probe)
                 self.config.tool_logger.info(f"Added {len(probe.functions)} for system I/O probes: {name}")
                 
             for name, value in self.config.io_libraries.items():
                 probe = BCCProbes(ProbeType.USER, name, [])
                 if "regex" not in value:
-                    pattern = re.compile(".*")
+                    pattern = re.compile("^(?!__).*")
                 else:
                     pattern = re.compile(value["regex"])
                 link = value["link"]
@@ -344,9 +375,9 @@ class IOProbes:
                 symbols = symbols_dict.keys()
                 for symbol in tqdm(symbols, desc=f"User symbols for {name}"):
                     if (symbol or symbol != "") and pattern.match(symbol):
-                        if fname not in functions_added:
+                        if symbol not in functions_added:
                             probe.functions.append(BCCFunctions(symbol))
-                            functions_added.add(fname)
+                            functions_added.add(symbol)
                             self.config.tool_logger.debug(f"Adding Probe function {symbol} from {name}")
                 self.probes.append(probe)
                 self.config.tool_logger.info(f"Added {len(probe.functions)} for I/O probes: {name}")
@@ -395,32 +426,8 @@ class IOProbes:
                 bpf_text += text
 
         return (bpf_text, category_fn_map, count)
-    def is_function_valid(self, function_name):
-        return  "." not in function_name and "$" not in function_name
-
-    def get_bcc_functions(self, regex):
-        
-        from bcc import BPF
-        matches = BPF.get_kprobe_functions(regex)
-        probes = []
-        bcc_list = {}
-        for line in tqdm(matches, desc=f"Matching for {regex}"):
-            if line.decode() not in self.regex_functions and self.is_function_valid(line.decode()):
-                self.config.tool_logger.debug(f"Adding {line.decode()} to probe")
-                self.regex_functions.add(line.decode())
-                value = BPF.ksym(BPF.ksymname(line), show_module=True).decode()
-                value = list(filter(None, re.split(r'\]|\[| ', value)))
-                function_name = value[0]
-                module = value[1]
-                if self.is_function_valid(function_name):
-                    if module not in bcc_list:
-                        bcc_list[module] = []
-                    bcc_list[module].append(BCCFunctions(function_name))
-            else:
-                self.config.tool_logger.debug(f"Skipping {line.decode()} to probe")
-        for key, value in bcc_list.items():
-            probes.append(BCCProbes(ProbeType.KERNEL, key, value))
-        return probes
+    
+   
 
     def get_bcc_function(self, function_name,
         entry_struct: List[Tuple] = [],

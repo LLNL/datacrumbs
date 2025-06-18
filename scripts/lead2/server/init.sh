@@ -23,7 +23,7 @@ while getopts "gh" opt; do
 done
 
 if [ "$GEN_PROBES" = true ]; then
-    ${DATACRUMBS_DIR}/scripts/lead2/server/initialize_tool --module lead2 --generate_probes --log_file "${DATACRUMBS_DIR}/logs/lead2-init.log"
+    ${DATACRUMBS_DIR}/scripts/lead2/server/initialize_tool lead2 --generate_probes --log_file "${DATACRUMBS_DIR}/logs/lead2-init.log"
 else
-    ${DATACRUMBS_DIR}/scripts/lead2/server/initialize_tool --module lead2 --log_file "${DATACRUMBS_DIR}/logs/lead2-init.log"
+    ${DATACRUMBS_DIR}/scripts/lead2/server/initialize_tool lead2 --log_file "${DATACRUMBS_DIR}/logs/lead2-init.log"
 fi

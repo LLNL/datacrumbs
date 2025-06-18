@@ -1,4 +1,3 @@
-import clang.cindex
 import sys
 import re
 
@@ -8,6 +7,7 @@ class Functions:
         self.regex = regex
 
     def get_function_names(self):
+        import clang.cindex
         # Read the header file
         index = clang.cindex.Index.create()
         tu = index.parse(self.header_file, args=['-D__KERNEL__'],)
@@ -20,7 +20,7 @@ class Functions:
                     if self.regex is not None:
                         if not re.match(self.regex, func_name):
                             return
-                functions.append(func_name)
+                    functions.append(func_name)
             for child in node.get_children():
                 visit(child)
         visit(tu.cursor)

@@ -1,48 +1,33 @@
-name: wombat
-install_dir: /proj/csc671/proj_shared/datacrumbs/install
+name: lead2
+install_dir: /home/haridev/datacrumbs/install
 mode: trace
-file: logs/wombat-trace.pfw
+file: /localdisk/haridev/logs/lead2-trace.pfw
 system:
   - name: sys
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/syscalls.h
-    regex: ^(?!__).*
   - name: os_page_cache
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/pagemap.h
-    regex: ^(?!__).*
   - name: swap
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
-    regex: ^(?!__).*
-  # - name: vfs
-  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fs.h
-  #   regex: .*
-  # - name: btrfs
-  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/btrfs.h
-  #   regex: .*
-  # - name: bio
-  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/blkdev.h
-  #   regex: .*
-  # - name: shm
-  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
-  #   regex: .*
-  # - name: fscache
-  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fscache.h
-  #   regex: .*
-  # - name: aio
-  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/aio.h
-  #   regex: .*
+  - name: vfs
+    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fs.h
+  - name: bio
+    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/blkdev.h
+  - name: shm
+    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
+  - name: fscache
+    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fscache.h
   - name: mm
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/mm.h
-    regex: ^(?!__).*
-# io:
-#   - name: libc
-#     link: /usr/lib64/libc.so.6
-#     regex: .*
-#   - name: hdf5
-#     link: /home/haridev/datacrumbs/install/lib/libhdf5.so
-#     regex: .*
-#   - name: mpi
-#     link: /home/haridev/datacrumbs/install/lib/libmpi.so
-#     regex: .*
+  - name: xfs
+    regex: xfs.*
+io:
+  - name: libc
+    link: /usr/lib64/libc.so.6
+  # - name: hdf5
+  #   link: /home/haridev/datacrumbs/install/lib/libhdf5.so
+  # - name: mpi
+  #   link: /home/haridev/datacrumbs/install/lib/libmpi.so
 user:
   - name: test_posix
     link: /home/haridev/datacrumbs/install/libexec/datacrumbs/bin/df_tracer_test
