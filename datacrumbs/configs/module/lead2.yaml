@@ -1,7 +1,7 @@
 name: lead2
 install_dir: /home/haridev/datacrumbs/install
 mode: trace
-file: /localdisk/haridev/logs/lead2-trace.pfw
+file: /scratch/haridev/logs/lead2-trace.pfw
 system:
   - name: sys
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/syscalls.h
@@ -12,7 +12,7 @@ system:
   - name: vfs
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fs.h
   - name: bio
-    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/blkdev.h
+    regex: bio.*
   - name: shm
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
   - name: fscache

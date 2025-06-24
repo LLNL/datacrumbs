@@ -70,7 +70,7 @@ export DATACRUMBS_DIR=/home/haridev/datacrumbs
 export DATACRUMBS_INSTALL_DIR=/home/haridev/datacrumbs/install
 source ${DATACRUMBS_INSTALL_DIR}/bin/activate
 source ${DATACRUMBS_DIR}/scripts/lead2/server/setup.sh
-source ${DATACRUMBS_DIR}/scripts/lead2/server/init.sh -g
+${DATACRUMBS_DIR}/scripts/lead2/server/init.sh -g
 ```
 
 ### Starting Server
@@ -82,8 +82,8 @@ export SPACK_DIR=/home/haridev/spack
 export DATACRUMBS_DIR=/home/haridev/datacrumbs
 export DATACRUMBS_INSTALL_DIR=/home/haridev/datacrumbs/install
 source ${DATACRUMBS_DIR}/scripts/lead2/server/setup.sh
-source ${DATACRUMBS_DIR}/scripts/lead2/server/init.sh
-source ${DATACRUMBS_DIR}/scripts/lead2/server/run.sh
+${DATACRUMBS_DIR}/scripts/lead2/server/init.sh
+${DATACRUMBS_DIR}/scripts/lead2/server/run.sh
 ```
 
 ### Running Simple Test
@@ -92,6 +92,6 @@ source ${DATACRUMBS_DIR}/scripts/lead2/server/run.sh
 export SPACK_DIR=/home/haridev/spack
 export DATACRUMBS_DIR=/home/haridev/datacrumbs
 export DATACRUMBS_INSTALL_DIR=/home/haridev/datacrumbs/install
-source ${DATACRUMBS_DIR}/scripts/wombat/client/setup.sh
-source ${DATACRUMBS_DIR}/scripts/wombat/client/tests/test_posix.sh
+source ${DATACRUMBS_DIR}/scripts/lead2/client/setup.sh
+source ${DATACRUMBS_DIR}/scripts/lead2/client/tests/test_posix.sh
 ```

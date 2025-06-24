@@ -2,12 +2,22 @@ from enum import Enum
 
 
 class ProbeType(Enum):
-    SYSTEM = 0
-    KERNEL = 1
-    USER = 2
+    SYSTEM = "SYSTEM"
+    KERNEL = "KERNEL"
+    USER = "USER"
 
     def __str__(self):
         return self.value
+    
+    @staticmethod
+    def get_enum(value):
+        if ProbeType.SYSTEM.value == value:
+            return ProbeType.SYSTEM
+        elif ProbeType.KERNEL.value == value:
+            return ProbeType.KERNEL
+        elif ProbeType.USER.value == value:
+            return ProbeType.USER
+        return None
 
 class Mode(Enum):
     PROFILE = 'profile'

@@ -9,6 +9,7 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
+#include <sys/stat.h>
 
 class Timer {
 public:
@@ -54,18 +55,18 @@ int test_open(const char *filename, int flag) {
   }
   return fd;
 }
-int test_read(int fd, char *buf, int size) {
-  int bytes = read(fd, buf, size);
+ssize_t test_read(int fd, void *buf, ssize_t size) {
+  ssize_t bytes = read(fd, buf, size);
   if (bytes == -1) {
-    perror("read");
+      fprintf(stderr, "read : %s (errno: %d)\n", strerror(errno), errno);
     return -1;
   }
   return bytes;
 }
-int test_write(int fd, const char *buf, int size) {
-  int bytes = write(fd, buf, size);
+ssize_t test_write(int fd, const void *buf, ssize_t size) {
+  ssize_t bytes = write(fd, buf, size);
   if (bytes == -1) {
-    perror("write");
+      fprintf(stderr, "write on fd:%d of size:%ld failed with %ld: %s (errno: %d)\n",fd,size, bytes, strerror(errno), errno);
     return -1;
   }
   return bytes;
@@ -102,12 +103,31 @@ int main(int argc, char *argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
   int files = atoi(argv[1]);
   int ops = atoi(argv[2]);
-  int ts = atoi(argv[3]);
+  ssize_t ts = atol(argv[3]);
   std::string dir = std::string(argv[4]);
   int test_flag = atoi(argv[5]);
   int direct_io_flag = atoi(argv[6]);
-  std::string data = gen_random(ts);
-  char *read_data = (char *)malloc(ts);
+  struct stat st;
+  if (stat(dir.c_str(), &st) != 0) {
+    perror("stat");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  size_t alignment = st.st_blksize;
+  void *data_aligned = nullptr;
+  void *read_data_aligned = nullptr;
+  if (posix_memalign(&data_aligned, alignment, ts) != 0) {
+    perror("posix_memalign data");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  if (posix_memalign(&read_data_aligned, alignment, ts) != 0) {
+    perror("posix_memalign read_data");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  char *data = (char*)data_aligned;
+  char *read_data = (char*)read_data_aligned;
+  for (int i = 0; i < ts; ++i) {
+    ((char *)data)[i] = 'a' + (i % 26); // Fill with some data
+  }
   Timer open_timer = Timer();
   Timer write_timer = Timer();
   Timer read_timer = Timer();
@@ -146,6 +166,7 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Error opening file:%s %s (errno: %d)\n", filename.c_str(), strerror(errno), errno);
       assert(fd != -1);
     }
+    printf("Opened file: %s with fd: %d, ts: %zd\n", filename.c_str(), fd, ts);
     if (sleep_time > 0) {
       printf("Sleeping for %d\n", sleep_time);
       sleep(sleep_time);
@@ -158,7 +179,7 @@ int main(int argc, char *argv[]) {
       }
       if (test_flag == 0 || test_flag == 2) {
         write_timer.resumeTime();
-        assert(test_write(fd, data.c_str(), ts) == ts);
+        assert(test_write(fd, data, ts) == ts);
         write_timer.pauseTime();
       }
 

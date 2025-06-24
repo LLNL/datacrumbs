@@ -49,10 +49,13 @@ class ConfigurationManager:
         
 
     def derive(self):
+        data_path = f"{self.project_root}/datacrumbs/data/{self.module}"
+        os.makedirs(data_path, exist_ok=True)
+        os.chmod(data_path, 0o700)
         self.function_file = f"{self.project_root}/datacrumbs/configs/function.json"
-        self.io_probes_file = f"{self.project_root}/datacrumbs/data/io_probes_file.json"
-        self.user_probes_file = f"{self.project_root}/datacrumbs/data/user_probes_file.json"
-        self.category_fn_map = f"{self.project_root}/datacrumbs/data/category_fn_map.json"
+        self.io_probes_file = f"{self.project_root}/datacrumbs/data/{self.module}/io_probes_file.json"
+        self.user_probes_file = f"{self.project_root}/datacrumbs/data/{self.module}/user_probes_file.json"
+        self.category_fn_map = f"{self.project_root}/datacrumbs/data/{self.module}/category_fn_map.json"
     
     def load_from_yaml(self, yaml_file_name: str):
         """

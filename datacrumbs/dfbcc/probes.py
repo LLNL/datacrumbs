@@ -167,7 +167,7 @@ class BCCProbes:
             BCCFunctions.from_dict(func) for func in data.get("functions", [])
         ]
         return BCCProbes(
-            type=ProbeType[data["name"]],
+            type=ProbeType.get_enum(data["name"]),
             category=data["category"],
             functions=functions,
         )

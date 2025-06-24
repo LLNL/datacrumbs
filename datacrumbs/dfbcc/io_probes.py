@@ -1,6 +1,7 @@
 from typing import *
 import re
 import json
+import os
 from tqdm import tqdm
 from datacrumbs.dfbcc.collector import BCCCollector
 from datacrumbs.dfbcc.probes import BCCFunctions, BCCProbes
@@ -14,7 +15,7 @@ def is_function_valid(function_name):
 
 def get_bcc_functions(regex):        
     from bcc import BPF
-    matches = BPF.get_kprobe_functions(regex)
+    matches = BPF.get_kprobe_functions(bytes(f"{regex}", "utf-8"))
     functions = set()
     for line in tqdm(matches, desc=f"Matching for {regex}"):
         if is_function_valid(line.decode()):
@@ -348,7 +349,10 @@ class IOProbes:
                     pattern = re.compile("^(?!__).*")
                 else:
                     pattern = re.compile(value["regex"])
-                probe = BCCProbes(ProbeType.KERNEL, name, [])
+                if name == "sys":
+                    probe = BCCProbes(ProbeType.SYSTEM, name, [])
+                else:
+                    probe = BCCProbes(ProbeType.KERNEL, name, [])
                 if "header" in value:
                     functions = Functions(value["header"], pattern)
                     function_names = functions.get_function_names()
@@ -383,19 +387,18 @@ class IOProbes:
                 self.config.tool_logger.info(f"Added {len(probe.functions)} for I/O probes: {name}")
                     
             self.config.tool_logger.info(f"Added {len(functions_added)} I/O probes")
-            io_probes_file = self.config.io_probes_file
-            with open(io_probes_file, "w") as f:
+            with open(self.config.io_probes_file, "w") as f:
                 json.dump([probe.to_dict() for probe in self.probes], f, separators=(",", ":"))
-            self.config.tool_logger.info(f"Probes generated and saved to {io_probes_file}")
+            os.chmod(self.config.io_probes_file, 0o777)
+            self.config.tool_logger.info(f"Probes generated and saved to {self.config.io_probes_file}")
         else:
             try:
-                io_probes_file = self.config.io_probes_file
-                with open(io_probes_file, "r") as f:
+                with open(self.config.io_probes_file, "r") as f:
                     loaded_probes = json.load(f)
                     self.probes = [BCCProbes.from_dict(probe) for probe in loaded_probes]
-                self.config.tool_logger.info(f"Probes loaded from {io_probes_file}")
+                self.config.tool_logger.info(f"Probes loaded from {self.config.io_probes_file}")
             except FileNotFoundError:
-                self.config.tool_logger.error(f"Probes file {io_probes_file} not found")
+                self.config.tool_logger.error(f"Probes file {self.config.io_probes_file} not found")
         
 
     def collector_fn(self, collector: BCCCollector, category_fn_map, count: int):

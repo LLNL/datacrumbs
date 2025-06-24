@@ -35,19 +35,18 @@ class UserProbes:
                         num_symbols += 1
                         self.config.tool_logger.debug(f"Adding Probe function {symbol} from {key}")
                 self.probes.append(probe)
-            probes_file = self.config.user_probes_file
-            with open(probes_file, "w") as f:
+            with open(self.config.user_probes_file, "w") as f:
                 json.dump([probe.to_dict() for probe in self.probes], f, separators=(",", ":"))
-            self.config.tool_logger.info(f"Probes generated and saved to {probes_file}")
+            os.chmod(self.config.user_probes_file, 0o777)
+            self.config.tool_logger.info(f"Probes generated and saved to {self.config.user_probes_file}")
         else:
             try:
-                probes_file = self.config.user_probes_file
-                with open(probes_file, "r") as f:
+                with open(self.config.user_probes_file, "r") as f:
                     loaded_probes = json.load(f)
                     self.probes = [BCCProbes.from_dict(probe) for probe in loaded_probes]
-                self.config.tool_logger.info(f"Probes loaded from {probes_file}")
+                self.config.tool_logger.info(f"Probes loaded from {self.config.user_probes_file}")
             except FileNotFoundError:
-                self.config.tool_logger.error(f"Probes file {probes_file} not found")
+                self.config.tool_logger.error(f"Probes file {self.config.user_probes_file} not found")
 
     def collector_fn(self, collector: BCCCollector, category_fn_map, count: int):
         bpf_text = ""

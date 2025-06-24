@@ -56,3 +56,4 @@ install
 *.pfw.gz
 trace.c
 profile.c
+*.core
