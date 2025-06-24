@@ -52,8 +52,8 @@ dependency
 install 
 
 # Data
-/*.pfw
-/*.pfw.gz
+*.pfw
+*.pfw.gz
 trace.c
 profile.c
 *.core
