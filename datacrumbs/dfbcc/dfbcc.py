@@ -8,9 +8,6 @@ import psutil
 import math
 import concurrent.futures
 from tqdm import tqdm
-# External Imports
-from bcc import BPF
-from bcc.utils import printb
 
 # Internal Imports
 from datacrumbs.dfbcc.app_connector import BCCApplicationConnector
@@ -75,7 +72,9 @@ class BCCMain:
         
         # Store self.category_fn_map into a JSON file
         with open(self.category_fn_map_file, "w") as json_file:
-            json.dump({key: (value[0], value[1].to_dict()) for key, value in self.category_fn_map.items()}, json_file, indent=4)
+            json.dump({key: (value[0], value[1].to_dict()) for key, value in self.category_fn_map.items()}, json_file, separators=(",", ":"))
+        os.chmod(self.category_fn_map_file, 0o777)
+        self.config.tool_logger.info(f"Total functions probed: {len(self.category_fn_map)}")
         bpf_text += probe_text
         # bpf_text += str(collector)
         bpf_text = bpf_text.replace(
@@ -92,9 +91,13 @@ class BCCMain:
         os.rename(self.filename, formatted_filename)
         os.rename(formatted_filename, self.filename)
         self.config.tool_logger.info(f"Wrote program into {self.filename}")
+        os.chmod(self.filename, 0o777)
         return self
     
     def load(self):
+        # External Imports
+        from bcc import BPF
+        from bcc.utils import printb
         if os.path.exists(self.category_fn_map_file):
             with open(self.category_fn_map_file, "r") as json_file:
                 self.category_fn_map = {key: (value[0], BCCFunctions.from_dict(value[1])) for key, value in json.load(json_file).items()}

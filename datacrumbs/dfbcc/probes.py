@@ -74,23 +74,31 @@ class BCCFunctions:
         return f"{self.name}"
 
     def to_dict(self) -> Dict:
-        return {
-            "name": self.name,
-            "regex": self.regex,
-            "entry_struct": self.entry_struct,
-            "exit_struct": self.exit_struct,
-            "entry_cmd": self.entry_cmd,
-            "exit_cmd_stats": self.exit_cmd_stats,
-            "exit_cmd_key": self.exit_cmd_key,
-            "entry_args": self.entry_args,
-            "custom": self.custom,
-        }
+        val = {}
+        val["name"] = self.name
+        if self.regex:
+            val["regex"] = self.regex
+        if self.entry_struct:
+            val["entry_struct"] = self.entry_struct
+        if self.exit_struct:
+            val["exit_struct"] = self.exit_struct
+        if self.entry_cmd:
+            val["entry_cmd"] = self.entry_cmd.replace(" ", "").replace("\t", "")
+        if self.exit_cmd_stats:     
+            val["exit_cmd_stats"] = self.exit_cmd_stats.replace(" ", "").replace("\t", "")
+        if self.exit_cmd_key:
+            val["exit_cmd_key"] = self.exit_cmd_key.replace(" ", "").replace("\t", "")
+        if self.entry_args:
+            val["entry_args"] = self.entry_args.replace(" ", "").replace("\t", "")
+        if self.custom:
+            val["custom"] = self.custom
+        return val
 
     @staticmethod
     def from_dict(data: Dict) -> "BCCFunctions":
         return BCCFunctions(
             name=data["name"],
-            regex=data.get("regex"),
+            regex=data.get("regex", None),
             entry_struct=data.get("entry_struct", []),
             exit_struct=data.get("exit_struct", []),
             entry_cmd=data.get("entry_cmd", ""),
@@ -146,11 +154,12 @@ class BCCProbes:
         self.functions = functions
     
     def to_dict(self) -> Dict:
-        return {
-            "type": self.type.name,
-            "category": self.category,
-            "functions": [func.to_dict() for func in self.functions],
-        }
+        val = {}
+        val["name"] = self.type.name
+        val["category"] = self.category
+        if len(self.functions) > 0:
+            val["functions"] = [func.to_dict() for func in self.functions]
+        return val
 
     @staticmethod
     def from_dict(data: Dict) -> "BCCProbes":
@@ -158,7 +167,7 @@ class BCCProbes:
             BCCFunctions.from_dict(func) for func in data.get("functions", [])
         ]
         return BCCProbes(
-            type=ProbeType[data["type"]],
+            type=ProbeType.get_enum(data["name"]),
             category=data["category"],
             functions=functions,
         )

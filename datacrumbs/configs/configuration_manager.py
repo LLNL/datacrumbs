@@ -17,6 +17,8 @@ class ConfigurationManager:
     project_root: str
     # Configuration variables
     user_libraries: Dict[str, str] = {}
+    io_libraries: Dict[str, str] = {}
+    system_io_headers: Dict[str, str] = {}
     interval_sec: float
     module: str = "default"
     install_dir: str
@@ -47,10 +49,13 @@ class ConfigurationManager:
         
 
     def derive(self):
+        data_path = f"{self.project_root}/datacrumbs/data/{self.module}"
+        os.makedirs(data_path, exist_ok=True)
+        os.chmod(data_path, 0o700)
         self.function_file = f"{self.project_root}/datacrumbs/configs/function.json"
-        self.io_probes_file = f"{self.project_root}/datacrumbs/data/io_probes_file.json"
-        self.user_probes_file = f"{self.project_root}/datacrumbs/data/user_probes_file.json"
-        self.category_fn_map = f"{self.project_root}/datacrumbs/data/category_fn_map.json"
+        self.io_probes_file = f"{self.project_root}/datacrumbs/data/{self.module}/io_probes_file.json"
+        self.user_probes_file = f"{self.project_root}/datacrumbs/data/{self.module}/user_probes_file.json"
+        self.category_fn_map = f"{self.project_root}/datacrumbs/data/{self.module}/category_fn_map.json"
     
     def load_from_yaml(self, yaml_file_name: str):
         """
@@ -79,20 +84,20 @@ class ConfigurationManager:
         """
 
         parser = argparse.ArgumentParser(description="Configuration Manager")
-        parser.add_argument("--module", type=str, help="Module name.  That is picked from datacrumbs/configs/module", default="default")
-        parser.add_argument("--install_dir", type=str, default=os.path.join(self.project_root, "build"), help="Installation directory (default: project_root/build)")
-        parser.add_argument("--mode", type=str, choices=[e.value for e in Mode], default=Mode.TRACE.value, help="Mode of operation")
+        parser.add_argument("module", type=str, help="Module name. That is picked from datacrumbs/configs/module")
+        parser.add_argument("--install_dir", type=str, default=None, help="Installation directory (default: project_root/build)")
+        parser.add_argument("--mode", type=str, choices=[e.value for e in Mode], default=None, help="Mode of operation")
         parser.add_argument(
             "--file", 
             type=str, 
-            default="datacrumbs.pfw", 
+            default=None, 
             help="Profile/Trace file"
         )
         parser.add_argument("--generate_probes", action="store_true", default=False, help="Generate probes (default: False)")
-        parser.add_argument("--interval_sec", type=float, default=1.0, help="Interval in seconds for profiling")
-        parser.add_argument("--trace_type", type=str, choices=[e.value for e in TraceType], default=TraceType.RING_BUFFER.value, help="Type of trace (default: ring_buffer)")
+        parser.add_argument("--interval_sec", type=float, default=None, help="Interval in seconds for profiling")
+        parser.add_argument("--trace_type", type=str, choices=[e.value for e in TraceType], default=None, help="Type of trace (default: ring_buffer)")
         parser.add_argument("--log_level", type=str, choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", help="Logging level")
-        parser.add_argument("--log_file", type=str, default="datacrumbs.log", help="Log file name (default: datacrumbs.log)")
+        parser.add_argument("--log_file", type=str, default=None, help="Log file name (default: datacrumbs.log)")
         args = parser.parse_args()
         return args
     
@@ -131,6 +136,8 @@ class ConfigurationManager:
             "interval_sec": self.interval_sec,
             "trace_type": self.trace_type.name if self.trace_type else None,
             "user_libraries": self.user_libraries,
+            "io_libraries": self.io_libraries,
+            "system_io_headers": self.system_io_headers,
             "io_probes_file": self.io_probes_file,
             "function_file": getattr(self, "function_file", None),
             "user_probes_file": getattr(self, "user_probes_file", None),
@@ -138,7 +145,7 @@ class ConfigurationManager:
         }
         self.tool_logger.info("Final Configuration Values:")
         for key, value in config_values.items():
-            self.tool_logger.info(f"{key}: {value}")
+            self.tool_logger.info(f"\t{key}: {value}")
     
     def validate_config(self):
         """
@@ -168,13 +175,16 @@ class ConfigurationManager:
             yaml_file_name (str): The name of the YAML file (without extension) to load.
         """
         args = self.define_args()
-        self.load_from_yaml(args.module)
-        self.override_with_args(args)
         try:
             os.remove(args.log_file)
         except OSError:
             pass        
         self.tool_logger = self.setup_logger("tool", args.log_file, "%(asctime)s [%(levelname)s]: %(message)s in %(pathname)s:%(lineno)d", level=args.log_level)
+        # Ensure the log file exists before setting permissions
+        open(args.log_file, 'a').close()
+        os.chmod(args.log_file, 0o777)
+        self.load_from_yaml(args.module)
+        self.override_with_args(args)
         self.validate_config()
         self.tool_logger.info("Configuration loaded and overridden successfully.")
         self.pretty_print_config()
@@ -196,6 +206,12 @@ class ConfigurationManager:
         if "user" in config:
             for obj in config["user"]:
                 self.user_libraries[obj["name"]] = obj
+        if "io" in config:
+            for obj in config["io"]:
+                self.io_libraries[obj["name"]] = obj
+        if "system" in config:
+            for obj in config["system"]:
+                self.system_io_headers[obj["name"]] = obj
         if "profile" in config:
             if "interval_sec" in config["profile"]:
                 status, self.interval_sec = convert_or_fail(

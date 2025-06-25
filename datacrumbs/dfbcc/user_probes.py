@@ -2,13 +2,12 @@ from typing import *
 import os
 import re
 import json
-from bcc import BPF
 from tqdm import tqdm
 from datacrumbs.dfbcc.collector import BCCCollector
 from datacrumbs.dfbcc.probes import BCCFunctions, BCCProbes
 from datacrumbs.common.enumerations import ProbeType
 from datacrumbs.configs.configuration_manager import ConfigurationManager
-from datacrumbs.dfbcc.elf import CorpusReader
+from datacrumbs.elf.elf import CorpusReader
 
 class UserProbes:
     config: ConfigurationManager
@@ -28,7 +27,6 @@ class UserProbes:
                 link = obj["link"]
                 reader = CorpusReader(link)
                 symbols_dict = reader.get_symbols()
-                self.config.tool_logger.info(f"{symbols_dict}")
                 symbols_dict = {k: v for k, v in symbols_dict.items() if v.get("type") == "FUNC" and v.get("defined") != "UND" and v.get("binding") != "WEAK"}
                 symbols = symbols_dict.keys()
                 for symbol in tqdm(symbols, desc=f"User symbols for {key}"):
@@ -37,19 +35,18 @@ class UserProbes:
                         num_symbols += 1
                         self.config.tool_logger.debug(f"Adding Probe function {symbol} from {key}")
                 self.probes.append(probe)
-            probes_file = self.config.user_probes_file
-            with open(probes_file, "w") as f:
-                json.dump([probe.to_dict() for probe in self.probes], f)
-            self.config.tool_logger.info(f"Probes generated and saved to {probes_file}")
+            with open(self.config.user_probes_file, "w") as f:
+                json.dump([probe.to_dict() for probe in self.probes], f, separators=(",", ":"))
+            os.chmod(self.config.user_probes_file, 0o777)
+            self.config.tool_logger.info(f"Probes generated and saved to {self.config.user_probes_file}")
         else:
             try:
-                probes_file = self.config.user_probes_file
-                with open(probes_file, "r") as f:
+                with open(self.config.user_probes_file, "r") as f:
                     loaded_probes = json.load(f)
                     self.probes = [BCCProbes.from_dict(probe) for probe in loaded_probes]
-                self.config.tool_logger.info(f"Probes loaded from {probes_file}")
+                self.config.tool_logger.info(f"Probes loaded from {self.config.user_probes_file}")
             except FileNotFoundError:
-                self.config.tool_logger.error(f"Probes file {probes_file} not found")
+                self.config.tool_logger.error(f"Probes file {self.config.user_probes_file} not found")
 
     def collector_fn(self, collector: BCCCollector, category_fn_map, count: int):
         bpf_text = ""
@@ -80,7 +77,7 @@ class UserProbes:
 
         return (bpf_text, category_fn_map, count)
 
-    def attach_probes(self, bpf: BPF) -> None:
+    def attach_probes(self, bpf) -> None:
         self.config.tool_logger.info("Attaching probe for User Probes")
         for probe in tqdm(self.probes, "attach User probes"):
             for fn in tqdm(probe.functions, "attach User functions"):

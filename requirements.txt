@@ -2,3 +2,6 @@ psutil==5.8
 tqdm
 pyelftools
 clang-format
+clang==19.1.7
+libclang
+pyyaml

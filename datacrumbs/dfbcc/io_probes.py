@@ -1,13 +1,37 @@
 from typing import *
 import re
 import json
+import os
 from tqdm import tqdm
-from bcc import BPF
 from datacrumbs.dfbcc.collector import BCCCollector
 from datacrumbs.dfbcc.probes import BCCFunctions, BCCProbes
 from datacrumbs.common.enumerations import ProbeType
 from datacrumbs.configs.configuration_manager import ConfigurationManager
+from datacrumbs.elf.elf import CorpusReader
+from datacrumbs.llvm.functions import Functions
 
+def is_function_valid(function_name):
+    return "." not in function_name and "$" not in function_name
+
+def get_bcc_functions(regex):        
+    from bcc import BPF
+    matches = BPF.get_kprobe_functions(bytes(f"{regex}", "utf-8"))
+    functions = set()
+    for line in tqdm(matches, desc=f"Matching for {regex}"):
+        if is_function_valid(line.decode()):
+            functions.add(line.decode())
+    return functions
+
+def update_functions(filename, cat, functions):
+    with open(filename, "r") as f:
+        loaded_probes = json.load(f)
+        probes = [BCCProbes.from_dict(probe) for probe in loaded_probes]
+    probe = BCCProbes(ProbeType.KERNEL, cat, [])
+    for fname in functions:
+        probe.functions.append(BCCFunctions(fname))
+    probes.append(probe)
+    with open(filename, "w") as f:
+        json.dump([probe.to_dict() for probe in probes], f, separators=(",", ":"))
 
 class IOProbes:
     config: ConfigurationManager
@@ -32,6 +56,8 @@ class IOProbes:
                                 }
                             }
                             """
+            functions_added = set()
+            
             self.probes.append(
                 BCCProbes(
                     ProbeType.SYSTEM,
@@ -41,13 +67,13 @@ class IOProbes:
                             "openat",
                             entry_struct=[("uint64", "file_hash")],
                             entry_args=", int dfd, const char *filename, int flags",
-                            entry_cmd="""
+                            entry_cmd=r"""
                             struct filename_t fname_i;
                             u64 filename_len = sizeof(fname_i.fname);
                             int len = bpf_probe_read_user_str(&fname_i.fname, filename_len, filename);
-                            //fname_i.fname[len-1] = '\\0';
+                            //fname_i.fname[len-1] = '\0';
                             u64 filehash = get_hash(fname_i.fname, filename_len);
-                            bpf_trace_printk(\"Hash value is %d for filename \%s\",filehash,filename);
+                            bpf_trace_printk("Hash value is %d for filename %s",filehash,filename);
                             file_hash.update(&filehash, &fname_i);
                             latest_hash.update(&key, &filehash);
                             """,
@@ -108,14 +134,6 @@ class IOProbes:
                             """,
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
-                        self.get_bcc_function("copy_file_range"),
-                        self.get_bcc_function("execve"),
-                        self.get_bcc_function("execveat"),
-                        self.get_bcc_function("exit"),
-                        self.get_bcc_function(
-                            "faccessat"
-                        ),
-                        self.get_bcc_function("fcntl"),
                         self.get_bcc_function(
                             "fallocate",
                             entry_struct=[("uint64", "file_hash")],
@@ -149,8 +167,6 @@ class IOProbes:
                             """,
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
-                        self.get_bcc_function("fsopen"),
-                        self.get_bcc_function("fstatfs"),
                         self.get_bcc_function(
                             "fsync",
                             entry_struct=[("uint64", "file_hash")],
@@ -173,7 +189,6 @@ class IOProbes:
                             """,
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
-                        self.get_bcc_function("io_pgetevents"),
                         self.get_bcc_function(
                             "lseek",
                             entry_struct=[("uint64", "file_hash")],
@@ -185,11 +200,6 @@ class IOProbes:
                             """,
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
-                        self.get_bcc_function("memfd_create"),
-                        self.get_bcc_function("migrate_pages"),
-                        self.get_bcc_function("mlock"),
-                        self.get_bcc_function("mmap"),
-                        self.get_bcc_function("msync"),
                         self.get_bcc_function(
                             "pread64",                        
                             entry_struct=[("uint64", "file_hash")],                        
@@ -314,17 +324,6 @@ class IOProbes:
                             exit_cmd_key=exit_cmd_key_file_check,
                         ),
                         self.get_bcc_function(
-                            "renameat"
-                        ),
-                        self.get_bcc_function(
-                            "renameat2"
-                        ),
-                        self.get_bcc_function("statfs"),
-                        self.get_bcc_function("statx"),
-                        self.get_bcc_function("sync"),
-                        self.get_bcc_function("sync_file_range"),
-                        self.get_bcc_function("syncfs"),
-                        self.get_bcc_function(
                             "writev",                        
                             entry_struct=[("uint64", "file_hash")],                        
                             exit_struct=[("uint64", "size_sum")],
@@ -342,84 +341,64 @@ class IOProbes:
                     ])),
                 )
             )
-            self.probes.append(
-                BCCProbes(
-                    ProbeType.USER,
-                    "c",
-                    list(filter(None, [
-                        self.get_bcc_function("fopen"),
-                        self.get_bcc_function("fopen64"),
-                        self.get_bcc_function("fclose"),
-                        self.get_bcc_function("fread"),
-                        self.get_bcc_function("fwrite"),
-                        self.get_bcc_function("ftell"),
-                        self.get_bcc_function("fseek"),
-                        self.get_bcc_function("open"),
-                        self.get_bcc_function("open64"),
-                        self.get_bcc_function("creat"),
-                        self.get_bcc_function("creat64"),
-                        self.get_bcc_function("close_range"),
-                        self.get_bcc_function("closefrom"),
-                        self.get_bcc_function("close"),
-                        self.get_bcc_function("read"),
-                        self.get_bcc_function("pread"),
-                        self.get_bcc_function("pread64"),
-                        self.get_bcc_function("write"),
-                        self.get_bcc_function("pwrite"),
-                        self.get_bcc_function("pwrite64"),
-                        self.get_bcc_function("lseek"),
-                        self.get_bcc_function("lseek64"),
-                        self.get_bcc_function("fdopen"),
-                        self.get_bcc_function("fileno"),
-                        self.get_bcc_function("fileno_unlocked"),
-                        self.get_bcc_function("mmap"),
-                        self.get_bcc_function("mmap64"),
-                        self.get_bcc_function("munmap"),
-                        self.get_bcc_function("msync"),
-                        self.get_bcc_function("mremap"),
-                        self.get_bcc_function("madvise"),
-                        self.get_bcc_function("shm_open"),
-                        self.get_bcc_function("shm_unlink"),
-                        self.get_bcc_function("memfd_create"),
-                        self.get_bcc_function("fsync"),
-                        self.get_bcc_function("fdatasync"),
-                        self.get_bcc_function("fcntl"),
-                        self.get_bcc_function("posix_memalign"),
-                        self.get_bcc_function("valloc"),
-                        self.get_bcc_function("memalign"),
-                        self.get_bcc_function("pvalloc"),
-                        self.get_bcc_function("aligned_alloc"),
-                    ])),
-                )
-            )
-            
-            self.probes.extend(self.get_bcc_functions(b".*page.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*lru.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*swap.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*buffer.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*nr.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*map.*"))
-            self.probes.extend(self.get_bcc_functions(b".*bio.*"))
-            self.probes.extend(self.get_bcc_functions(b".*aio.*"))
-            self.probes.extend(self.get_bcc_functions(b".*ext4.*"))
-            self.probes.extend(self.get_bcc_functions(b".*vfs.*"))
-            #self.probes.extend(self.get_bcc_functions(b".*llseek.*"))
-            self.probes.extend(self.get_bcc_functions(b".*file.*"))
-            self.probes.extend(self.get_bcc_functions(b".*block.*"))
-            self.config.tool_logger.info(f"Added {len(self.regex_functions)} I/O probes")
-            io_probes_file = self.config.io_probes_file
-            with open(io_probes_file, "w") as f:
-                json.dump([probe.to_dict() for probe in self.probes], f)
-            self.config.tool_logger.info(f"Probes generated and saved to {io_probes_file}")
+            for fn in self.probes[-1].functions:
+                if fn.name not in functions_added:
+                    functions_added.add(fn.name)
+            for name, value in self.config.system_io_headers.items():
+                if "regex" not in value:
+                    pattern = re.compile("^(?!__).*")
+                else:
+                    pattern = re.compile(value["regex"])
+                if name == "sys":
+                    probe = BCCProbes(ProbeType.SYSTEM, name, [])
+                else:
+                    probe = BCCProbes(ProbeType.KERNEL, name, [])
+                if "header" in value:
+                    functions = Functions(value["header"], pattern)
+                    function_names = functions.get_function_names()
+                else:
+                    function_names = get_bcc_functions(value["regex"])
+                for fname in tqdm(function_names, desc=f"System I/O headers for {name}"):
+                    if fname not in functions_added:
+                        probe.functions.append(BCCFunctions(fname))
+                        functions_added.add(fname)
+                    
+                self.probes.append(probe)
+                self.config.tool_logger.info(f"Added {len(probe.functions)} for system I/O probes: {name}")
+                
+            for name, value in self.config.io_libraries.items():
+                probe = BCCProbes(ProbeType.USER, name, [])
+                if "regex" not in value:
+                    pattern = re.compile("^(?!__).*")
+                else:
+                    pattern = re.compile(value["regex"])
+                link = value["link"]
+                reader = CorpusReader(link)
+                symbols_dict = reader.get_symbols()
+                symbols_dict = {k: v for k, v in symbols_dict.items() if v.get("type") == "FUNC" and v.get("defined") != "UND" and v.get("binding") != "WEAK"}
+                symbols = symbols_dict.keys()
+                for symbol in tqdm(symbols, desc=f"User symbols for {name}"):
+                    if (symbol or symbol != "") and pattern.match(symbol):
+                        if symbol not in functions_added:
+                            probe.functions.append(BCCFunctions(symbol))
+                            functions_added.add(symbol)
+                            self.config.tool_logger.debug(f"Adding Probe function {symbol} from {name}")
+                self.probes.append(probe)
+                self.config.tool_logger.info(f"Added {len(probe.functions)} for I/O probes: {name}")
+                    
+            self.config.tool_logger.info(f"Added {len(functions_added)} I/O probes")
+            with open(self.config.io_probes_file, "w") as f:
+                json.dump([probe.to_dict() for probe in self.probes], f, separators=(",", ":"))
+            os.chmod(self.config.io_probes_file, 0o777)
+            self.config.tool_logger.info(f"Probes generated and saved to {self.config.io_probes_file}")
         else:
             try:
-                io_probes_file = self.config.io_probes_file
-                with open(io_probes_file, "r") as f:
+                with open(self.config.io_probes_file, "r") as f:
                     loaded_probes = json.load(f)
                     self.probes = [BCCProbes.from_dict(probe) for probe in loaded_probes]
-                self.config.tool_logger.info(f"Probes loaded from {io_probes_file}")
+                self.config.tool_logger.info(f"Probes loaded from {self.config.io_probes_file}")
             except FileNotFoundError:
-                self.config.tool_logger.error(f"Probes file {io_probes_file} not found")
+                self.config.tool_logger.error(f"Probes file {self.config.io_probes_file} not found")
         
 
     def collector_fn(self, collector: BCCCollector, category_fn_map, count: int):
@@ -450,30 +429,8 @@ class IOProbes:
                 bpf_text += text
 
         return (bpf_text, category_fn_map, count)
-    def is_function_valid(self, function_name):
-        return  "." not in function_name and "$" not in function_name
-
-    def get_bcc_functions(self, regex):
-        matches = BPF.get_kprobe_functions(regex)
-        probes = []
-        bcc_list = {}
-        for line in tqdm(matches, desc=f"Matching for {regex}"):
-            if line.decode() not in self.regex_functions and self.is_function_valid(line.decode()):
-                self.config.tool_logger.debug(f"Adding {line.decode()} to probe")
-                self.regex_functions.add(line.decode())
-                value = BPF.ksym(BPF.ksymname(line), show_module=True).decode()
-                value = list(filter(None, re.split('\]|\[| ', value)))
-                function_name = value[0]
-                module = value[1]
-                if self.is_function_valid(function_name):
-                    if module not in bcc_list:
-                        bcc_list[module] = []
-                    bcc_list[module].append(BCCFunctions(function_name))
-            else:
-                self.config.tool_logger.debug(f"Skipping {line.decode()} to probe")
-        for key, value in bcc_list.items():
-            probes.append(BCCProbes(ProbeType.KERNEL, key, value))
-        return probes
+    
+   
 
     def get_bcc_function(self, function_name,
         entry_struct: List[Tuple] = [],
@@ -495,7 +452,7 @@ class IOProbes:
             return None
             
 
-    def attach_probes(self, bpf: BPF) -> None:
+    def attach_probes(self, bpf) -> None:
         self.config.tool_logger.info("Attaching I/O Probes")
         for probe in tqdm(self.probes, "attach I/O probes"):
             for fn in tqdm(probe.functions, "attach I/O functions"):

@@ -34,6 +34,7 @@ class PerfettoWriter:
         with open(self.config.profile_file, "rb") as f_in:
             with gzip.open(f"{self.config.profile_file}.gz", "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
+            os.chmod(f"{self.config.profile_file}.gz", 0o777)
         try:
             os.remove(self.config.profile_file)
         except OSError:
