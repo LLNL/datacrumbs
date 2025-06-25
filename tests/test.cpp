@@ -107,6 +107,7 @@ int main(int argc, char *argv[]) {
   std::string dir = std::string(argv[4]);
   int test_flag = atoi(argv[5]);
   int direct_io_flag = atoi(argv[6]);
+  int sleep_time = atoi(argv[7]);
   struct stat st;
   if (stat(dir.c_str(), &st) != 0) {
     perror("stat");
@@ -132,7 +133,6 @@ int main(int argc, char *argv[]) {
   Timer write_timer = Timer();
   Timer read_timer = Timer();
   Timer close_timer = Timer();
-  int sleep_time = 0;
   for (int file_idx = 0; file_idx < files; ++file_idx) {
 
     std::string filename = dir + "/file_" + std::to_string(file_idx) + "_" +
@@ -173,11 +173,11 @@ int main(int argc, char *argv[]) {
     }
     for (int op_idx = 0; op_idx < ops; ++op_idx) {
       
+      if (test_flag == 0 || test_flag == 2) {
       if (sleep_time > 0) {
         printf("Sleeping for write for %d for step %d of %d\n", sleep_time, op_idx, ops);
         sleep(sleep_time);
       }
-      if (test_flag == 0 || test_flag == 2) {
         write_timer.resumeTime();
         assert(test_write(fd, data, ts) == ts);
         write_timer.pauseTime();

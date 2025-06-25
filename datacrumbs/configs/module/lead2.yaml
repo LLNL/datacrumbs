@@ -21,6 +21,10 @@ system:
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/mm.h
   - name: xfs
     regex: xfs.*
+  - name: iomap
+    regex: iomap.*
+  - name: iov
+    regex: iov.*
 io:
   - name: libc
     link: /usr/lib64/libc.so.6
