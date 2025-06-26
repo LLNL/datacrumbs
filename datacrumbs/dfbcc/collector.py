@@ -150,3 +150,41 @@ class BCCCollector(ABC):
         ).replace(
             "DFFNLOOKUP", self.lookup_fn
         )
+        
+        self.usdt_functions = """
+        
+        DFEVENTSTRUCT
+        
+        int trace_usdt_entry(struct pt_regs *ctx DFENTRYARGS) {
+            DFFILTERPID
+            
+            DFFNENTRY
+            
+            DFENTRYCMD
+            
+            return 0;
+        }
+
+        int trace_usdt_exit(struct pt_regs *ctx) {
+            DFFILTERPID
+            
+            DFFNLOOKUP
+            
+            DFCAPTUREEVENTKEY
+            
+            DFEXITCMDKEY
+            
+            DFCAPTUREEVENTVALUE
+            
+            DFEXITCMDSTATS
+            
+            DFSUBMITEVENT
+            return 0;
+        }
+        """.replace(
+            "DFFILTERPID", self.filter_pid
+        ).replace(
+            "DFFNENTRY", self.capture_entry_fn
+        ).replace(
+            "DFFNLOOKUP", self.lookup_fn
+        )

@@ -58,3 +58,4 @@ trace.c
 profile.c
 *.core
 logs/*
+poc/test

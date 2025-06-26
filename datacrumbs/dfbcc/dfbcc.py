@@ -46,6 +46,7 @@ class BCCMain:
         self.index = 0
         self.filename = f"{self.config.mode.value}.c"
         self.category_fn_map_file = self.config.category_fn_map
+        self.base_usdt_text = ""
         pass
 
     def build(self) -> any:
@@ -111,6 +112,23 @@ class BCCMain:
         app_connector = BCCApplicationConnector()
         io_probes = IOProbes()
         user_probes = UserProbes()
+        
+        
+        
+        if self.config.mode == Mode.PROFILE:
+            collector = BCCProfileCollector()
+            self.base_usdt_text += str(BCCProfileHeader())
+        elif self.config.mode == Mode.TRACE:
+            collector = BCCTraceCollector()
+            self.base_usdt_text += str(BCCTraceHeader())
+        self.base_usdt_text += collector.get_usdt_header()
+        io_probes = IOProbes()
+        user_probes = UserProbes()
+        probe_text, self.category_fn_map, count = user_probes.collector_usdt_fn(
+            collector, self.category_fn_map, count
+        )
+        self.base_usdt_text += probe_text
+        
         self.config.tool_logger.info(f"Read program from {self.filename}")
         self.bpf = BPF(text=bpf_text, debug=0)
         self.config.tool_logger.info(f"Loaded program into BCC")
