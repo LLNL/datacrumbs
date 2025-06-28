@@ -148,7 +148,7 @@ class UserProbes:
                 if ProbeType.USDT == probe.type:
                     if probe.category == "python":
                         try:
-                            usdt.enable_probe_or_bail(
+                            usdt.enable_probe(
                                 probe="function__entry",
                                 fn_name=f"trace_python_entry",
                             )
@@ -161,7 +161,7 @@ class UserProbes:
                             )
                             is_error = True
                         try:
-                            usdt.enable_probe_or_bail(
+                            usdt.enable_probe(
                                 probe="function__return",
                                 fn_name=f"trace_python_exit",
                             )

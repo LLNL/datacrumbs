@@ -418,33 +418,37 @@ class BCCMain:
         event.tid = ctypes.c_uint32(c_event.id >> 32).value
         # self.config.tool_logger.info(f"Got event {c_event.event_id} PID {event.pid}")
         if c_event.event_id == USDT_PROBE_EVENT_ID and event.pid not in self.bpfs:
-            # This is a special event for new usdt probes
-            from bcc import BPF, USDT
-            usdt = USDT(pid=event.pid)
-            is_error = self.user_probes.attach_usdt(usdt)
-            if is_error:
-                self.config.tool_logger.error(f"Unable to attach USDT probes for PID {event.pid}. Please check the logs for more details.")
-                return
-            #self.config.tool_logger.info(usdt.get_text())
-            ctx_array = (ctypes.c_void_p * 1)()
-            ctx_array[0] = ctypes.c_void_p(usdt.get_context())
-            usdt_text = lib.bcc_usdt_genargs(ctx_array, 1)
-            probes = usdt.enumerate_active_probes()
-            for (binpath, fn_name, addr, pid) in probes:
-                self.bpf.attach_uprobe(name=binpath, fn_name=fn_name,
-                              addr=addr, pid=pid)
-            if event.pid not in self.bpfs:
-                self.bpfs[event.pid] = 0
-            self.bpfs[event.pid] += 1
-            # pid_specific_text = self.base_usdt_text.replace("USDT_PID", str(event.pid))
-            # pid_specific_text = pid_specific_text.replace("USDT_START_TS", str(c_event.ts))
-            # self.config.tool_logger.info(f"Attaching USDT to PID {event.pid}")
-            # self.bpfs[event.pid] = BPF(text=pid_specific_text, usdt_contexts=[usdt])
-            # self.open_buffer(self.bpfs[event.pid], self.handle_trace_event2)
-            for i in range(20):
-                sleep(1)
-                self.poll_buffers()
-            self.config.tool_logger.info(f"Attached USDT probes for PID {event.pid}")
+            try:
+                # This is a special event for new usdt probes
+                from bcc import BPF, USDT
+                usdt = USDT(pid=event.pid)
+                is_error = self.user_probes.attach_usdt(usdt)
+                if is_error:
+                    self.config.tool_logger.error(f"Unable to attach USDT probes for PID {event.pid}. Please check the logs for more details.")
+                    return
+                #self.config.tool_logger.info(usdt.get_text())
+                ctx_array = (ctypes.c_void_p * 1)()
+                ctx_array[0] = ctypes.c_void_p(usdt.get_context())
+                usdt_text = lib.bcc_usdt_genargs(ctx_array, 1)
+                probes = usdt.enumerate_active_probes()
+                for (binpath, fn_name, addr, pid) in probes:
+                    self.bpf.attach_uprobe(name=binpath, fn_name=fn_name,
+                                addr=addr, pid=pid)
+                if event.pid not in self.bpfs:
+                    self.bpfs[event.pid] = 0
+                self.bpfs[event.pid] += 1
+                # pid_specific_text = self.base_usdt_text.replace("USDT_PID", str(event.pid))
+                # pid_specific_text = pid_specific_text.replace("USDT_START_TS", str(c_event.ts))
+                # self.config.tool_logger.info(f"Attaching USDT to PID {event.pid}")
+                # self.bpfs[event.pid] = BPF(text=pid_specific_text, usdt_contexts=[usdt])
+                # self.open_buffer(self.bpfs[event.pid], self.handle_trace_event2)
+                for i in range(20):
+                    sleep(1)
+                    self.poll_buffers()
+                self.config.tool_logger.info(f"Attached USDT probes for PID {event.pid}")
+            except Exception as e:
+                self.config.tool_logger.error(f"Error attaching USDT probes for PID {event.pid}: {e}")
+                return -1
             return -1
         elif c_event.event_id == USDT_PYTHON_EVENT_ID:
             self.usdt = True
@@ -487,7 +491,7 @@ class BCCMain:
     def handle_trace_event(self, ctx, data, size):
         self.index += 1
         status = self.async_handle_event(self.index, data)
-        if status > -1:
+        if status is None or status > -1:
             self.has_events = True
             # future = self.executor.submit(self.async_handle_trace, self.index, data)
             # self.futures.append(future) 

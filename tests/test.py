@@ -1,4 +1,5 @@
 import os
+import time
 
 def test_one():
     print("Running test_one")
@@ -16,6 +17,6 @@ def test_three():
 
 if __name__ == "__main__":
     print(f"PID: {os.getpid()}")
-    input("Press Enter to continue...")
+    # input("Press Enter to continue...")
     test_one()
-    input("Press Enter to continue...")
+    # input("Press Enter to continue...")
