@@ -132,7 +132,7 @@ class BCCTraceCollector(BCCCollector):
             stats_key->ts = (fn->ts  - *start_ts);
             stats_key->event_id = DFEVENTID;
             stats_key->dur = bpf_ktime_get_ns() - fn->ts;
-            bpf_trace_printk(\"Tracing USDT PID \%d \%s \%d\",pid, stats_key->method, stats_key->event_id);
+            //bpf_trace_printk(\"Tracing USDT PID \%d \%s \%d\",pid, stats_key->method, stats_key->event_id);
         """
         
         if self.config.trace_type == TraceType.PERF:
