@@ -11,8 +11,8 @@ system:
   #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
   # - name: vfs
   #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fs.h
-  # - name: bio
-  #   regex: bio.*
+  - name: bio
+    regex: bio.*
   # - name: shm
   #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
   # - name: fscache
@@ -36,6 +36,8 @@ user:
   - name: test_posix
     link: /home/haridev/datacrumbs/install/libexec/datacrumbs/bin/df_tracer_test
     regex: ^(?!__).*
+  - name: python
+    lang: python
 profile:
   interval_sec: 0.0001
 

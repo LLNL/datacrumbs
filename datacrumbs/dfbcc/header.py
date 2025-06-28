@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from datacrumbs.configs.configuration_manager import ConfigurationManager
 from datacrumbs.common.enumerations import TraceType
+from datacrumbs.common.constants import *
 
 class BCCHeader(ABC):
     def __init__(self):
@@ -9,6 +10,7 @@ class BCCHeader(ABC):
         #include <linux/sched.h>
         #include <uapi/linux/limits.h>
         #include <uapi/linux/ptrace.h>
+        #include <linux/bpf.h>
         """
 
         self.data_structures = """
@@ -55,10 +57,20 @@ class BCCHeader(ABC):
             (*hash_value)++;
             return *hash_value;
         }*/
+        static __always_inline int _bpf_readarg_trace_python_exit_1(struct pt_regs *ctx, void *dest, size_t len) {
+            if (len != sizeof(uint64_t)) return -1;
+            *((uint64_t *)dest) = ctx->r13; __asm__ __volatile__("": : :"memory");
+            return 0;
+        }
+            static __always_inline int _bpf_readarg_trace_python_exit_2(struct pt_regs *ctx, void *dest, size_t len) {
+            if (len != sizeof(uint64_t)) return -1;
+            *((uint64_t *)dest) = ctx->r14; __asm__ __volatile__("": : :"memory");
+            return 0;
+        }
         """
         
-        self.usdt_data_structures = """        
-        #define MAX_STRING_LENGTH 80
+        self.usdt_data_structures = f"""        
+        #define MAX_STRING_LENGTH {MAX_STRING_LENGTH}
         """
         
         self.usdt_events_ds = """
@@ -67,4 +79,4 @@ class BCCHeader(ABC):
         """
 
     def __str__(self) -> str:
-        return self.includes + self.data_structures + self.events_ds + self.util
+        return self.includes + self.data_structures + self.usdt_data_structures + self.events_ds + self.util

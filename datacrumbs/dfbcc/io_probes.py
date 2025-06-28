@@ -73,7 +73,7 @@ class IOProbes:
                             int len = bpf_probe_read_user_str(&fname_i.fname, filename_len, filename);
                             //fname_i.fname[len-1] = '\0';
                             u64 filehash = get_hash(fname_i.fname, filename_len);
-                            bpf_trace_printk("Hash value is %d for filename %s",filehash,filename);
+                            //bpf_trace_printk("Hash value is %d for filename %s",filehash,filename);
                             file_hash.update(&filehash, &fname_i);
                             latest_hash.update(&key, &filehash);
                             """,

@@ -242,12 +242,21 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
 }
 #endif  // LATENCY
 #endif  // SYSCALLS
-""".replace("READ_CLASS", read_class) \
+"""
+
+first = program.replace("READ_CLASS", read_class) \
    .replace("READ_METHOD", read_method) \
    .replace("PID_FILTER", "if ((pid >> 32) != %d) { return 0; }" % args.pid) \
    .replace("DEFINE_NOLANG", "#define NOLANG" if not language else "") \
    .replace("DEFINE_LATENCY", "#define LATENCY" if args.latency else "") \
-   .replace("DEFINE_SYSCALLS", "#define SYSCALLS" if args.syscalls else "")
+   .replace("DEFINE_SYSCALLS", "")
+
+second = program.replace("READ_CLASS", "") \
+   .replace("READ_METHOD", "") \
+   .replace("PID_FILTER", "if ((pid >> 32) != %d) { return 0; }" % args.pid) \
+   .replace("DEFINE_NOLANG", "") \
+   .replace("DEFINE_LATENCY", "") \
+   .replace("DEFINE_SYSCALLS", "#define SYSCALLS")
 
 if language:
     if args.pid <= 0:
@@ -266,8 +275,8 @@ if args.ebpf or args.verbose:
     print(program)
     if args.ebpf:
         exit()
-
-bpf = BPF(text=program, usdt_contexts=[usdt] if usdt else [])
+bpf2 = BPF(text=second)
+bpf = BPF(text=first, usdt_contexts=[usdt] if usdt else [])
 if args.syscalls:
     print("Attached kernel tracepoints for syscall tracing.")
 
@@ -279,38 +288,62 @@ def get_data():
                                     kv[0].method.decode('utf-8', 'replace'),
                                    (kv[1].num_calls, kv[1].total_ns)),
                    bpf["times"].items()))
+        if "times" in bpf2:
+            data.extend(map(lambda kv: (kv[0].clazz.decode('utf-8', 'replace') \
+                                        + "." + \
+                                        kv[0].method.decode('utf-8', 'replace'),
+                                    (kv[1].num_calls, kv[1].total_ns)),
+                    bpf2["times"].items()))
     else:
         data = list(map(lambda kv: (kv[0].clazz.decode('utf-8', 'replace') \
                                     + "." + \
                                     kv[0].method.decode('utf-8', 'replace'),
                                    (kv[1].value, 0)),
                    bpf["counts"].items()))
+        if "counts" in bpf2:
+            data.extend(map(lambda kv: (kv[0].clazz.decode('utf-8', 'replace') \
+                                        + "." + \
+                                        kv[0].method.decode('utf-8', 'replace'),
+                                    (kv[1].value, 0)),
+                    bpf2["counts"].items()))
 
     if args.syscalls:
         if args.latency:
-            syscalls = map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
-                                       (kv[1].num_calls, kv[1].total_ns)),
-                           bpf["systimes"].items())
-            data.extend(syscalls)
+            # syscalls = map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
+            #                            (kv[1].num_calls, kv[1].total_ns)),
+            #                bpf["systimes"].items())
+            # data.extend(syscalls)
+            if "systimes" in bpf2:
+                data.extend(map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
+                                        (kv[1].num_calls, kv[1].total_ns)),
+                            bpf2["systimes"].items()))
         else:
             syscalls = map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
                                        (kv[1].value, 0)),
                            bpf["syscounts"].items())
             data.extend(syscalls)
+            if "syscounts" in bpf2:
+                data.extend(map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
+                                        (kv[1].value, 0)),
+                            bpf2["syscounts"].items()))
 
     return sorted(data, key=lambda kv: kv[1][1 if args.latency else 0])
 
 def clear_data():
     if args.latency:
         bpf["times"].clear()
+        bpf2["times"].clear()
     else:
         bpf["counts"].clear()
+        bpf2["counts"].clear()
 
     if args.syscalls:
         if args.latency:
             bpf["systimes"].clear()
+            bpf2["systimes"].clear()
         else:
             bpf["syscounts"].clear()
+            bpf2["syscounts"].clear()
 
 exit_signaled = False
 print("Tracing calls in process %d (language: %s)... Ctrl-C to quit." %
