@@ -8,6 +8,8 @@ import psutil
 import math
 import concurrent.futures
 from tqdm import tqdm
+import time
+from bcc.libbcc import lib
 
 # Internal Imports
 from datacrumbs.dfbcc.app_connector import BCCApplicationConnector
@@ -19,7 +21,7 @@ from datacrumbs.dfbcc.io_probes import IOProbes
 from datacrumbs.dfbcc.user_probes import UserProbes
 from datacrumbs.dfbcc.probes import BCCFunctions, BCCProbes
 from datacrumbs.configs.configuration_manager import ConfigurationManager
-from datacrumbs.common.data_structure import DFEvent, Filename, DFTraceEvent
+from datacrumbs.common.data_structure import DFEvent, Filename, DFTraceEvent, DFUSDTTraceEvent
 from datacrumbs.common.enumerations import Mode, TraceType
 from datacrumbs.common.utils import *
 from datacrumbs.common.constants import *
@@ -46,6 +48,9 @@ class BCCMain:
         self.index = 0
         self.filename = f"{self.config.mode.value}.c"
         self.category_fn_map_file = self.config.category_fn_map
+        self.base_usdt_text = ""
+        self.bpfs = {}
+        self.usdt_bin_paths = set()
         pass
 
     def build(self) -> any:
@@ -59,27 +64,31 @@ class BCCMain:
             bpf_text += str(BCCTraceHeader())
         bpf_text += str(app_connector)
         bpf_text += str(collector)
-        io_probes = IOProbes(generate_probes=self.config.generate_probes)
         count = 0
+        user_probes = UserProbes(generate_probes=self.config.generate_probes)
+        probe_text = user_probes.collector_usdt_fn(
+            collector
+        )
+        bpf_text += probe_text
+        probe_text, self.category_fn_map, count = user_probes.collector_fn(
+            collector, self.category_fn_map, count
+        )
+        bpf_text += probe_text
+        io_probes = IOProbes(generate_probes=self.config.generate_probes)
         probe_text, self.category_fn_map, count = io_probes.collector_fn(
             collector, self.category_fn_map, count
         )
         bpf_text += probe_text
-        user_probes = UserProbes(generate_probes=self.config.generate_probes)
-        probe_text, self.category_fn_map, count = user_probes.collector_fn(
-            collector, self.category_fn_map, count
-        )
-        
         # Store self.category_fn_map into a JSON file
         with open(self.category_fn_map_file, "w") as json_file:
             json.dump({key: (value[0], value[1].to_dict()) for key, value in self.category_fn_map.items()}, json_file, separators=(",", ":"))
         os.chmod(self.category_fn_map_file, 0o777)
         self.config.tool_logger.info(f"Total functions probed: {len(self.category_fn_map)}")
-        bpf_text += probe_text
         # bpf_text += str(collector)
         bpf_text = bpf_text.replace(
             "INTERVAL_RANGE", str(int(self.config.interval_sec * 1e9))
         )
+        
         self.config.tool_logger.debug(f"Compiled Program is \n{bpf_text}")
         
         f = open(f"{self.filename}", "w")
@@ -109,14 +118,36 @@ class BCCMain:
         with open(self.filename, "r") as file:
             bpf_text = file.read()
         app_connector = BCCApplicationConnector()
+        self.usdt=False
+        # if self.config.mode == Mode.PROFILE:
+        #     collector = BCCProfileCollector()
+        #     # self.base_usdt_text += str(BCCProfileHeader()) TODO(haridev): Add header for profile
+        # elif self.config.mode == Mode.TRACE:
+        #     collector = BCCTraceCollector()
+        #     self.base_usdt_text += BCCTraceHeader().get_usdt_header()
         io_probes = IOProbes()
-        user_probes = UserProbes()
+        self.user_probes = UserProbes()
+        # probe_text = self.user_probes.collector_usdt_fn(
+        #     collector
+        # )
+        # self.base_usdt_text += probe_text
+        # usdt_filename = "usdt_collector.c"
+        # f = open(f"{usdt_filename}", "w")
+        # f.write(self.base_usdt_text)
+        # f.close()
+        # # Format the C code using clang-format
+        # formatted_filename = f"{usdt_filename}.formatted"
+        # os.system(f"clang-format -i {usdt_filename}")
+        # os.rename(usdt_filename, formatted_filename)
+        # os.rename(formatted_filename, usdt_filename)
+        # self.config.tool_logger.info(f"Wrote program into {usdt_filename}")
+        # os.chmod(usdt_filename, 0o777)
         self.config.tool_logger.info(f"Read program from {self.filename}")
         self.bpf = BPF(text=bpf_text, debug=0)
         self.config.tool_logger.info(f"Loaded program into BCC")
         app_connector.attach_probe(self.bpf)
         io_probes.attach_probes(self.bpf)
-        user_probes.attach_probes(self.bpf)
+        self.user_probes.attach_probes(self.bpf)
         matched = self.bpf.num_open_kprobes()
         self.config.tool_logger.info(f"{matched} functions matched")
         return self
@@ -378,97 +409,158 @@ class BCCMain:
             return self.filename_map[key]
         else:
             return None
-    
     def async_handle_event(self, index, data):
         event = DFEvent()
         event.id = index
         c_event = ctypes.cast(data, ctypes.POINTER(DFTraceEvent)).contents
-        event_tuple = self.category_fn_map[str(c_event.event_id)]
-        event.cat = event_tuple[0]
-        function_probe = event_tuple[1]
-        # self.config.tool_logger.info(f"{c_event.ip} IP processed for {function_probe.name}")
         event.args = {}
         event.pid = ctypes.c_uint32(c_event.id).value
         event.tid = ctypes.c_uint32(c_event.id >> 32).value
+        # self.config.tool_logger.info(f"Got event {c_event.event_id} PID {event.pid}")
+        if c_event.event_id == USDT_PROBE_EVENT_ID and event.pid not in self.bpfs:
+            try:
+                # This is a special event for new usdt probes
+                from bcc import BPF, USDT
+                usdt = USDT(pid=event.pid)
+                is_error = self.user_probes.attach_usdt(usdt)
+                if is_error:
+                    self.config.tool_logger.error(f"Unable to attach USDT probes for PID {event.pid}. Please check the logs for more details.")
+                    return
+                #self.config.tool_logger.info(usdt.get_text())
+                ctx_array = (ctypes.c_void_p * 1)()
+                ctx_array[0] = ctypes.c_void_p(usdt.get_context())
+                usdt_text = lib.bcc_usdt_genargs(ctx_array, 1)
+                probes = usdt.enumerate_active_probes()
+                for (binpath, fn_name, addr, pid) in probes:
+                    self.bpf.attach_uprobe(name=binpath, fn_name=fn_name,
+                                addr=addr, pid=pid)
+                if event.pid not in self.bpfs:
+                    self.bpfs[event.pid] = 0
+                self.bpfs[event.pid] += 1
+                # pid_specific_text = self.base_usdt_text.replace("USDT_PID", str(event.pid))
+                # pid_specific_text = pid_specific_text.replace("USDT_START_TS", str(c_event.ts))
+                # self.config.tool_logger.info(f"Attaching USDT to PID {event.pid}")
+                # self.bpfs[event.pid] = BPF(text=pid_specific_text, usdt_contexts=[usdt])
+                # self.open_buffer(self.bpfs[event.pid], self.handle_trace_event2)
+                for i in range(20):
+                    sleep(1)
+                    self.poll_buffers()
+                self.config.tool_logger.info(f"Attached USDT probes for PID {event.pid}")
+            except Exception as e:
+                self.config.tool_logger.error(f"Error attaching USDT probes for PID {event.pid}: {e}")
+                return -1
+            return -1
+        elif c_event.event_id == USDT_PYTHON_EVENT_ID:
+            self.usdt = True
+            # This is a special event for python usdt probes
+            c_event = ctypes.cast(data, ctypes.POINTER(DFUSDTTraceEvent)).contents
+            # Extract the 'clazz' member from c_event and convert to string
+            event.cat = c_event.clazz.decode() if hasattr(c_event, "clazz") and isinstance(c_event.clazz, bytes) else str(c_event.clazz)
+            event.name = c_event.method.decode() if hasattr(c_event, "method") and isinstance(c_event.method, bytes) else str(c_event.method)
+            self.config.tool_logger.info(f"Event {event.cat} with {event.name} for PID {event.pid}")
+        elif str(c_event.event_id) in self.category_fn_map:
+            # This is a normal event
+            event_tuple = self.category_fn_map[str(c_event.event_id)]
+            event.cat = event_tuple[0]
+            function_probe = event_tuple[1]
+            if function_probe.regex:
+                event.name = self.bpf.sym(c_event.ip, event.pid, show_module=True).decode()
+                if "unknown" in event.name:
+                    event.name = self.bpf.ksym(c_event.ip, show_module=True).decode()
+            else:
+                event.name = function_probe.name
+            if not function_probe.regex:
+                class_type = function_probe.get_class()
+                if class_type:
+                    c_event = ctypes.cast(data, ctypes.POINTER(class_type)).contents
+                    event.args = function_probe.get_args(c_event)
+                    if "file_hash" in event.args: # and event.args["file_hash"] in self.filename_map and self.filename_map[event.args["file_hash"]] is not None:
+                        event.args["fhash"] = event.args.pop("file_hash")
+        else:
+            # This is an unknown event
+            self.config.tool_logger.warning(f"Unknown event {c_event.event_id} for PID {event.pid} with IP {c_event.ip}")
+            return -1
+        # self.config.tool_logger.info(f"{c_event.ip} IP processed for {function_probe.name}")
         event.ts = int(c_event.ts)
         event.ph = 'X'
-        event.dur = c_event.dur
-        if function_probe.regex:
-            event.name = self.bpf.sym(c_event.ip, event.pid, show_module=True).decode()
-            if "unknown" in event.name:
-                event.name = self.bpf.ksym(c_event.ip, show_module=True).decode()
-        else:
-            event.name = function_probe.name
-        if not function_probe.regex:
-            class_type = function_probe.get_class()
-            if class_type:
-                c_event = ctypes.cast(data, ctypes.POINTER(class_type)).contents
-                event.args = function_probe.get_args(c_event)
-                if "file_hash" in event.args: # and event.args["file_hash"] in self.filename_map and self.filename_map[event.args["file_hash"]] is not None:
-                    event.args["fhash"] = event.args.pop("file_hash")
-        # self.last_processed_ts = c_event.ts
-        # self.config.tool_logger.debug(f"{self.last_processed_ts} timestamp processed")
+        event.dur = c_event.dur                    
         self.writer.write(event)
         self.no_event_count = 0
-        return
+        return 0
     
     def handle_trace_event(self, ctx, data, size):
-        self.has_events = True
         self.index += 1
-        self.async_handle_event(self.index, data)
-        # future = self.executor.submit(self.async_handle_trace, self.index, data)
-        # self.futures.append(future)
+        status = self.async_handle_event(self.index, data)
+        if status is None or status > -1:
+            self.has_events = True
+            # future = self.executor.submit(self.async_handle_trace, self.index, data)
+            # self.futures.append(future) 
+            self.pbar.update(1)
         self.no_event_count = 0
-        self.pbar.update(1)
-        return 
+        return 0
+
+    def handle_trace_event2(self, ctx, data, size):
+        self.index += 1
+        status = self.async_handle_event(self.index, data)
+        if status > -1:
+            self.has_events = True
+            # future = self.executor.submit(self.async_handle_trace, self.index, data)
+            # self.futures.append(future) 
+            self.pbar.update(1)
+        self.no_event_count = 0
+        return 0
     
-    def open_buffer(self, callback):
+    def open_buffer(self, bpf, callback):
         if self.config.trace_type == TraceType.PERF:
-            self.bpf["events"].open_perf_buffer(self.handle_trace_event, page_cnt=DEFAULT_PERF_BUFFER_PAGES)
+            bpf["events"].open_perf_buffer(callback, page_cnt=DEFAULT_PERF_BUFFER_PAGES)
         elif self.config.trace_type == TraceType.RING_BUFFER:
-            self.bpf["events"].open_ring_buffer(self.handle_trace_event)
+            bpf["events"].open_ring_buffer(callback)
+    
+    def poll_buffer(self, bpf):
+        """Polls the buffer for events"""
+        if self.config.trace_type == TraceType.PERF:
+            bpf.perf_buffer_poll()
+        elif self.config.trace_type == TraceType.RING_BUFFER:
+            bpf.ring_buffer_consume()
+    def poll_buffers(self):
+        self.poll_buffer(self.bpf)
             
-    def poll_buffer(self):
-        if self.config.trace_type == TraceType.PERF:
-            self.bpf.perf_buffer_poll()
-        elif self.config.trace_type == TraceType.RING_BUFFER:
-            self.bpf.ring_buffer_consume()
-    
     def trace_run(self) -> None:
-        self.open_buffer(self.handle_trace_event)
-        sleep_sec = self.config.interval_sec * 5
+        self.open_buffer(self.bpf, self.handle_trace_event)
+        sleep_sec = 0
         self.last_processed_ts = -1
-        wait_for = (30.0 / (sleep_sec) - 1)
+        wait_for = 30
         self.no_event_count = 0
         self.config.tool_logger.info("Ready to run code")
         self.pbar = tqdm()
+        current_index = self.index
         try:
-            while True:                
-                try:
-                    self.config.tool_logger.debug(
-                        f"sleeping for {sleep_sec} secs with last ts {self.last_processed_ts}"
+            start_time = time.time()
+            while True:
+                self.poll_buffers()
+                # sleep(sleep_sec)
+                if current_index != self.index:
+                    start_time = time.time()
+                    current_index = self.index
+                elapsed = time.time() - start_time
+                # self.config.tool_logger.info(
+                # f"elapsed {elapsed} seconds since last event"
+                # )
+                if self.has_events and current_index == self.index and elapsed > wait_for:
+                    # for future in concurrent.futures.as_completed(self.futures):
+                    #     try:
+                    #         future.result()
+                    #     except Exception as exc:
+                    #         print('generated an exception: %s' % (exc))
+                    self.config.tool_logger.info(
+                        f"No events for {elapsed} seconds. Quiting Profiler Now."
                     )
-                    sleep(sleep_sec)                    
-                    if self.has_events:
-                        self.no_event_count += 1
-                    if self.has_events and self.no_event_count > wait_for:
-                        # for future in concurrent.futures.as_completed(self.futures):
-                        #     try:
-                        #         future.result()
-                        #     except Exception as exc:
-                        #         print('generated an exception: %s' % (exc))
-                        self.config.tool_logger.info(
-                            f"No events for {self.no_event_count * sleep_sec} seconds. Quiting Profiler Now."
-                        )
-                        for k, v in self.bpf["file_hash"].items_lookup_and_delete_batch():
-                            self.writer.write_process_independent_metadata("FH", v.fname.decode(), k.value)
-                        self.stop()
-                        break
-                except KeyboardInterrupt:
+                    for k, v in self.bpf["file_hash"].items_lookup_and_delete_batch():
+                        self.writer.write_process_independent_metadata("FH", v.fname.decode(), k.value)
+                    self.stop()
                     break
                 for k, v in self.bpf["file_hash"].items_lookup_and_delete_batch():
                     self.writer.write_process_independent_metadata("FH", v.fname.decode(), k.value)
                 #filenames.items_delete_batch(keys)
-                self.poll_buffer()
         except KeyboardInterrupt:
             pass

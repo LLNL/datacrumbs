@@ -5,6 +5,7 @@ class ProbeType(Enum):
     SYSTEM = "SYSTEM"
     KERNEL = "KERNEL"
     USER = "USER"
+    USDT = "USDT"
 
     def __str__(self):
         return self.value
@@ -17,6 +18,8 @@ class ProbeType(Enum):
             return ProbeType.KERNEL
         elif ProbeType.USER.value == value:
             return ProbeType.USER
+        elif ProbeType.USDT.value == value:
+            return ProbeType.USDT
         return None
 
 class Mode(Enum):

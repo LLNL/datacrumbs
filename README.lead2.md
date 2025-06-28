@@ -93,5 +93,5 @@ export SPACK_DIR=/home/haridev/spack
 export DATACRUMBS_DIR=/home/haridev/datacrumbs
 export DATACRUMBS_INSTALL_DIR=/home/haridev/datacrumbs/install
 source ${DATACRUMBS_DIR}/scripts/lead2/client/setup.sh
-source ${DATACRUMBS_DIR}/scripts/lead2/client/tests/test_posix.sh
+${DATACRUMBS_DIR}/scripts/lead2/client/tests/test_posix.sh
 ```

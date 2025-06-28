@@ -1,5 +1,6 @@
 import ctypes
 from typing import *
+from datacrumbs.common.constants import *
 
 
 class DFEvent:
@@ -26,4 +27,14 @@ class DFTraceEvent(ctypes.Structure):
         ("ip", ctypes.c_uint64),
         ("ts", ctypes.c_uint64),
         ("dur", ctypes.c_uint64),
+    ]
+
+class DFUSDTTraceEvent(ctypes.Structure):
+    _fields_ = [
+        ("id", ctypes.c_uint64),
+        ("event_id", ctypes.c_uint64),
+        ("ts", ctypes.c_uint64),
+        ("dur", ctypes.c_uint64),
+        ("clazz", ctypes.c_char * MAX_STRING_LENGTH),
+        ("method", ctypes.c_char * MAX_STRING_LENGTH),
     ]
