@@ -8,8 +8,10 @@ CLONEROOT=${2:-"$CWD"}
 GITTAG=${3:-"v6.1"}
 GITOUT=${4:-"Montage-${GITTAG}"}
 
-# NOTE: Change OPENMPIMODULE as needed
+# NOTE: Change OPENMPIMODULE as needed or change USEMPI to false if you don't want to use MPI.
 OPENMPIMODULE="openmpi"
+USEMPIMODULE=true
+USEMPI=true
 
 GITOUTDIR="${CLONEROOT}/${GITOUT}"
 
@@ -38,10 +40,19 @@ fi
 cp "${CWD}"/MontageExec.template.sh "${CWD}"/MontageExec
 sed -i "s|MONTAGE_DIR=.*|MONTAGE_DIR=${GITOUTDIR}|" "$CWD"/MontageExec
 
-module load $OPENMPIMODULE || {
-  echo 'MPI module not found'
-  exit 1
-}
+if [[ $USEMPIMODULE == true ]]; then
+  module load $OPENMPIMODULE || {
+    echo 'MPI module name not found, please check the OPENMPIMODULE variable.'
+  }
+elif ! command -v mpicc &>/dev/null; then
+  echo "mpicc not found in system PATH"
+  if [[ $USEMPI == true ]]; then
+    echo "Please load the MPI module or set USEMPI to false."
+    exit 1
+  fi
+else
+  echo "Continuing without MPI support."
+fi
 
 if [[ $RUNMAKE == true ]]; then
   make clean
