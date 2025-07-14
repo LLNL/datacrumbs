@@ -60,5 +60,7 @@ profile.c
 logs/*
 poc/test
 
+install_init
+
 # Montage cloned source
 apps/Montage/Montage-*
