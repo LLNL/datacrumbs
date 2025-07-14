@@ -40,13 +40,14 @@ fi
 cp "${CWD}"/MontageExec.template.sh "${CWD}"/MontageExec
 sed -i "s|MONTAGE_DIR=.*|MONTAGE_DIR=${GITOUTDIR}|" "$CWD"/MontageExec
 
-if [[ $USEMPIMODULE == true ]]; then
-  module load $OPENMPIMODULE || {
-    echo 'MPI module name not found, please check the OPENMPIMODULE variable.'
-  }
-elif ! command -v mpicc &>/dev/null; then
-  echo "mpicc not found in system PATH"
-  if [[ $USEMPI == true ]]; then
+if [[ $USEMPI == true ]]; then
+  if [[ $USEMPIMODULE == true ]]; then
+    if ! module load "$OPENMPIMODULE"; then
+      echo 'MPI module name not found, please check the OPENMPIMODULE variable.'
+      exit 1
+    fi
+  elif ! command -v mpicc &>/dev/null; then
+    echo "mpicc not found in system PATH"
     echo "Please load the MPI module or set USEMPI to false."
     exit 1
   fi
