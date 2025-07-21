@@ -37,6 +37,7 @@ build
 
 #VSCode
 .cache
+.DS_Store
 
 # Log files
 *.log
