@@ -60,3 +60,4 @@ profile.c
 *.core
 logs/*
 poc/test
+create_hdf5_c
