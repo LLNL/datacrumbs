@@ -21,7 +21,7 @@ while getopts "gh" opt; do
 done
 
 if [ "$GEN_PROBES" = true ]; then
-    ${DATACRUMBS_DIR}/scripts/wombat/server/initialize_tool --module wombat --generate_probes
+    ${DATACRUMBS_DIR}/scripts/chameleon/server/initialize_tool chameleon --generate_probes
 else
-    ${DATACRUMBS_DIR}/scripts/wombat/server/initialize_tool --module wombat
+    ${DATACRUMBS_DIR}/scripts/chameleon/server/initialize_tool chameleon
 fi

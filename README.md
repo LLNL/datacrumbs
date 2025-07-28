@@ -138,3 +138,12 @@ The output format used is Chrome Tracing format and can be viewed using [perfett
 
 The profiler output can be analyzed using Dask distributed analysis. Please refer to the [notebook](analysis/analysis.ipynb).
 
+## Get non-rrot access to BPF
+
+System Tap has a permission model
+
+eBPF program types can make non-root is different
+Look at CAP_BPF CAP_PERF_MON
+Avoid CAP_SYS_ADMIN
+
+Security Guide: https://www.linuxfoundation.org/hubfs/eBPF/ControlPlane%20%E2%80%94%20eBPF%20Security%20Threat%20Model.pdf

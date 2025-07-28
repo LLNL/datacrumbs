@@ -10,6 +10,8 @@ while getopts "gh" opt; do
             echo "Usage: $0 [-g] [-h]"
             echo "  -g    Generate probes"
             echo "  -h    Show this help message"
+
+            ${DATACRUMBS_DIR}/scripts/ares/server/initialize_tool -h
             exit 0
             ;;
         *)
@@ -21,7 +23,7 @@ while getopts "gh" opt; do
 done
 
 if [ "$GEN_PROBES" = true ]; then
-    ${DATACRUMBS_DIR}/scripts/wombat/server/initialize_tool --module wombat --generate_probes
+    ${DATACRUMBS_DIR}/scripts/ares/server/initialize_tool ares --generate_probes --log_file "${DATACRUMBS_DIR}/logs/ares-init.log"
 else
-    ${DATACRUMBS_DIR}/scripts/wombat/server/initialize_tool --module wombat
+    ${DATACRUMBS_DIR}/scripts/ares/server/initialize_tool ares --log_file "${DATACRUMBS_DIR}/logs/ares-init.log"
 fi
