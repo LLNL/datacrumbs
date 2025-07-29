@@ -356,6 +356,8 @@ class IOProbes:
                 if "header" in value:
                     functions = Functions(value["header"], pattern)
                     function_names = functions.get_function_names()
+                    if name == "sys":
+                        function_names = [fname.replace("sys_", "") if fname.startswith("sys_") else fname for fname in function_names]
                 else:
                     function_names = get_bcc_functions(value["regex"])
                 for fname in tqdm(function_names, desc=f"System I/O headers for {name}"):
@@ -454,8 +456,8 @@ class IOProbes:
 
     def attach_probes(self, bpf) -> None:
         self.config.tool_logger.info("Attaching I/O Probes")
-        for probe in tqdm(self.probes, "attach I/O probes"):
-            for fn in tqdm(probe.functions, "attach I/O functions"):
+        for probe_id, probe in tqdm(enumerate(self.probes), "attach I/O probes", total=len(self.probes)):
+            for fn_id, fn in tqdm(enumerate(probe.functions), "attach I/O functions", total=len(probe.functions)):
                 try:
                     if ProbeType.SYSTEM == probe.type:
                         fnname = bpf.get_syscall_prefix().decode() + fn.name
@@ -498,7 +500,9 @@ class IOProbes:
                         if fn.regex:
                             is_regex = True
                             fname = fn.regex
-                        if probe.category in self.config.user_libraries:
+                        if probe.category == "libc":
+                            library = "c"
+                        elif probe.category in self.config.user_libraries:
                             library = self.config.user_libraries[probe.category]["link"]
                             bpf.add_module(library)
 
@@ -528,3 +532,12 @@ class IOProbes:
                     self.config.tool_logger.warn(
                         f"Unable attach probe  {probe.category} to io function {fn.name} due to {e}"
                     )
+                    self.probes[probe_id].functions[fn_id].valid = False
+        valid_probes = []
+        for probe in self.probes:
+            valid_functions = [fn for fn in probe.functions if fn.valid]
+            if valid_functions:
+                probe.functions = valid_functions
+                valid_probes.append(probe)
+        with open(self.config.io_probes_file, "w") as f:
+            json.dump([probe.to_dict() for probe in valid_probes], f, separators=(",", ":"))

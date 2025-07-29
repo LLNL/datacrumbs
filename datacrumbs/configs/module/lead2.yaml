@@ -1,30 +1,33 @@
 name: lead2
 install_dir: /home/haridev/datacrumbs/install
 mode: trace
-file: /scratch/haridev/logs/lead2-trace.pfw
+file: /tmp/lead2-trace.pfw
 system:
   - name: sys
     header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/syscalls.h
-  - name: os_page_cache
-    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/pagemap.h
-  - name: swap
-    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
-  - name: vfs
-    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fs.h
-  - name: bio
-    regex: bio.*
-  - name: shm
-    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
-  - name: fscache
-    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fscache.h
-  - name: mm
-    header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/mm.h
-  - name: xfs
-    regex: xfs.*
-  - name: iomap
-    regex: iomap.*
-  - name: iov
-    regex: iov.*
+    regex: sys_.*
+  # - name: os_page_cache
+  #   regex: filemap.*
+  # - name: os_page_cache
+  #   regex: kiocb.*
+  # - name: swap
+  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
+  # - name: vfs
+  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fs.h
+  # - name: bio
+  #   regex: bio.*
+  # - name: shm
+  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
+  # - name: fscache
+  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fscache.h
+  # - name: mm
+  #   header: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/mm.h
+  # - name: xfs
+  #   regex: xfs.*
+  # - name: iomap
+  #   regex: iomap.*
+  # - name: iov
+  #   regex: iov.*
 io:
   - name: libc
     link: /usr/lib64/libc.so.6
@@ -36,8 +39,6 @@ user:
   - name: test_posix
     link: /home/haridev/datacrumbs/install/libexec/datacrumbs/bin/df_tracer_test
     regex: ^(?!__).*
-  - name: python
-    lang: python
 profile:
   interval_sec: 0.0001
 

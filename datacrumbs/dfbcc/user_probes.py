@@ -81,8 +81,8 @@ class UserProbes:
 
     def attach_probes(self, bpf) -> None:
         self.config.tool_logger.info("Attaching probe for User Probes")
-        for probe in tqdm(self.probes, "attach User probes"):
-            for fn in tqdm(probe.functions, "attach User functions"):
+        for probe_id, probe in tqdm(enumerate(self.probes), "attach I/O probes", total=len(self.probes)):
+            for fn_id, fn in tqdm(enumerate(probe.functions), "attach I/O functions", total=len(probe.functions)):
                 try:
                     self.config.tool_logger.debug(
                         f"Adding Probe function {fn.name} from {probe.category}"
@@ -107,5 +107,14 @@ class UserProbes:
                     self.config.tool_logger.warn(
                         f"Unable attach probe {probe.category} to user function {fn.name} due to {e}"
                     )
+                    self.probes[probe_id].functions[fn_id].valid = False
+        valid_probes = []
+        for probe in self.probes:
+            valid_functions = [fn for fn in probe.functions if fn.valid]
+            if valid_functions:
+                probe.functions = valid_functions
+                valid_probes.append(probe)
+        with open(self.config.user_probes_file, "w") as f:
+            json.dump([probe.to_dict() for probe in valid_probes], f, separators=(",", ":"))
 
 

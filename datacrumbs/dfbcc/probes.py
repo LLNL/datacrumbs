@@ -16,6 +16,7 @@ class BCCFunctions:
     entry_struct_str: str
     exit_struct_str: str
     custom: bool
+    valid: bool
 
     def __init__(
         self,
@@ -27,6 +28,7 @@ class BCCFunctions:
         entry_cmd: str = "",
         exit_cmd_stats: str = "",
         exit_cmd_key: str = "",
+        valid: bool = True,
     ) -> None:
         self.name = name
         self.regex = regex
@@ -42,6 +44,7 @@ class BCCFunctions:
             self.custom = False
         else:
             self.custom = True
+        self.valid = valid
         
     def get_str_from_args(self, args):
         args_str = ""
@@ -83,15 +86,17 @@ class BCCFunctions:
         if self.exit_struct:
             val["exit_struct"] = self.exit_struct
         if self.entry_cmd:
-            val["entry_cmd"] = self.entry_cmd.replace(" ", "").replace("\t", "")
-        if self.exit_cmd_stats:     
-            val["exit_cmd_stats"] = self.exit_cmd_stats.replace(" ", "").replace("\t", "")
+            val["entry_cmd"] = self.entry_cmd.replace("  ", " ").replace("\t", " ")
+        if self.exit_cmd_stats:
+            val["exit_cmd_stats"] = self.exit_cmd_stats.replace("  ", " ").replace("\t", " ")
         if self.exit_cmd_key:
-            val["exit_cmd_key"] = self.exit_cmd_key.replace(" ", "").replace("\t", "")
+            val["exit_cmd_key"] = self.exit_cmd_key.replace("  ", " ").replace("\t", " ")
         if self.entry_args:
-            val["entry_args"] = self.entry_args.replace(" ", "").replace("\t", "")
+            val["entry_args"] = self.entry_args.replace("  ", " ").replace("\t", " ")
         if self.custom:
             val["custom"] = self.custom
+        if not self.valid:
+            val["valid"] = self.valid
         return val
 
     @staticmethod
@@ -105,6 +110,7 @@ class BCCFunctions:
             exit_cmd_stats=data.get("exit_cmd_stats", ""),
             exit_cmd_key=data.get("exit_cmd_key", ""),
             entry_args=data.get("entry_args", ""),
+            valid=data.get("valid", True),
         )
     
     def get_class(self):
