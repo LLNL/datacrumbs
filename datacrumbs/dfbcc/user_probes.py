@@ -97,7 +97,7 @@ class UserProbes:
                         if fn.regex:
                             is_regex = True
                             fname = fn.regex
-                        if fn.address and not is_regex:
+                        if fn.address and fn.address != 0 and not is_regex:
                             bpf.attach_uprobe(
                                 name=library,
                                 addr=fn.address,

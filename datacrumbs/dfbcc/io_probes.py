@@ -501,7 +501,7 @@ class IOProbes:
                         if probe.category in self.config.user_libraries:
                             library = self.config.user_libraries[probe.category]["link"]
                             bpf.add_module(library)
-                        if fn.address and not is_regex:
+                        if fn.address and fn.address != 0 and not is_regex:
                             bpf.attach_uprobe(
                                 name=library,
                                 addr=fn.address,
