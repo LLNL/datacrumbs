@@ -498,7 +498,7 @@ class IOProbes:
                         if fn.regex:
                             is_regex = True
                             fname = fn.regex
-                        if probe.category in self.config.user_libraries:
+                        if probe.category in self.config.io_libraries:
                             library = self.config.user_libraries[probe.category]["link"]
                             bpf.add_module(library)
                         if fn.address and fn.address != 0 and not is_regex:
