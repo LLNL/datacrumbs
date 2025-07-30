@@ -380,7 +380,7 @@ class IOProbes:
                 for symbol in tqdm(symbols, desc=f"User symbols for {name}"):
                     if (symbol or symbol != "") and pattern.match(symbol):
                         if symbol not in functions_added:
-                            probe.functions.append(BCCFunctions(symbol))
+                            probe.functions.append(BCCFunctions(symbol, address=symbols_dict[symbol]["address"]))
                             functions_added.add(symbol)
                             self.config.tool_logger.debug(f"Adding Probe function {symbol} from {name}")
                 self.probes.append(probe)
@@ -501,29 +501,40 @@ class IOProbes:
                         if probe.category in self.config.user_libraries:
                             library = self.config.user_libraries[probe.category]["link"]
                             bpf.add_module(library)
-
-                        if is_regex:
+                        if fn.address and not is_regex:
                             bpf.attach_uprobe(
                                 name=library,
-                                sym_re=fname,
+                                addr=fn.address,
                                 fn_name=f"trace_{probe.category}_{fn.name}_entry".replace(".", "_"),
                             )
                             bpf.attach_uretprobe(
                                 name=library,
-                                sym_re=fname,
+                                addr=fn.address,
                                 fn_name=f"trace_{probe.category}_{fn.name}_exit".replace(".", "_"),
                             )
-                        else:
-                            bpf.attach_uprobe(
-                                name=library,
-                                sym=fname,
-                                fn_name=f"trace_{probe.category}_{fn.name}_entry".replace(".", "_"),
-                            )
-                            bpf.attach_uretprobe(
-                                name=library,
-                                sym=fname,
-                                fn_name=f"trace_{probe.category}_{fn.name}_exit".replace(".", "_"),
-                            )
+                        else:                        
+                            if is_regex:
+                                bpf.attach_uprobe(
+                                    name=library,
+                                    sym_re=fname,
+                                    fn_name=f"trace_{probe.category}_{fn.name}_entry".replace(".", "_"),
+                                )
+                                bpf.attach_uretprobe(
+                                    name=library,
+                                    sym_re=fname,
+                                    fn_name=f"trace_{probe.category}_{fn.name}_exit".replace(".", "_"),
+                                )
+                            else:
+                                bpf.attach_uprobe(
+                                    name=library,
+                                    sym=fname,
+                                    fn_name=f"trace_{probe.category}_{fn.name}_entry".replace(".", "_"),
+                                )
+                                bpf.attach_uretprobe(
+                                    name=library,
+                                    sym=fname,
+                                    fn_name=f"trace_{probe.category}_{fn.name}_exit".replace(".", "_"),
+                                )
                 except Exception as e:
                     self.config.tool_logger.warn(
                         f"Unable attach probe  {probe.category} to io function {fn.name} due to {e}"
