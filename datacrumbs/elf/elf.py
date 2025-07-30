@@ -187,7 +187,7 @@ class CorpusReader(et.elffile.ELFFile):  # noqa
                     "type": symbol_type,
                     "binding": binding,
                     "visibility": visibility,
-                    "address": int(hex(symbol["st_value"]), 16),
+                    "address": hex(symbol["st_value"]),
                     "defined": et.descriptions.describe_symbol_shndx(
                         self._get_symbol_shndx(symbol, sym_idx, idx)
                     ).strip(),

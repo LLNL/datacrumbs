@@ -502,14 +502,15 @@ class IOProbes:
                             library = self.config.user_libraries[probe.category]["link"]
                             bpf.add_module(library)
                         if fn.address and fn.address != 0 and not is_regex:
+                            self.config.tool_logger.info("Using address for function " + fn.name)                            
                             bpf.attach_uprobe(
                                 name=library,
-                                addr=fn.address,
+                                addr=int(fn.address, 16),
                                 fn_name=f"trace_{probe.category}_{fn.name}_entry".replace(".", "_"),
                             )
                             bpf.attach_uretprobe(
                                 name=library,
-                                addr=fn.address,
+                                addr=int(fn.address, 16),
                                 fn_name=f"trace_{probe.category}_{fn.name}_exit".replace(".", "_"),
                             )
                         else:                        
