@@ -1,9 +1,9 @@
 name: ares
-install_dir: /home/${USER}/datacrumbs/install
+install_dir: /home/xcatcadmin/datacrumbs/install
 # mode options: `trace` or `profile`
 # currently only `trace` mode
 mode: trace
-file: /home/${USER}/logs/ares-trace.pfw
+file: /home/xcatcadmin/logs/ares-trace.pfw
 # if no headers installed use regex as sys.*
 system:
   - name: sys

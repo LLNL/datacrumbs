@@ -200,9 +200,9 @@ class ConfigurationManager:
             self.create_log_file(args.log_file, args.log_level)
         self.load_from_yaml(args.module)
         self.override_with_args(args)
+        self.derive()
         self.validate_config()
         self.tool_logger.info("Configuration loaded and overridden successfully.")
-        self.derive()
         self.pretty_print_config()
         return self
     
