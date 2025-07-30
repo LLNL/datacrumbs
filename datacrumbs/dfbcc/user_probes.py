@@ -100,12 +100,12 @@ class UserProbes:
                         if fn.address and fn.address != 0 and not is_regex:
                             bpf.attach_uprobe(
                                 name=library,
-                                addr=fn.address,
+                                addr=int(fn.address, 16),
                                 fn_name=f"trace_{probe.category}_{fn.name}_entry".replace(".", "_"),
                             )
                             bpf.attach_uretprobe(
                                 name=library,
-                                addr=fn.address,
+                                addr=int(fn.address, 16),
                                 fn_name=f"trace_{probe.category}_{fn.name}_exit".replace(".", "_"),
                             )
                         else:                        
