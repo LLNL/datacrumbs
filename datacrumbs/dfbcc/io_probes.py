@@ -502,7 +502,7 @@ class IOProbes:
                             library = self.config.io_libraries[probe.category]["link"]
                             bpf.add_module(library)
                         if fn.address and not is_regex:
-                            self.config.tool_logger.info(f"Using address for function {fn.name} address:{fn.address} on library:{library}")                            
+                            self.config.tool_logger.debug(f"Using address for function {fn.name} address:{fn.address} on library:{library}")                            
                             bpf.attach_uprobe(
                                 name=library,
                                 addr=int(fn.address, 16),
