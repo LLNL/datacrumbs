@@ -1,9 +1,12 @@
 #ifndef EXAMPLE_H
 #define EXAMPLE_H
 
-struct event_t {
- int pid;
- int event_id;
+struct data_t {
+  int pid;
+  int uid;
+  char command[16];
+  char message[12];
+  char path[16];
 };
 
 #endif
