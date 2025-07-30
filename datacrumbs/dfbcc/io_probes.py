@@ -417,7 +417,7 @@ class IOProbes:
                     else:
                         text = collector.generic_functions
                 text = text.replace("DFCAT", probe.category)
-                text = text.replace("DFFUNCTION", fn.name)
+                text = text.replace("DFFUNCTION", fn.name.replace(".", "_"))
                 text = text.replace("DFEVENTID", str(count))
                 text = text.replace("DFENTRYCMD", fn.entry_cmd)
                 text = text.replace("DFEXITCMDSTATS", fn.exit_cmd_stats)
@@ -506,23 +506,23 @@ class IOProbes:
                             bpf.attach_uprobe(
                                 name=library,
                                 sym_re=fname,
-                                fn_name=f"trace_{probe.category}_{fn.name}_entry",
+                                fn_name=f"trace_{probe.category}_{fn.name}_entry".replace(".", "_"),
                             )
                             bpf.attach_uretprobe(
                                 name=library,
                                 sym_re=fname,
-                                fn_name=f"trace_{probe.category}_{fn.name}_exit",
+                                fn_name=f"trace_{probe.category}_{fn.name}_exit".replace(".", "_"),
                             )
                         else:
                             bpf.attach_uprobe(
                                 name=library,
                                 sym=fname,
-                                fn_name=f"trace_{probe.category}_{fn.name}_entry",
+                                fn_name=f"trace_{probe.category}_{fn.name}_entry".replace(".", "_"),
                             )
                             bpf.attach_uretprobe(
                                 name=library,
                                 sym=fname,
-                                fn_name=f"trace_{probe.category}_{fn.name}_exit",
+                                fn_name=f"trace_{probe.category}_{fn.name}_exit".replace(".", "_"),
                             )
                 except Exception as e:
                     self.config.tool_logger.warn(

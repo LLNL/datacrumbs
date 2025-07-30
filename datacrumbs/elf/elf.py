@@ -182,8 +182,6 @@ class CorpusReader(et.elffile.ELFFile):  # noqa
 
                 # We aren't considering st_value, which could be many things
                 # https://docs.oracle.com/cd/E19683-01/816-1386/6m7qcoblj/index.html#chapter6-35166
-                if "." in symbol.name:
-                    continue
                 symbols[symbol.name] = {
                     "version_info": version_info,
                     "type": symbol_type,
