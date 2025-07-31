@@ -67,3 +67,6 @@ create_hdf5_c
 # Montage cloned source
 install_init
 apps/Montage/Montage-*
+poc/bpf-core/example
+poc/bpf-core/example.skel.h
+file
