@@ -11,7 +11,7 @@ all: $(TARGET) $(BPF_OBJ) find-map
 $(TARGET): $(USER_C) $(USER_SKEL) 
 	gcc -Wall -o $(TARGET) $(USER_C) -L../libbpf/src -l:libbpf.so -lelf -lz
 
-%.bpf.o: %.bpf.c vmlinux.h
+%.bpf.o:  example.kprobe.bpf.c  example.syscall.bpf.c  example.uprobe.bpf.c  example.usdt.bpf.c   vmlinux.h
 	clang \
 	    -target bpf \
         -D __TARGET_ARCH_$(ARCH) \
