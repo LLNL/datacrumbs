@@ -1,4 +1,3 @@
-#include "example.generic.bpf.h"
 SEC("ksyscall/openat")
 int BPF_KPROBE(openat_entry, struct pt_regs* regs) {
   generic_call(1);

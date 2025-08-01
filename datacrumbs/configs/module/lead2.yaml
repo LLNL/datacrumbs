@@ -1,0 +1,19 @@
+name: lead2
+install_dir: /home/haridev/datacrumbs/install
+mode: tracer
+trace_file_path: /scratch/haridev/logs/lead2-trace.pfw
+capture_probes:
+  - type: header
+    name: sys
+    probe: syscalls
+    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/syscalls.h
+    regex: sys_.*
+  - type: binary
+    probe: uprobe
+    name: libc
+    file: /usr/lib64/libc.so.6
+  - type: ksym
+    probe: kprobe
+    name: bio
+    regex: bio.*
+profiling_interval: 0.0001
