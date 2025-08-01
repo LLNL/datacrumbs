@@ -40,10 +40,11 @@ class IOProbes:
 
     def __init__(self, generate_probes=False) -> None:
         self.config = ConfigurationManager.get_instance()
-
+        print("here")
         if generate_probes:
             self.regex_functions = set()
             self.probes = []
+            
             exit_cmd_key_file_check = """
                             int* fd_ptr = latest_fd.lookup(&id);
                             if (fd_ptr != 0 ) {
