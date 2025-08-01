@@ -16,214 +16,47 @@
 #include <datacrumbs/server/bpf/macros.bpf.h>
 #include <datacrumbs/server/bpf/shared.h>
 
-DATACRUMBS_MAP(pid_map, u32, u64, 1024);
+DATACRUMBS_MAP(pid_map, u64, u64, 1024);
 DATACRUMBS_MAP(fn_pid_map, struct fn_key_t, struct fn_value_t);
-DATACRUMBS_RINGBUF(output, 1024 * 1024 * 16U);  // 16MB ring buffer
-DATACRUMBS_MAP(file_map, char[MAX_STR_READ_LEN], u32, 1024);
-DATACRUMBS_TRIE(inclusion_path_trie, struct string_t, u32);
+DATACRUMBS_RINGBUF(output, 1 << 16);
 
-#ifndef DATACRUMBS_TRACE_ALL
-#define DATACRUMBS_TRACE_ALL 0
-#endif
-
-static inline __attribute__((always_inline)) u32 hash_str(const char* str, size_t len) {
-  u32 hash = 5381;
-#pragma unroll
-  for (int i = 0; i < 128; ++i) {
-    if (i >= len) break;
-    hash = ((hash << 5) + hash) + str[i];  // hash * 33 + c
-  }
-  return hash;
-}
-
-static inline __attribute__((always_inline)) u32 hash_and_store(struct string_t* str, size_t len) {
-  u32* existing = bpf_map_lookup_elem(&file_map, str);
-  if (existing) {
-    return *existing;  // Return existing hash
-  }
-  u32 hash = hash_str(str->str, len);
-  // Store new hash
-  bpf_map_update_elem(&file_map, str, &hash, BPF_ANY);
-  return hash;
-}
-
-// Returns 1 if any prefix in trie matches 'str' of length 'len', else 0
-static inline __attribute__((always_inline)) int prefix_search(void* trie, struct string_t* key) {
-  // key->len = MAX_STR_READ_LEN;
-  unsigned int* found = bpf_map_lookup_elem(trie, key);
-  if (found && *found != 1) {
-    DBG_PRINTK("Found string:%s value:%u", key->str, *found);
-    return 1;
-  }
-  DBG_PRINTK("Not Found string:%s value:%u", key->str, found ? *found : 0);
-
-  return 0;
-}
-
-#if defined(DATACRUMBS_TRACE_ALL) && (DATACRUMBS_TRACE_ALL == 1)
-static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* key, u64* start_ts) {
-  key->id = bpf_get_current_pid_tgid();
-  return 1;
-}
-#else
-static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* key, u64* start_ts) {
-  key->id = bpf_get_current_pid_tgid();
-  u32 pid = key->id & 0xFFFFFFFF;
-  (void)pid;
-  start_ts = (u64*)bpf_map_lookup_elem(&pid_map, &pid);
-  if (start_ts == 0 || key->id == 0) return 0;
-  return 1;
-}
-#endif
-
-#ifndef DATACRUMBS_TRACING_ENABLE
-#define DATACRUMBS_TRACING_ENABLE 1
-#endif
-
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
 static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
+  key.id = bpf_get_current_pid_tgid();
+  u64* start_ts = bpf_map_lookup_elem(&pid_map, &key.id);
+  if (start_ts == 0 || key.id == 0) return 0;
+
   key.event_id = event_id;
-  u64 start_ts;
-  if (!need_tracing(&key, &start_ts)) {
-    return 0;  // not tracing this pid
-  }
   struct fn_value_t fn = {};
   fn.ts = bpf_ktime_get_ns();
   bpf_map_update_elem(&fn_pid_map, &key, &fn, BPF_ANY);
-  DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
+  bpf_printk("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
   return 0;
 }
-#else
-static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
-  return 0;
-}
-#endif
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
 static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
-  u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
-  key.event_id = event_id;
-  u64 start_ts;
-  if (!need_tracing(&key, &start_ts)) {
-    return 0;  // not tracing this pid
-  }
+  key.id = bpf_get_current_pid_tgid();
+  u64* start_ts = bpf_map_lookup_elem(&pid_map, &key.id);
+  if (start_ts == 0 || key.id == 0) return 0;
+  key.event_id += event_id;
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
   if (fn == 0) return 0;  // missed entry
-  DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
-  struct general_event_t* event;
-  DATACRUMBS_RB_RESERVE(output, struct general_event_t, event);
-  event->type = 1;
-  event->id = key.id;
-  event->event_id = event_id;
-  DATACRUMBS_COLLECT_TIME(event);
-  DATACRUMBS_EVENT_SUBMIT(event);
-  return 0;
-}
-#else
-static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
-  return 0;
-}
-#endif
-
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
-static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx, u64 event_id) {
-  struct fn_key_t key = {};
-  key.event_id = event_id;
-  u64 start_ts;
-  if (!need_tracing(&key, &start_ts)) {
-    return 0;  // not tracing this pid
+  struct general_event_t* stats_key;
+  stats_key = bpf_ringbuf_reserve(&output, sizeof(struct general_event_t), 0);
+  if (!stats_key) {
+    bpf_printk("Failed to reserve space in ring buffer for stats for pid:%d, event_id:%llu\n",
+               (u32)key.id, event_id);
+    return 0;  // failed to reserve space
   }
-  struct fn_value_t fn = {};
-  fn.ts = bpf_ktime_get_ns();
-  bpf_map_update_elem(&fn_pid_map, &key, &fn, BPF_ANY);
-  DBG_PRINTK("USDT  Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
+  stats_key->id = key.id;
+  stats_key->event_id = event_id;
+  struct general_event_t* stats = stats_key;
+  stats->ts = (fn->ts - *start_ts);
+  stats->dur = bpf_ktime_get_ns() - fn->ts;
+  bpf_ringbuf_submit(stats_key, 0);
+  bpf_printk("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, event_id);
   return 0;
 }
-
-#else
-static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx, u64 event_id) {
-  return 0;
-}
-#endif
-
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
-
-static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
-                                                           long clazz, long method) {
-  u64 te = bpf_ktime_get_ns();
-  struct fn_key_t key = {};
-  key.event_id = event_id;
-  u64 start_ts;
-  if (!need_tracing(&key, &start_ts)) {
-    return 0;  // not tracing this pid
-  }
-  struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
-  if (fn == 0) return 0;  // missed entry
-  DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
-  struct string_t local_str = {};                                                      // 100
-  long len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)clazz);  // 90
-  local_str.len = len;
-  int found = prefix_search(&inclusion_path_trie, &local_str);
-  if (!found) {
-    DBG_PRINTK("Skipping usdt for %s as it is not in inclusion path trie\n", local_str.str);
-    return 0;  // Skip if not in inclusion path
-  }
-
-  struct usdt_event_t* event;
-  DATACRUMBS_RB_RESERVE(output, struct usdt_event_t, event);
-  event->type = 3;
-  event->id = key.id;
-  event->event_id = event_id;
-  DATACRUMBS_COLLECT_TIME(event);
-
-  u32 class_hash = hash_and_store(&local_str, len);
-  event->class_hash = class_hash;                                                  // 100
-  len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)method);  // 90
-
-  u32 method_hash = hash_and_store(&local_str, len);
-  event->method_hash = method_hash;  // 100
-  DATACRUMBS_EVENT_SUBMIT(event);
-  return 0;
-}
-
-#else
-static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
-                                                           long clazz, long method) {
-  return 0;
-}
-#endif
-
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
-static inline __attribute__((always_inline)) int generic_fork_exit(struct pt_regs* ctx,
-                                                                   u64 event_id) {
-  struct fn_key_t key = {};
-  key.event_id = event_id;
-  u64 start_ts;
-  if (need_tracing(&key, &start_ts)) {
-    // u64 id = bpf_get_current_pid_tgid();
-    u64 tsp = bpf_ktime_get_ns();
-    u32 pid = PT_REGS_RC(ctx);
-    (void)pid;
-    if (pid != 0) {
-      DBG_PRINTK("Collect forked tracing PID %d", pid);
-      bpf_map_update_elem(&pid_map, &pid, &tsp, BPF_ANY);
-    }
-  }
-  return generic_exit(ctx, event_id);
-}
-
-#else
-static inline __attribute__((always_inline)) int generic_fork_exit(struct pt_regs* ctx,
-                                                                   u64 event_id) {
-  return 0;
-}
-#endif
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 #endif  // DATACRUMBS_SERVER_BPF_COMMON_H
-
-/**
- *  Not Found string:/tmp/dlio/data/unet3d/train/img_137_of_168.npz value:1
-        Found string:/tmp/dlio/data/unet3d/train/img_131_of_168.npz value:3
- */

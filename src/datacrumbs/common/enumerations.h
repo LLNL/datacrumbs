@@ -45,6 +45,7 @@ enum class CaptureType : uint8_t {
   HEADER = 0,
   BINARY = 1,
   KSYM = 2,
+  USDT = 3,
 };
 
 inline void convert(const std::string& s, CaptureType& type) {
@@ -54,9 +55,11 @@ inline void convert(const std::string& s, CaptureType& type) {
     type = CaptureType::BINARY;
   } else if (s == "ksym") {
     type = CaptureType::KSYM;
+  } else if (s == "usdt") {
+    type = CaptureType::USDT;
   } else {
     throw std::invalid_argument("Unknown CaptureType: " + s +
-                                ". Valid types are: header, binary, or ksym.");
+                                ". Valid types are: header, binary, ksym, or usdt.");
   }
 }
 

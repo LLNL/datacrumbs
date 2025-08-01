@@ -11,13 +11,16 @@ class Probe {
   Probe(ProbeType _type) : type(_type) {}
   ProbeType type;  // The type of probe
   std::string name;
-  std::string intercept_name;
   std::vector<std::string> functions;  // Arguments for the probe
+  virtual bool validate() const {
+    if (name.empty()) return false;
+    if (functions.empty()) return false;
+    return true;
+  }
   virtual json_object* toJson() const {
     json_object* j = json_object_new_object();
     json_object_object_add(j, "type", json_object_new_int(static_cast<int>(type)));
     json_object_object_add(j, "name", json_object_new_string(name.c_str()));
-    json_object_object_add(j, "intercept_name", json_object_new_string(intercept_name.c_str()));
 
     json_object* funcs = json_object_new_array();
     for (const auto& func : functions) {
@@ -33,9 +36,6 @@ class Probe {
     json_object* name_obj = json_object_object_get(j, "name");
     if (name_obj) p.name = json_object_get_string(name_obj);
 
-    json_object* intercept_obj = json_object_object_get(j, "intercept_name");
-    if (intercept_obj) p.intercept_name = json_object_get_string(intercept_obj);
-
     json_object* funcs_obj = json_object_object_get(j, "functions");
     if (funcs_obj && json_object_get_type(funcs_obj) == json_type_array) {
       int len = json_object_array_length(funcs_obj);
@@ -48,15 +48,25 @@ class Probe {
   }
 };
 
-struct KPROBE : public Probe {
+struct SysCallProbe : public Probe {
  public:
-  KPROBE() : Probe(ProbeType::KPROBE) {}
+  SysCallProbe() : Probe(ProbeType::SYSCALLS) {}
+};
+
+struct KProbe : public Probe {
+ public:
+  KProbe() : Probe(ProbeType::KPROBE) {}
 };
 
 struct UProbe : public Probe {
  public:
   UProbe() : Probe(ProbeType::UPROBE), binary_path() {}
   std::string binary_path;  // Path to the binary
+  bool validate() const override {
+    if (!Probe::validate()) return false;
+    if (binary_path.empty()) return false;
+    return true;
+  }
   json_object* toJson() const override {
     json_object* j = Probe::toJson();
     json_object_object_add(j, "binary_path", json_object_new_string(binary_path.c_str()));
@@ -68,7 +78,6 @@ struct UProbe : public Probe {
     Probe base = Probe::fromJson(j);
     p.type = base.type;
     p.name = base.name;
-    p.intercept_name = base.intercept_name;
     p.functions = base.functions;
 
     json_object* bin_obj = json_object_object_get(j, "binary_path");
@@ -83,6 +92,12 @@ struct USDTProbe : public Probe {
   USDTProbe() : Probe(ProbeType::USDT), binary_path(), provider() {}
   std::string binary_path;  // Path to the binary
   std::string provider;     // USDT provider name
+  bool validate() const override {
+    if (!Probe::validate()) return false;
+    if (binary_path.empty()) return false;
+    if (provider.empty()) return false;
+    return true;
+  }
   json_object* toJson() const override {
     json_object* j = Probe::toJson();
     json_object_object_add(j, "binary_path", json_object_new_string(binary_path.c_str()));
@@ -95,7 +110,6 @@ struct USDTProbe : public Probe {
     Probe base = Probe::fromJson(j);
     p.type = base.type;
     p.name = base.name;
-    p.intercept_name = base.intercept_name;
     p.functions = base.functions;
 
     json_object* bin_obj = json_object_object_get(j, "binary_path");
@@ -125,11 +139,17 @@ class HeaderCaptureProbe : public CaptureProbe {
   HeaderCaptureProbe() : CaptureProbe(CaptureType::HEADER), file() {}
   std::string file;  // Name of the header to capture
 };
-
 class BinaryCaptureProbe : public CaptureProbe {
  public:
   BinaryCaptureProbe() : CaptureProbe(CaptureType::BINARY), file() {}
   std::string file;  // Path to the binary
+};
+
+class USDTCaptureProbe : public CaptureProbe {
+ public:
+  USDTCaptureProbe() : CaptureProbe(CaptureType::USDT), binary_path(), provider() {}
+  std::string binary_path;  // Path to the binary
+  std::string provider;     // USDT provider name
 };
 
 }  // namespace datacrumbs
