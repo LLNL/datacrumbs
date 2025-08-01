@@ -5,7 +5,7 @@ string(TOLOWER "${PROJECT_NAME}" LOWER_PROJECT_NAME)
 
 if(CMAKE_INSTALL_LIBDIR)
     message(STATUS "CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR}")
-    set(DATACRUMBS_INSTALL_LIB_DIR ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+    set(DATACRUMBS_LIBDIR ${CMAKE_INSTALL_LIBDIR})
     set(DATACRUMBS_INSTALL_INCLUDE_DIR
         ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR})
     set(DATACRUMBS_INSTALL_DOCDIR
@@ -17,14 +17,14 @@ if(CMAKE_INSTALL_LIBDIR)
     set(DATACRUMBS_INSTALL_LIBEXEC
         ${CMAKE_INSTALL_PREFIX}/libexec/${PROJECT_NAME})
 else()
-    set(DATACRUMBS_LIBDIR lib)
-    set(DATACRUMBS_INSTALL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+    set(DATACRUMBS_LIBDIR "lib")
     set(DATACRUMBS_INSTALL_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include")
     set(DATACRUMBS_INSTALL_DOCDIR "${CMAKE_INSTALL_PREFIX}/doc")
     set(DATACRUMBS_INSTALL_SYSCONFDIR "${CMAKE_INSTALL_PREFIX}/etc/modulefiles")
     set(DATACRUMBS_INSTALL_BINARYDIR "${CMAKE_INSTALL_PREFIX}/bin")
-    set(DATACRUMBS_INSTALL_LIBEXEC ${CMAKE_INSTALL_PREFIX}/libexec)
-    message(STATUS "[${UPPER_PROJECT_NAME}] DATACRUMBS_LIBDIR set to ${DATACRUMBS_LIBDIR}")
+    message(STATUS "DATACRUMBS_LIBDIR set to ${DATACRUMBS_LIBDIR}")
+    set(DATACRUMBS_INSTALL_LIBEXEC
+        ${CMAKE_INSTALL_PREFIX}/libexec/${PROJECT_NAME})
 endif()
 
 if(NOT DATACRUMBS_EXTERNALLY_CONFIGURED)
@@ -33,77 +33,77 @@ if(NOT DATACRUMBS_EXTERNALLY_CONFIGURED)
     set(EXECUTABLE_OUTPUT_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all Libraries")
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
-    set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec)
 endif()
-function(print_all_variables)
-  message(STATUS "CMake Variables:")
-  get_cmake_property(_variableNames VARIABLES)
-  list(SORT _variableNames)
-  foreach (_variableName ${_variableNames})
-    message(STATUS "${_variableName}=${${_variableName}}")
-  endforeach()
-endfunction()
-option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
-option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" ON)
-option(BPFTOOL_EXECUTABLE "Path to bpftool executable" "")
-
-# Optionally allow user to specify host name via CMake option
-option(DATACRUMBS_HOST "Host name for datacrumbs (numbers will be stripped if not set)" "")
-
-if(NOT DATACRUMBS_SKIP_PROBE_EXPLORING)
-    set(ENABLE_PROBE_EXPLORER ON)
-else()
-    set(ENABLE_PROBE_EXPLORER OFF)
-endif()
-
-if(NOT DATACRUMBS_SKIP_PROBE_GENERATION)
-    set(ENABLE_PROBE_GENERATOR ON)
-else()
-    set(ENABLE_PROBE_GENERATOR OFF)
-endif()
-
-# Helper macro to prepend clean_bpf_before_run to custom targets
-macro(add_custom_target_with_clean name)
-    add_custom_target(${name}
-        COMMAND ${CMAKE_COMMAND} --build . --target extra_clean
-        COMMAND ${ARGN}
-        COMMENT "Running ${name} with BPF clean"
-    )
-endmacro()
-
-add_custom_target_with_clean(clean_all)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBBPF libbpf)
-
-if(LIBBPF_VERSION VERSION_LESS "1.0.0")
-    message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf version 1.0.0 or newer is required, but found ${LIBBPF_VERSION}")
-endif()
-# print_all_variables()
-if(LIBBPF_FOUND)
-    set(LIBBPF_VERSION "${LIBBPF_VERSION}")
-    message(STATUS "[${UPPER_PROJECT_NAME}] Found libbpf version: ${LIBBPF_VERSION}")
-    include_directories(${LIBBPF_INCLUDEDIR})
-    link_directories(${LIBBPF_LIBDIR})
-else()
-    message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf not found!")
-endif()
-
-# Ensure the process output directory exists
-file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/process/)
-file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/)
-
-set(configuration_variables --user $ENV{USER} --config_path ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs --data_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data --trace_log_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
-
-set(DATACRUMBS_CLIENT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.h)
+set(DATACRUMBS_CLIENT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.c ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.h)
 
 add_library(${PROJECT_NAME}_client SHARED ${DATACRUMBS_CLIENT_SRC})
-add_dependencies(${PROJECT_NAME}_client clean_all)
 install(
     TARGETS ${PROJECT_NAME}_client
+    EXPORT ${DATACRUMBS_EXPORTED_TARGETS}
+    LIBRARY DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
+    ARCHIVE DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
+    RUNTIME DESTINATION ${DATACRUMBS_INSTALL_BIN_DIR}
+)
+
+set(DATACRUMBS_COMMON_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/data_structures.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/enumerations.h
+)
+
+set(DATACRUMBS_EXPLORER_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/probe_explorer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/probe_explorer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/mechanism/elf_capture.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/mechanism/elf_capture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/mechanism/header_capture.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/mechanism/header_capture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/mechanism/ksym_capture.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/mechanism/ksym_capture.cpp
+)
+set(DEPENDENCY_LIB ${CMAKE_EXE_LINKER_FLAGS} $ENV{LDFLAGS})
+find_package(yaml-cpp REQUIRED)
+
+if(${yaml-cpp_FOUND})
+    message(STATUS "[${UPPER_PROJECT_NAME}] found yaml-cpp at ${YAML_CPP_INCLUDE_DIR}")
+    include_directories(${YAML_CPP_INCLUDE_DIR})
+    set(YAML_CPP_LIBRARY_DIR "${YAML_CPP_CMAKE_DIR}/../../")
+    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${YAML_CPP_LIBRARY_DIR} ${YAML_CPP_LIBRARIES})
+else()
+    message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] yaml-cpp is needed for ${PROJECT_NAME} build")
+endif()
+
+find_package(LLVM REQUIRED CONFIG)
+
+if(LLVM_FOUND)
+    message(STATUS "[${UPPER_PROJECT_NAME}] found LLVM at ${LLVM_INCLUDE_DIRS}")
+    include_directories(${LLVM_INCLUDE_DIRS})
+    link_directories(${LLVM_LIBRARY_DIRS})
+    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} ${LLVM_LIBRARIES} -lclang)
+else()
+    message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] LLVM is needed for ${PROJECT_NAME} build")
+endif()
+
+find_package(json-c REQUIRED)
+
+if(json-c_FOUND)
+    message(STATUS "[${UPPER_PROJECT_NAME}] found json-c at ${json-c_INCLUDE_DIRS}")
+    include_directories(json-c::json-c)
+    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} json-c::json-c)
+else()
+    message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] json-c is needed for ${PROJECT_NAME} build")
+endif()
+
+add_executable(${PROJECT_NAME}_explorer ${DATACRUMBS_EXPLORER_SRC} ${DATACRUMBS_COMMON_SRC})
+target_link_libraries(${PROJECT_NAME}_explorer ${DEPENDENCY_LIB})
+install(
+    TARGETS ${PROJECT_NAME}_explorer
     EXPORT ${DATACRUMBS_EXPORTED_TARGETS}
     LIBRARY DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
     ARCHIVE DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}

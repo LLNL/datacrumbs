@@ -1,5 +1,4 @@
 
-#include "example.generic.bpf.h"
 SEC("uprobe//usr/lib64/libc.so.6:open")
 int BPF_UPROBE(open_entry, struct pt_regs* regs) {
   generic_call(5);

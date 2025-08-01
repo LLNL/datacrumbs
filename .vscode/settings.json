@@ -5,6 +5,7 @@
     "editor.formatOnSave": true,
     "files.associations": {
         "string": "cpp",
-        "numbers": "c"
+        "numbers": "c",
+        "example.h": "c"
     }
 }
