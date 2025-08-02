@@ -3,6 +3,7 @@
     "type": 0,
     "name": "sys",
     "functions": [
+      "old_select",
       "old_mmap",
       "ni_syscall"
     ]
@@ -16,7 +17,11 @@
   {
     "type": 1,
     "name": "bio",
-    "functions": []
+    "functions": [
+      "bio_get_last_bvec",
+      "bio_will_gap",
+      "bio_integrity_init"
+    ]
   },
   {
     "type": 3,

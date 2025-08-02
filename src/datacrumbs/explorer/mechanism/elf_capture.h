@@ -16,7 +16,7 @@ class ElfSymbolExtractor {
 
   ~ElfSymbolExtractor();
 
-  std::vector<std::string> extract_symbols();
+  std::pair<std::vector<std::string>, std::vector<std::string>> extract_symbols();
 
  private:
   bool is_elf() const;

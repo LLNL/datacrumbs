@@ -24,6 +24,7 @@ class ConfigurationManager {
   Mode mode;                            // Mode of operation (PROFILER or TRACER)
   std::filesystem::path trace_log_dir;  // Path to the trace file
   std::vector<std::shared_ptr<CaptureProbe>> capture_probes;  // List of capture probes
+  std::string user;                                           // User for the configuration
 
   // Profiling specific configurations
   float profiling_interval;  // Interval for profiling in seconds
