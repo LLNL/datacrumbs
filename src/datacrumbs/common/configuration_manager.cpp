@@ -308,6 +308,10 @@ void ConfigurationManager::derive_configurations() {
   // Construct probe file name: probes-user-host.json
   std::string probe_file_name = "probes-" + user + "-" + hostname_str + ".json";
   this->probe_file_path = this->data_dir / probe_file_name;
+  // Construct probe exclusion file name: probes-exclusion-user-host.json
+  std::string probe_exclusion_file_name = "probes-exclusion-" + user + "-" + hostname_str + ".json";
+  this->probe_exclusion_file_path = this->data_dir / probe_exclusion_file_name;
+
   // Construct categories file name: categories-user-host.json
   std::string categories_file_name = "categories-" + user + "-" + hostname_str + ".json";
   this->category_map_path = this->data_dir / categories_file_name;
