@@ -12,7 +12,7 @@ capture_probes:
     probe: uprobe
     type: binary
     file: /usr/lib64/libc.so.6
-    regex: ^(?!.*_dl_)(?!.*_rtld_)(?!__).*
+    regex: ^(?!__).*
   - name: bio
     probe: kprobe
     type: ksym

@@ -6,11 +6,50 @@
 #include <datacrumbs/explorer/probe_explorer.h>
 
 #include <regex>
+#include <unordered_map>
+#include <unordered_set>
 namespace datacrumbs {
 ProbeExplorer::ProbeExplorer(int argc, char** argv) {
   configManager_ = datacrumbs::Singleton<ConfigurationManager>::get_instance(argc, argv);
 }
 std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
+  std::unordered_map<std::string, std::unordered_set<std::string>> exclusionMap;
+  if (!configManager_->probe_exclusion_file_path.empty() &&
+      std::filesystem::exists(configManager_->probe_exclusion_file_path)) {
+    std::ifstream ifs(configManager_->probe_exclusion_file_path);
+    if (ifs.is_open()) {
+      std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+      json_object* jobj = json_tokener_parse(content.c_str());
+      if (jobj && json_object_get_type(jobj) == json_type_array) {
+        int arr_len = json_object_array_length(jobj);
+        for (int i = 0; i < arr_len; ++i) {
+          json_object* probe_obj = json_object_array_get_idx(jobj, i);
+          if (!probe_obj) continue;
+          json_object* name_obj = nullptr;
+          json_object* funcs_obj = nullptr;
+          if (json_object_object_get_ex(probe_obj, "name", &name_obj) &&
+              json_object_object_get_ex(probe_obj, "functions", &funcs_obj) &&
+              json_object_get_type(name_obj) == json_type_string &&
+              json_object_get_type(funcs_obj) == json_type_array) {
+            std::string probe_name = json_object_get_string(name_obj);
+            std::unordered_set<std::string> func_set;
+            int func_len = json_object_array_length(funcs_obj);
+            for (int j = 0; j < func_len; ++j) {
+              json_object* func_obj = json_object_array_get_idx(funcs_obj, j);
+              if (func_obj && json_object_get_type(func_obj) == json_type_string) {
+                func_set.insert(json_object_get_string(func_obj));
+              }
+            }
+            exclusionMap[probe_name] = std::move(func_set);
+          }
+        }
+      }
+      if (jobj) json_object_put(jobj);
+    } else {
+      std::cerr << "Failed to open exclusion probes file: " << configManager_->exclusion_probes
+                << std::endl;
+    }
+  }
   std::vector<std::shared_ptr<Probe>> probes;
   for (const auto& capture_probe : configManager_->capture_probes) {
     std::vector<std::string> functionNames;
@@ -75,6 +114,20 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         break;
       default:
         std::cerr << "Unknown probe type!" << std::endl;
+    }
+
+    if (!exclusionMap.empty()) {
+      auto it = exclusionMap.find(capture_probe->name);
+      if (it != exclusionMap.end()) {
+        const auto& excludedFuncs = it->second;
+        std::vector<std::string> filteredNames;
+        for (const auto& name : functionNames) {
+          if (excludedFuncs.find(name) == excludedFuncs.end()) {
+            filteredNames.push_back(name);
+          }
+        }
+        functionNames = std::move(filteredNames);
+      }
     }
     if (!capture_probe->regex.empty()) {
       std::regex re(capture_probe->regex);
