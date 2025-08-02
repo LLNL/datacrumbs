@@ -31,6 +31,7 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
 #define DC_YAML_DATA_DIR "data_dir"
 #define DC_YAML_PROFILING_INTERVAL "profiling_interval"
 #define DC_YAML_CAPTURE_PROBES "capture_probes"
+#define DC_YAML_USER "user"
 
 /**
  * FIXME:
@@ -48,6 +49,7 @@ class ArgumentParser {
   std::optional<std::string> trace_log_dir;
   std::optional<float> profiling_interval;
   std::optional<std::string> config_path;
+  std::optional<std::string> user;
 
   ArgumentParser(int argc, char** argv) {
     std::cout << "[ArgumentParser] Parsing command line arguments..." << std::endl;
@@ -74,10 +76,13 @@ class ArgumentParser {
       } else if (arg == "--config_path" && i + 1 < argc) {
         config_path = argv[++i];
         std::cout << "[ArgumentParser] Config path set to: " << *config_path << std::endl;
+      } else if (arg == "--user" && i + 1 < argc) {
+        user = argv[++i];
+        std::cout << "[ArgumentParser] User set to: " << *user << std::endl;
       } else if (arg == "--help" || arg == "-h") {
         std::cout << "Usage: " << argv[0] << " <config_name> [--mode <mode>] "
                   << "[--trace_file_path <path>] [--profiling_interval <seconds>] "
-                  << "[--config_path <path>]\n";
+                  << "[--config_path <path>] [--user <user>]\n";
         exit(0);
       } else {
         std::cerr << "[ArgumentParser] Unknown argument: " << arg << std::endl;
@@ -93,8 +98,8 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
       mode(Mode::PROFILER),
       trace_log_dir(DATACRUMBS_LOG_DIR),
       capture_probes(),
-      profiling_interval(0.1f)  // Default profiling interval in seconds
-{
+      profiling_interval(0.1f),  // Default profiling interval in seconds
+      user("datacrumbs") {
   std::cout << "[ConfigurationManager] Initializing with arguments..." << std::endl;
   ArgumentParser parser(argc, argv);
   this->name = parser.config_name;
@@ -135,6 +140,7 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
       std::cout << "[ConfigurationManager] Data directory not specified, using default: "
                 << this->data_dir << std::endl;
     }
+
     if (config[DC_YAML_PROFILING_INTERVAL]) {
       this->profiling_interval = config[DC_YAML_PROFILING_INTERVAL].as<float>();
       std::cout << "[ConfigurationManager] Profiling interval set from config: "
@@ -252,6 +258,13 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
         }
       }
     }
+    if (config[DC_YAML_USER]) {
+      this->user = config[DC_YAML_USER].as<std::string>();
+      std::cout << "[ConfigurationManager] User set from config: " << this->user << std::endl;
+    } else {
+      std::cout << "[ConfigurationManager] No user specified in config, using default: "
+                << this->user << std::endl;
+    }
 
     if (parser.config_path) {
       this->path = *parser.config_path;
@@ -273,6 +286,14 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
       std::cout << "[ConfigurationManager] Profiling interval overridden by argument: "
                 << *parser.profiling_interval << std::endl;
     }
+    if (parser.user) {
+      this->user = *parser.user;
+      std::cout << "[ConfigurationManager] User overridden by argument: " << *parser.user
+                << std::endl;
+    } else {
+      std::cout << "[ConfigurationManager] No user specified, using default: " << this->user
+                << std::endl;
+    }
   }
   derive_configurations();
   validate_configurations();
@@ -280,7 +301,6 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
 };
 
 void ConfigurationManager::derive_configurations() {
-  std::string user = std::getenv("USER") ? std::getenv("USER") : "unknown";
   char hostname[256];
   if (gethostname(hostname, sizeof(hostname)) != 0) {
     std::strncpy(hostname, "unknownhost", sizeof(hostname));

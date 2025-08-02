@@ -28,10 +28,12 @@ void ProbeGenerator::run() {
     std::cout << "[ProbeGenerator] Processing probe: " << probe.name << std::endl;
     std::stringstream ss;
     ss << "#include <datacrumbs/server/bpf/common.h>" << std::endl;
-    for (const auto& func : probe.functions) {
+    for (size_t func_index = 0; func_index < probe.functions.size(); ++func_index) {
+      const auto& func = probe.functions[func_index];
+
       auto current_event_id = this->eventIdCounter_++;
-      std::cout << "[ProbeGenerator] Generating for function: " << func
-                << " (event_id: " << current_event_id << ")" << std::endl;
+      // std::cout << "[ProbeGenerator] Generating for function: " << func
+      //           << " (event_id: " << current_event_id << ")" << std::endl;
       // Map event id to probe name and function name
       struct json_object* info = json_object_new_object();
       json_object_object_add(info, "probe_name", json_object_new_string(probe.name.c_str()));
@@ -40,26 +42,27 @@ void ProbeGenerator::run() {
 
       switch (probe.type) {
         case ProbeType::KPROBE: {
-          std::cout << "[ProbeGenerator] Using KProbeGenerator" << std::endl;
+          // std::cout << "[ProbeGenerator] Using KProbeGenerator" << std::endl;
           KProbeGenerator generator(current_event_id, func);
           ss << generator.generate().str() << std::endl;
           break;
         }
         case ProbeType::UPROBE: {
-          std::cout << "[ProbeGenerator] Using UProbeGenerator" << std::endl;
+          // std::cout << "[ProbeGenerator] Using UProbeGenerator" << std::endl;
           auto uprobe = UProbe::fromJson(jprobe);
-          UProbeGenerator uprobe_gen(current_event_id, func, uprobe.binary_path);
+          const auto& offset = uprobe.function_offsets[func_index];
+          UProbeGenerator uprobe_gen(current_event_id, func, offset, uprobe.binary_path);
           ss << uprobe_gen.generate().str() << std::endl;
           break;
         }
         case ProbeType::SYSCALLS: {
-          std::cout << "[ProbeGenerator] Using SyscallGenerator" << std::endl;
+          // std::cout << "[ProbeGenerator] Using SyscallGenerator" << std::endl;
           SyscallGenerator syscall_gen(current_event_id, func);
           ss << syscall_gen.generate().str() << std::endl;
           break;
         }
         case ProbeType::USDT: {
-          std::cout << "[ProbeGenerator] Using USDTGenerator" << std::endl;
+          // std::cout << "[ProbeGenerator] Using USDTGenerator" << std::endl;
           auto usdt = USDTProbe::fromJson(jprobe);
           USDTGenerator usdt_gen(current_event_id, func, usdt.binary_path, usdt.provider);
           ss << usdt_gen.generate().str() << std::endl;
@@ -84,7 +87,8 @@ void ProbeGenerator::run() {
         out << ss.str();
         out.close();
         probe_files.push_back(probe.name + ".bpf.c");
-        std::cout << "[ProbeGenerator] Generated file: " << filename << std::endl;
+        std::cout << "[ProbeGenerator] Generated " << probe.functions.size()
+                  << " functions file: " << filename << std::endl;
       }
     }
   }
