@@ -1,4 +1,6 @@
 #include <datacrumbs/common/configuration_manager.h>
+#include <datacrumbs/common/logging.h>  // Added for logging macros
+#include <datacrumbs/common/utils.h>
 #include <datacrumbs/explorer/mechanism/elf_capture.h>
 #include <datacrumbs/explorer/mechanism/header_capture.h>
 #include <datacrumbs/explorer/mechanism/ksym_capture.h>
@@ -8,12 +10,22 @@
 #include <regex>
 #include <unordered_map>
 #include <unordered_set>
+
 namespace datacrumbs {
+
+// Constructor for ProbeExplorer, initializes the configuration manager singleton
 ProbeExplorer::ProbeExplorer(int argc, char** argv) {
+  DC_LOG_TRACE("ProbeExplorer::ProbeExplorer - start");
   configManager_ = datacrumbs::Singleton<ConfigurationManager>::get_instance(argc, argv);
+  DC_LOG_TRACE("ProbeExplorer::ProbeExplorer - end");
 }
+
+// Extracts probes based on configuration and exclusion file
 std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
+  DC_LOG_TRACE("ProbeExplorer::extractProbes - start");
   std::unordered_map<std::string, std::unordered_set<std::string>> exclusionMap;
+
+  // Load exclusion map from file if specified
   if (!configManager_->probe_exclusion_file_path.empty() &&
       std::filesystem::exists(configManager_->probe_exclusion_file_path)) {
     std::ifstream ifs(configManager_->probe_exclusion_file_path);
@@ -46,22 +58,28 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
       }
       if (jobj) json_object_put(jobj);
     } else {
-      std::cerr << "Failed to open exclusion probes file: "
-                << configManager_->probe_exclusion_file_path.string() << std::endl;
+      DC_LOG_ERROR("Failed to open exclusion probes file: %s",
+                   configManager_->probe_exclusion_file_path.string().c_str());
     }
   }
-  std::cout << "Exclusion Map Contents:" << std::endl;
+
+  // Log the contents of the exclusion map for debugging
+  DC_LOG_DEBUG("Exclusion Map Contents:");
   for (const auto& [probe_name, func_set] : exclusionMap) {
-    std::cout << "Probe: " << probe_name << std::endl;
+    DC_LOG_DEBUG("Probe: %s", probe_name.c_str());
     for (const auto& func : func_set) {
-      std::cout << "  Excluded Function: " << func << std::endl;
+      DC_LOG_DEBUG("  Excluded Function: %s", func.c_str());
     }
   }
 
   std::vector<std::shared_ptr<Probe>> probes;
+
+  // Iterate over all capture probes from configuration
   for (const auto& capture_probe : configManager_->capture_probes) {
     std::vector<std::string> functionNames;
     std::shared_ptr<Probe> probe;
+
+    // Instantiate the correct probe type
     switch (capture_probe->probe_type) {
       case ProbeType::UPROBE:
         probe = std::make_shared<UProbe>();
@@ -76,26 +94,28 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         probe = std::make_shared<KProbe>();
         break;
       default:
+        DC_LOG_ERROR("Unknown probe type encountered in extractProbes()");
         throw std::runtime_error("Unknown probe type encountered in extractProbes()");
-        break;
     }
+
+    // Extract function names based on capture type
     switch (capture_probe->type) {
       case CaptureType::HEADER:
-        std::cout << "Extracting header probes..." << std::endl;
+        DC_LOG_INFO("Extracting header probes...");
         if (auto headerProbe = std::static_pointer_cast<HeaderCaptureProbe>(capture_probe)) {
-          std::cout << "Header Name: " << headerProbe->file << std::endl;
+          DC_LOG_DEBUG("Header Name: %s", headerProbe->file.c_str());
           functionNames = HeaderFunctionExtractor(headerProbe->file).extractFunctionNames();
         }
         break;
       case CaptureType::BINARY:
-        std::cout << "Extracting binary probes..." << std::endl;
+        DC_LOG_INFO("Extracting binary probes...");
         if (auto binaryProbe = std::static_pointer_cast<BinaryCaptureProbe>(capture_probe)) {
-          std::cout << "Binary Path: " << binaryProbe->file << std::endl;
+          DC_LOG_DEBUG("Binary Path: %s", binaryProbe->file.c_str());
           auto pair = ElfSymbolExtractor(binaryProbe->file).extract_symbols();
           functionNames = std::move(pair.first);
           auto functionOffsets = std::move(pair.second);
           if (capture_probe->probe_type == ProbeType::UPROBE) {
-            std::cout << "UPROBE: Extracting symbols from binary..." << std::endl;
+            DC_LOG_DEBUG("UPROBE: Extracting symbols from binary...");
             if (auto uprobe = std::dynamic_pointer_cast<UProbe>(probe)) {
               uprobe->binary_path = binaryProbe->file;
               uprobe->function_offsets = std::move(functionOffsets);
@@ -104,10 +124,10 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         }
         break;
       case CaptureType::USDT:
-        std::cout << "Extracting USDT probes..." << std::endl;
+        DC_LOG_INFO("Extracting USDT probes...");
         if (auto usdtProbe = std::static_pointer_cast<USDTCaptureProbe>(capture_probe)) {
           if (capture_probe->probe_type == ProbeType::USDT) {
-            std::cout << "USDT: Extracting symbols from binary..." << std::endl;
+            DC_LOG_DEBUG("USDT: Extracting symbols from binary...");
             if (auto usdt_probe = std::dynamic_pointer_cast<USDTProbe>(probe)) {
               usdt_probe->binary_path = usdtProbe->binary_path;
               usdt_probe->provider = usdtProbe->provider;
@@ -117,16 +137,17 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         }
         break;
       case CaptureType::KSYM:
-        std::cout << "Extracting kernel symbol probes..." << std::endl;
+        DC_LOG_INFO("Extracting kernel symbol probes...");
         if (auto ksymProbe = std::static_pointer_cast<KernelCaptureProbe>(capture_probe)) {
           functionNames = datacrumbs::Singleton<KSymCapture>::get_instance()->getFunctionsByRegex(
               ksymProbe->regex);
         }
         break;
       default:
-        std::cerr << "Unknown probe type!" << std::endl;
+        DC_LOG_WARN("Unknown capture type encountered!");
     }
 
+    // Filter function names by regex if specified
     if (!capture_probe->regex.empty()) {
       std::regex re(capture_probe->regex);
       std::vector<std::string> filteredNames;
@@ -139,6 +160,8 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
     }
 
     probe->name = capture_probe->name;
+
+    // For syscall probes, strip "sys_" prefix
     if (capture_probe->probe_type == ProbeType::SYSCALLS) {
       for (auto& name : functionNames) {
         if (name.rfind("sys_", 0) == 0) {
@@ -147,6 +170,7 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
       }
     }
 
+    // Exclude functions as per exclusion map
     if (!exclusionMap.empty()) {
       auto it = exclusionMap.find(capture_probe->name);
       if (it != exclusionMap.end()) {
@@ -162,24 +186,26 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
     }
 
     probe->functions = functionNames;
-    // for (const auto& name : functionNames) {
-    //   std::cout << "Function: " << name << std::endl;
-    // }
+
+    // Validate the probe before adding
     if (!probe->validate()) {
-      std::cerr << "Probe validation failed for: " << probe->name << std::endl;
+      DC_LOG_ERROR("Probe validation failed for: %s", probe->name.c_str());
       continue;  // Skip invalid probes
     }
-    std::cout << "Valid probe extracted: " << probe->name << std::endl;
-    // Add the probe to the list
+    DC_LOG_INFO("Valid probe extracted: %s", probe->name.c_str());
     probes.push_back(probe);
   }
+  DC_LOG_TRACE("ProbeExplorer::extractProbes - end");
   return probes;
 }
 
+// Writes extracted probes to a JSON file and returns the probe list
 std::vector<std::shared_ptr<Probe>> ProbeExplorer::writeProbesToJson() {
+  DC_LOG_TRACE("ProbeExplorer::writeProbesToJson - start");
   auto probes = extractProbes();
   json_object* jarray = json_object_new_array();
 
+  // Serialize each probe to JSON
   for (const auto& probe : probes) {
     json_object* jprobe = nullptr;
     switch (probe->type) {
@@ -196,12 +222,13 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::writeProbesToJson() {
         jprobe = std::dynamic_pointer_cast<USDTProbe>(probe)->toJson();
         break;
       default:
-        std::cerr << "Unknown probe type encountered." << std::endl;
+        DC_LOG_ERROR("Unknown probe type encountered.");
         continue;  // Skip unknown types
     }
     json_object_array_add(jarray, jprobe);
   }
 
+  // Write JSON to file
   const char* json_str = json_object_to_json_string_ext(jarray, JSON_C_TO_STRING_PRETTY);
 
   std::ofstream ofs(configManager_->probe_file_path);
@@ -209,35 +236,48 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::writeProbesToJson() {
     ofs << json_str;
     ofs.close();
   } else {
-    std::cerr << "Failed to open file: " << configManager_->probe_file_path << std::endl;
+    DC_LOG_ERROR("Failed to open file: %s", configManager_->probe_file_path.c_str());
   }
 
   json_object_put(jarray);  // free memory
+  DC_LOG_TRACE("ProbeExplorer::writeProbesToJson - end");
   return probes;
 }
+
 }  // namespace datacrumbs
 
 /**
+ * Example usage:
  * g++ -std=c++14 /home/haridev/datacrumbs/src/datacrumbs/common/configuration_manager.cpp
  * probe_explorer_test.cpp probe_explorer.cpp mechanism/ksym_capture.cpp -o probe_explorer_test
  * -I/home/haridev/datacrumbs/src -lelf `llvm-config --cxxflags  --ldflags --system-libs --libs
  * core` -lclang -lyaml-cpp
  */
 
+// Main function to run the probe explorer and print extracted probes
 int main(int argc, char** argv) {
+  DC_LOG_TRACE("main - start");
+  datacrumbs::utils::Timer timer;  // Create timer instance
+  timer.resumeTime();              // Start timing
+
   datacrumbs::ProbeExplorer explorer(argc, argv);
   auto probes = explorer.writeProbesToJson();
 
+  // Print probe names and a sample of their functions
   for (const auto& probe : probes) {
-    std::cout << "Probe: " << probe->name << "\n";
+    DC_LOG_INFO("Probe: %s", probe->name.c_str());
     int i = 0;
     for (const auto& value : probe->functions) {
-      std::cout << "  Value: " << value << "\n";
+      DC_LOG_DEBUG("  Value: %s", value.c_str());
       if (i++ > 10) {
-        std::cout << "  ... (truncated)" << std::endl;
+        DC_LOG_DEBUG("  ... (truncated)");
         break;
       }
     }
   }
+
+  timer.pauseTime();  // Stop timer and accumulate elapsed time
+  DC_LOG_PRINT("Elapsed time in Probe Explorer: %f seconds", timer.getElapsedTime());
+  DC_LOG_TRACE("main - end");
   return 0;
 }
