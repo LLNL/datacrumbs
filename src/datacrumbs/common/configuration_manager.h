@@ -29,9 +29,10 @@ class ConfigurationManager {
   float profiling_interval;  // Interval for profiling in seconds
 
   // Derived configurations
-  std::filesystem::path trace_file_path;    // Path to the trace file
-  std::filesystem::path probe_file_path;    // Path to the probe file
-  std::filesystem::path category_map_path;  // Path to the category map file
+  std::filesystem::path trace_file_path;            // Path to the trace file
+  std::filesystem::path probe_file_path;            // Path to the probe file
+  std::filesystem::path probe_exclusion_file_path;  // Path to the probe file
+  std::filesystem::path category_map_path;          // Path to the category map file
 
   ConfigurationManager(int argc, char** argv);
 

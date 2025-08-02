@@ -1,0 +1,28 @@
+[
+  {
+    "type": 0,
+    "name": "sys",
+    "functions": [
+      "old_mmap",
+      "ni_syscall"
+    ]
+  },
+  {
+    "type": 2,
+    "name": "libc",
+    "functions": [],
+    "binary_path": "\/usr\/lib64\/libc.so.6"
+  },
+  {
+    "type": 1,
+    "name": "bio",
+    "functions": []
+  },
+  {
+    "type": 3,
+    "name": "python",
+    "functions": [],
+    "binary_path": "\/lib64\/libpython3.9.so.1.0",
+    "provider": "python"
+  }
+]
