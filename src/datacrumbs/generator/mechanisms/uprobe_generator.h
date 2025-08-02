@@ -7,8 +7,9 @@ namespace datacrumbs {
 
 class UProbeGenerator {
  public:
-  UProbeGenerator(int event_id, const std::string& func_name, const std::string& provider)
-      : event_id_(event_id), func_name_(func_name), provider_(provider) {}
+  UProbeGenerator(int event_id, const std::string& func_name, const std::string& offset,
+                  const std::string& provider)
+      : event_id_(event_id), func_name_(func_name), offset_(offset), provider_(provider) {}
 
   std::stringstream generate() const {
     std::string sanitized_func_name = func_name_;
@@ -32,6 +33,7 @@ class UProbeGenerator {
   int event_id_;
   std::string func_name_;
   std::string provider_;
+  std::string offset_;
 };
 
 }  // namespace datacrumbs

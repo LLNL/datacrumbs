@@ -46,10 +46,18 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
       }
       if (jobj) json_object_put(jobj);
     } else {
-      std::cerr << "Failed to open exclusion probes file: " << configManager_->exclusion_probes
-                << std::endl;
+      std::cerr << "Failed to open exclusion probes file: "
+                << configManager_->probe_exclusion_file_path.string() << std::endl;
     }
   }
+  std::cout << "Exclusion Map Contents:" << std::endl;
+  for (const auto& [probe_name, func_set] : exclusionMap) {
+    std::cout << "Probe: " << probe_name << std::endl;
+    for (const auto& func : func_set) {
+      std::cout << "  Excluded Function: " << func << std::endl;
+    }
+  }
+
   std::vector<std::shared_ptr<Probe>> probes;
   for (const auto& capture_probe : configManager_->capture_probes) {
     std::vector<std::string> functionNames;
@@ -83,11 +91,14 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         std::cout << "Extracting binary probes..." << std::endl;
         if (auto binaryProbe = std::static_pointer_cast<BinaryCaptureProbe>(capture_probe)) {
           std::cout << "Binary Path: " << binaryProbe->file << std::endl;
-          functionNames = ElfSymbolExtractor(binaryProbe->file).extract_symbols();
+          auto pair = ElfSymbolExtractor(binaryProbe->file).extract_symbols();
+          functionNames = std::move(pair.first);
+          auto functionOffsets = std::move(pair.second);
           if (capture_probe->probe_type == ProbeType::UPROBE) {
             std::cout << "UPROBE: Extracting symbols from binary..." << std::endl;
             if (auto uprobe = std::dynamic_pointer_cast<UProbe>(probe)) {
               uprobe->binary_path = binaryProbe->file;
+              uprobe->function_offsets = std::move(functionOffsets);
             }
           }
         }
@@ -116,19 +127,6 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         std::cerr << "Unknown probe type!" << std::endl;
     }
 
-    if (!exclusionMap.empty()) {
-      auto it = exclusionMap.find(capture_probe->name);
-      if (it != exclusionMap.end()) {
-        const auto& excludedFuncs = it->second;
-        std::vector<std::string> filteredNames;
-        for (const auto& name : functionNames) {
-          if (excludedFuncs.find(name) == excludedFuncs.end()) {
-            filteredNames.push_back(name);
-          }
-        }
-        functionNames = std::move(filteredNames);
-      }
-    }
     if (!capture_probe->regex.empty()) {
       std::regex re(capture_probe->regex);
       std::vector<std::string> filteredNames;
@@ -148,6 +146,21 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         }
       }
     }
+
+    if (!exclusionMap.empty()) {
+      auto it = exclusionMap.find(capture_probe->name);
+      if (it != exclusionMap.end()) {
+        const auto& excludedFuncs = it->second;
+        std::vector<std::string> filteredNames;
+        for (const auto& name : functionNames) {
+          if (excludedFuncs.find(name) == excludedFuncs.end()) {
+            filteredNames.push_back(name);
+          }
+        }
+        functionNames = std::move(filteredNames);
+      }
+    }
+
     probe->functions = functionNames;
     // for (const auto& name : functionNames) {
     //   std::cout << "Function: " << name << std::endl;

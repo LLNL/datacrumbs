@@ -35,8 +35,8 @@ if(NOT DATACRUMBS_EXTERNALLY_CONFIGURED)
     set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec)
 endif()
 
-option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
-option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" OFF)
+option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" ON)
+option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" ON)
 
 # Optionally allow user to specify host name via CMake option
 option(DATACRUMBS_HOST "Host name for datacrumbs (numbers will be stripped if not set)" "")
@@ -53,30 +53,26 @@ else()
     set(ENABLE_PROBE_GENERATOR OFF)
 endif()
 
-# Always clean eBPF code before running
-add_custom_target(clean_bpf_before_run
-    COMMAND ${CMAKE_COMMAND} -E rm -rf
-    ${CMAKE_BINARY_DIR}/datacrumbs/bpf
-    ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/bpf
-    COMMENT "Cleaning BPF build artifacts before running"
-)
-
 # Helper macro to prepend clean_bpf_before_run to custom targets
 macro(add_custom_target_with_clean name)
     add_custom_target(${name}
-        COMMAND ${CMAKE_COMMAND} --build . --target clean_bpf_before_run
+        COMMAND ${CMAKE_COMMAND} --build . --target extra_clean
         COMMAND ${ARGN}
-        DEPENDS clean_bpf_before_run
         COMMENT "Running ${name} with BPF clean"
     )
 endmacro()
 
+add_custom_target_with_clean(clean_all)
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+set(configuration_variables --user $ENV{USER})
 
 set(DATACRUMBS_CLIENT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.c ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.h)
 
 add_library(${PROJECT_NAME}_client SHARED ${DATACRUMBS_CLIENT_SRC})
+add_dependencies(${PROJECT_NAME}_client clean_all)
 install(
     TARGETS ${PROJECT_NAME}_client
     EXPORT ${DATACRUMBS_EXPORTED_TARGETS}
@@ -162,7 +158,7 @@ endif()
 message(STATUS "[${UPPER_PROJECT_NAME}] DATACRUMBS_HOST is ${DATACRUMBS_HOST}")
 
 add_custom_target(run_explorer
-    COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}_explorer ${DATACRUMBS_HOST}
+    COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}_explorer ${DATACRUMBS_HOST} ${configuration_variables}
     DEPENDS ${PROJECT_NAME}_explorer
     COMMENT "Running ${PROJECT_NAME}_explorer with argument '${DATACRUMBS_HOST}'"
 )
@@ -182,7 +178,7 @@ install(
 )
 
 add_custom_target(run_generator
-    COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}_generator ${DATACRUMBS_HOST}
+    COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}_generator ${DATACRUMBS_HOST} ${configuration_variables}
     DEPENDS ${PROJECT_NAME}_generator
     COMMENT "Running ${PROJECT_NAME}_generator with argument '${DATACRUMBS_HOST}'"
 )
@@ -192,8 +188,6 @@ add_dependencies(run_generator run_explorer)
 
 set(DATACRUMBS_BPF_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/init.bpf.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/datacrumbs_process_events.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/datacrumbs_process_events.c
 )
 include_directories(${DATACRUMBS_INSTALL_LIBEXEC})
 include_directories(${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
@@ -276,17 +270,12 @@ add_custom_target(datacrumbs_bpf_skel ALL DEPENDS ${BPF_SKEL_OUTPUT})
 add_dependencies(datacrumbs_bpf_skel datacrumbs_bpf)
 
 set(DATACRUMBS_PROCESS_EVENTS_SRC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/datacrumbs_process_events.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/datacrumbs_process_events.cpp
     ${BPF_SKEL_OUTPUT}
 )
 include_directories(${CMAKE_INCLUDE_OUTPUT_DIRECTORY})
-add_executable(${PROJECT_NAME} ${DATACRUMBS_PROCESS_EVENTS_SRC})
-
-target_link_libraries(${PROJECT_NAME}
-    -l:libbpf.so
-    -lelf
-    -lz
-)
+add_executable(${PROJECT_NAME} ${DATACRUMBS_PROCESS_EVENTS_SRC} ${DATACRUMBS_COMMON_SRC})
+target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB} -l:libbpf.so -lelf -lz)
 add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel)
 
 add_custom_target(clean_bpf
@@ -296,7 +285,8 @@ add_custom_target(clean_bpf
     ${VMLINUX_HEADER}
     ${CMAKE_BINARY_DIR}/bpf
     ${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/bpf
-    COMMENT "Cleaning BPF build artifacts"
+    ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/bpf
+    COMMENT "Cleaning BPF build artifacts (ignoring if cannot remove)"
 )
 
 add_custom_target(extra_clean

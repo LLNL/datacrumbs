@@ -62,14 +62,23 @@ struct UProbe : public Probe {
  public:
   UProbe() : Probe(ProbeType::UPROBE), binary_path() {}
   std::string binary_path;  // Path to the binary
+  std::vector<std::string> function_offsets;
   bool validate() const override {
     if (!Probe::validate()) return false;
     if (binary_path.empty()) return false;
+    if (function_offsets.empty()) return false;
     return true;
   }
   json_object* toJson() const override {
     json_object* j = Probe::toJson();
     json_object_object_add(j, "binary_path", json_object_new_string(binary_path.c_str()));
+
+    json_object* offsets = json_object_new_array();
+    for (const auto& offset : function_offsets) {
+      json_object_array_add(offsets, json_object_new_string(offset.c_str()));
+    }
+    json_object_object_add(j, "function_offsets", offsets);
+
     return j;
   }
 
@@ -79,7 +88,16 @@ struct UProbe : public Probe {
     p.type = base.type;
     p.name = base.name;
     p.functions = base.functions;
-
+    json_object* offsets_obj = json_object_object_get(j, "function_offsets");
+    if (offsets_obj && json_object_get_type(offsets_obj) == json_type_array) {
+      int len = json_object_array_length(offsets_obj);
+      for (int i = 0; i < len; ++i) {
+        json_object* offset = json_object_array_get_idx(offsets_obj, i);
+        if (offset && json_object_get_type(offset) == json_type_string) {
+          p.function_offsets.push_back(json_object_get_string(offset));
+        }
+      }
+    }
     json_object* bin_obj = json_object_object_get(j, "binary_path");
     if (bin_obj) p.binary_path = json_object_get_string(bin_obj);
 
