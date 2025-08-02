@@ -114,5 +114,43 @@ inline std::vector<unsigned char> base64_decode(const std::string& encoded_strin
   return ret;
 }
 
+// Timer class for measuring elapsed time between code segments
+class Timer {
+ public:
+  Timer() : elapsed_time(0) {
+    // Trace constructor entry
+    DC_LOG_TRACE("Timer constructed, elapsed_time initialized to 0");
+  }
+
+  // Resume or start the timer
+  void resumeTime() {
+    DC_LOG_TRACE("Timer::resumeTime called");
+    t1 = std::chrono::high_resolution_clock::now();
+    DC_LOG_DEBUG("Timer resumed at current time point");
+  }
+
+  // Pause the timer and accumulate elapsed time
+  double pauseTime() {
+    DC_LOG_TRACE("Timer::pauseTime called");
+    auto t2 = std::chrono::high_resolution_clock::now();
+    double segment = std::chrono::duration<double>(t2 - t1).count();
+    elapsed_time += segment;
+    DC_LOG_DEBUG("Timer paused, segment duration: %f seconds, total elapsed: %f seconds", segment,
+                 elapsed_time);
+    return elapsed_time;
+  }
+
+  // Get the total elapsed time
+  double getElapsedTime() {
+    DC_LOG_TRACE("Timer::getElapsedTime called");
+    DC_LOG_DEBUG("Returning elapsed_time: %f seconds", elapsed_time);
+    return elapsed_time;
+  }
+
+ private:
+  std::chrono::high_resolution_clock::time_point t1;  // Last start/resume time
+  double elapsed_time;                                // Accumulated elapsed time in seconds
+};
+
 }  // namespace utils
 }  // namespace datacrumbs
