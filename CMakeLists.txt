@@ -69,7 +69,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 set(configuration_variables --user $ENV{USER})
 
-set(DATACRUMBS_CLIENT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.c ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.h)
+set(DATACRUMBS_CLIENT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.h)
 
 add_library(${PROJECT_NAME}_client SHARED ${DATACRUMBS_CLIENT_SRC})
 add_dependencies(${PROJECT_NAME}_client clean_all)
