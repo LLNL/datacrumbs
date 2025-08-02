@@ -1,23 +1,41 @@
 #pragma once
 
 #include <datacrumbs/common/enumerations.h>
+#include <datacrumbs/common/logging.h>
 #include <json-c/json.h>
 
 #include <string>
 #include <vector>
+
 namespace datacrumbs {
+
+// Base class representing a generic probe
 class Probe {
  public:
-  Probe(ProbeType _type) : type(_type) {}
-  ProbeType type;  // The type of probe
-  std::string name;
-  std::vector<std::string> functions;  // Arguments for the probe
+  // Constructor initializing the probe type
+  Probe(ProbeType _type) : type(_type) { DC_LOG_TRACE("Probe constructor called"); }
+
+  ProbeType type;                      // The type of probe (e.g., SYSCALLS, KPROBE, etc.)
+  std::string name;                    // Name of the probe
+  std::vector<std::string> functions;  // List of functions or arguments for the probe
+
+  // Validates the probe's configuration
   virtual bool validate() const {
-    if (name.empty()) return false;
-    if (functions.empty()) return false;
+    DC_LOG_TRACE("Probe::validate called");
+    if (name.empty()) {
+      DC_LOG_DEBUG("Probe name is empty");
+      return false;
+    }
+    if (functions.empty()) {
+      DC_LOG_DEBUG("Probe functions are empty");
+      return false;
+    }
     return true;
   }
+
+  // Serializes the probe to a JSON object
   virtual json_object* toJson() const {
+    DC_LOG_TRACE("Probe::toJson called");
     json_object* j = json_object_new_object();
     json_object_object_add(j, "type", json_object_new_int(static_cast<int>(type)));
     json_object_object_add(j, "name", json_object_new_string(name.c_str()));
@@ -31,7 +49,9 @@ class Probe {
     return j;
   }
 
+  // Deserializes a probe from a JSON object
   static Probe fromJson(const json_object* j) {
+    DC_LOG_TRACE("Probe::fromJson called");
     Probe p(static_cast<ProbeType>(json_object_get_int(json_object_object_get(j, "type"))));
     json_object* name_obj = json_object_object_get(j, "name");
     if (name_obj) p.name = json_object_get_string(name_obj);
@@ -48,28 +68,43 @@ class Probe {
   }
 };
 
+// Probe for system calls
 struct SysCallProbe : public Probe {
  public:
-  SysCallProbe() : Probe(ProbeType::SYSCALLS) {}
+  SysCallProbe() : Probe(ProbeType::SYSCALLS) { DC_LOG_TRACE("SysCallProbe constructor called"); }
 };
 
+// Probe for kernel functions (kprobes)
 struct KProbe : public Probe {
  public:
-  KProbe() : Probe(ProbeType::KPROBE) {}
+  KProbe() : Probe(ProbeType::KPROBE) { DC_LOG_TRACE("KProbe constructor called"); }
 };
 
+// Probe for user-space functions (uprobes)
 struct UProbe : public Probe {
  public:
-  UProbe() : Probe(ProbeType::UPROBE), binary_path() {}
-  std::string binary_path;  // Path to the binary
-  std::vector<std::string> function_offsets;
+  UProbe() : Probe(ProbeType::UPROBE), binary_path() { DC_LOG_TRACE("UProbe constructor called"); }
+  std::string binary_path;                    // Path to the binary being probed
+  std::vector<std::string> function_offsets;  // Offsets of functions in the binary
+
+  // Validates the uprobe's configuration
   bool validate() const override {
+    DC_LOG_TRACE("UProbe::validate called");
     if (!Probe::validate()) return false;
-    if (binary_path.empty()) return false;
-    if (function_offsets.empty()) return false;
+    if (binary_path.empty()) {
+      DC_LOG_DEBUG("UProbe binary_path is empty");
+      return false;
+    }
+    if (function_offsets.empty()) {
+      DC_LOG_DEBUG("UProbe function_offsets are empty");
+      return false;
+    }
     return true;
   }
+
+  // Serializes the uprobe to a JSON object
   json_object* toJson() const override {
+    DC_LOG_TRACE("UProbe::toJson called");
     json_object* j = Probe::toJson();
     json_object_object_add(j, "binary_path", json_object_new_string(binary_path.c_str()));
 
@@ -82,7 +117,9 @@ struct UProbe : public Probe {
     return j;
   }
 
+  // Deserializes a uprobe from a JSON object
   static UProbe fromJson(const json_object* j) {
+    DC_LOG_TRACE("UProbe::fromJson called");
     UProbe p;
     Probe base = Probe::fromJson(j);
     p.type = base.type;
@@ -105,25 +142,42 @@ struct UProbe : public Probe {
   }
 };
 
+// Probe for USDT (User-level Statically Defined Tracing) probes
 struct USDTProbe : public Probe {
  public:
-  USDTProbe() : Probe(ProbeType::USDT), binary_path(), provider() {}
-  std::string binary_path;  // Path to the binary
+  USDTProbe() : Probe(ProbeType::USDT), binary_path(), provider() {
+    DC_LOG_TRACE("USDTProbe constructor called");
+  }
+  std::string binary_path;  // Path to the binary being probed
   std::string provider;     // USDT provider name
+
+  // Validates the USDT probe's configuration
   bool validate() const override {
+    DC_LOG_TRACE("USDTProbe::validate called");
     if (!Probe::validate()) return false;
-    if (binary_path.empty()) return false;
-    if (provider.empty()) return false;
+    if (binary_path.empty()) {
+      DC_LOG_DEBUG("USDTProbe binary_path is empty");
+      return false;
+    }
+    if (provider.empty()) {
+      DC_LOG_DEBUG("USDTProbe provider is empty");
+      return false;
+    }
     return true;
   }
+
+  // Serializes the USDT probe to a JSON object
   json_object* toJson() const override {
+    DC_LOG_TRACE("USDTProbe::toJson called");
     json_object* j = Probe::toJson();
     json_object_object_add(j, "binary_path", json_object_new_string(binary_path.c_str()));
     json_object_object_add(j, "provider", json_object_new_string(provider.c_str()));
     return j;
   }
 
+  // Deserializes a USDT probe from a JSON object
   static USDTProbe fromJson(const json_object* j) {
+    DC_LOG_TRACE("USDTProbe::fromJson called");
     USDTProbe p;
     Probe base = Probe::fromJson(j);
     p.type = base.type;
@@ -140,32 +194,50 @@ struct USDTProbe : public Probe {
   }
 };
 
+// Base class for capture probes (used for capturing symbols, headers, binaries, etc.)
 class CaptureProbe {
  public:
-  CaptureProbe(CaptureType _type) : type(_type) {}
-  CaptureType type;  // The type of probe
-  std::string regex;
-  std::string name;
-  ProbeType probe_type;  // Type of probe (e.g., SYSCALLS, KPROBE, UPROBE, USDT)
+  // Constructor initializing the capture type
+  CaptureProbe(CaptureType _type) : type(_type) { DC_LOG_TRACE("CaptureProbe constructor called"); }
+
+  CaptureType type;      // The type of capture (e.g., KSYM, HEADER, BINARY, USDT)
+  std::string regex;     // Regex pattern for matching
+  std::string name;      // Name of the capture probe
+  ProbeType probe_type;  // Type of probe associated with the capture
 };
+
+// Capture probe for kernel symbols
 class KernelCaptureProbe : public CaptureProbe {
  public:
-  KernelCaptureProbe() : CaptureProbe(CaptureType::KSYM) {}
+  KernelCaptureProbe() : CaptureProbe(CaptureType::KSYM) {
+    DC_LOG_TRACE("KernelCaptureProbe constructor called");
+  }
 };
+
+// Capture probe for header files
 class HeaderCaptureProbe : public CaptureProbe {
  public:
-  HeaderCaptureProbe() : CaptureProbe(CaptureType::HEADER), file() {}
+  HeaderCaptureProbe() : CaptureProbe(CaptureType::HEADER), file() {
+    DC_LOG_TRACE("HeaderCaptureProbe constructor called");
+  }
   std::string file;  // Name of the header to capture
 };
+
+// Capture probe for binaries
 class BinaryCaptureProbe : public CaptureProbe {
  public:
-  BinaryCaptureProbe() : CaptureProbe(CaptureType::BINARY), file() {}
+  BinaryCaptureProbe() : CaptureProbe(CaptureType::BINARY), file() {
+    DC_LOG_TRACE("BinaryCaptureProbe constructor called");
+  }
   std::string file;  // Path to the binary
 };
 
+// Capture probe for USDT probes
 class USDTCaptureProbe : public CaptureProbe {
  public:
-  USDTCaptureProbe() : CaptureProbe(CaptureType::USDT), binary_path(), provider() {}
+  USDTCaptureProbe() : CaptureProbe(CaptureType::USDT), binary_path(), provider() {
+    DC_LOG_TRACE("USDTCaptureProbe constructor called");
+  }
   std::string binary_path;  // Path to the binary
   std::string provider;     // USDT provider name
 };
