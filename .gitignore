@@ -37,6 +37,7 @@ build
 
 #VSCode
 .cache
+.DS_Store
 
 # Log files
 *.log
@@ -60,4 +61,9 @@ profile.c
 logs/*
 poc/test
 
+#hdf5 tests
+create_hdf5_c
+
+# Montage cloned source
 install_init
+apps/Montage/Montage-*
