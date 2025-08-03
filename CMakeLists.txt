@@ -35,7 +35,7 @@ if(NOT DATACRUMBS_EXTERNALLY_CONFIGURED)
     set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec)
 endif()
 
-option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" ON)
+option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
 option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" ON)
 
 # Optionally allow user to specify host name via CMake option

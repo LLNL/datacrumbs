@@ -2,13 +2,51 @@
 
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>
+#include <datacrumbs/common/typdefs.h>
 #include <json-c/json.h>
 
 #include <string>
 #include <vector>
 
 namespace datacrumbs {
+struct EventWithId {
+  unsigned long long index;
+  unsigned int type;
+  unsigned long long tgid_pid;
+  unsigned long long event_id;
+  unsigned long long ts;
+  unsigned long long dur;
+  DataCrumbsArgs* args;
+  EventWithId(unsigned long long _index, unsigned int _type, unsigned long long _tgid_pid,
+              unsigned long long _event_id, unsigned long long _ts, unsigned long long _dur,
+              DataCrumbsArgs* _args)
+      : index(_index),
+        type(_type),
+        tgid_pid(_tgid_pid),
+        event_id(_event_id),
+        ts(_ts),
+        dur(_dur),
+        args(_args) {}
+  // Copy constructor
+  EventWithId(const EventWithId& other)
+      : index(other.index),
+        type(other.type),
+        tgid_pid(other.tgid_pid),
+        event_id(other.event_id),
+        ts(other.ts),
+        dur(other.dur),
+        args(other.args) {}
 
+  // Move constructor
+  EventWithId(EventWithId&& other) noexcept
+      : index(other.index),
+        type(other.type),
+        tgid_pid(other.tgid_pid),
+        event_id(other.event_id),
+        ts(other.ts),
+        dur(other.dur),
+        args(other.args) {}
+};
 // Base class representing a generic probe
 class Probe {
  public:

@@ -22,6 +22,8 @@ DATACRUMBS_RINGBUF(output, 1 << 16);
 
 static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* key, u64* start_ts) {
   key->id = bpf_get_current_pid_tgid();
+  u32 pid = key->id;
+  (void)pid;
   start_ts = (u64*)bpf_map_lookup_elem(&pid_map, &key->id);
   if (start_ts == 0 || key->id == 0) return 0;
   return 1;
@@ -29,42 +31,79 @@ static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* k
 
 static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
+  key.event_id = event_id;
   u64 start_ts;
   if (!need_tracing(&key, &start_ts)) {
-    bpf_printk("Skipping entry for pid:%d, event_id:%llu\n", (u32)key.id, event_id);
     return 0;  // not tracing this pid
   }
-  key.event_id = event_id;
   struct fn_value_t fn = {};
   fn.ts = bpf_ktime_get_ns();
   bpf_map_update_elem(&fn_pid_map, &key, &fn, BPF_ANY);
-  bpf_printk("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
+  DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
   return 0;
 }
 static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
+  u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
+  key.event_id = event_id;
   u64 start_ts;
   if (!need_tracing(&key, &start_ts)) {
-    bpf_printk("Skipping entry for pid:%d, event_id:%llu\n", (u32)key.id, event_id);
     return 0;  // not tracing this pid
   }
-  key.event_id = event_id;
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
   if (fn == 0) return 0;  // missed entry
   struct general_event_t* event;
-  event = bpf_ringbuf_reserve(&output, sizeof(struct general_event_t), 0);
-  if (!event) {
-    bpf_printk("Failed to reserve space in ring buffer for event for pid:%d, event_id:%llu\n",
-               (u32)key.id, event_id);
-    return 0;  // failed to reserve space
-  }
+  DATACRUMBS_RB_RESERVE(output, struct general_event_t, event);
   event->type = 1;
   event->id = key.id;
   event->event_id = event_id;
-  event->ts = (fn->ts - start_ts);
-  event->dur = bpf_ktime_get_ns() - fn->ts;
+  DATACRUMBS_COLLECT_TIME(event);
+  DATACRUMBS_SKIP_SMALL_EVENTS(event);
   bpf_ringbuf_submit(event, 0);
-  bpf_printk("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, event_id);
+  DBG_PRINTK("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, event_id);
+  return 0;
+}
+
+static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx, u64 event_id) {
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;  // not tracing this pid
+  }
+  struct fn_value_t fn = {};
+  fn.ts = bpf_ktime_get_ns();
+  bpf_map_update_elem(&fn_pid_map, &key, &fn, BPF_ANY);
+  DBG_PRINTK("USDT  Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
+  return 0;
+}
+static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
+                                                           long clazz, long method) {
+  u64 te = bpf_ktime_get_ns();
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;  // not tracing this pid
+  }
+  struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
+  if (fn == 0) {
+    DBG_PRINTK("USDT Exit Missed Entry called event_id:%llu pid:%d\n", event_id, (u32)key.id);
+    return 0;  // missed entry
+  }
+  struct usdt_event_t* event;
+  DATACRUMBS_RB_RESERVE(output, struct usdt_event_t, event);
+  event->type = 3;
+  event->id = key.id;
+  event->event_id = event_id;
+  DATACRUMBS_COLLECT_TIME(event);
+  DATACRUMBS_SKIP_SMALL_EVENTS(event);
+  bpf_probe_read_user(&event->clazz, sizeof(event->clazz), (void*)clazz);
+  bpf_probe_read_user(&event->method, sizeof(event->method), (void*)method);
+  bpf_ringbuf_submit(event, 0);
+  // bpf_ringbuf_output(&output, &event, sizeof(event), 0);
+  DBG_PRINTK("USDT Pushed pid:%d, event_id:%llu to %s.%s output\n", (u32)key.id, event_id,
+             event->clazz, event->method);
   return 0;
 }
 

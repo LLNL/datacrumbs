@@ -40,7 +40,7 @@ class SyscallGenerator {
     std::stringstream ss;
     // Generate entry probe
     ss << "SEC(\"ksyscall/" << func_name_ << "\")\n";
-    ss << "int BPF_KPROBE(" << sanitized_func_name << event_id_
+    ss << "int BPF_KSYSCALL(" << sanitized_func_name << event_id_
        << "_entry, struct pt_regs* regs) {\n";
     ss << "  generic_entry(ctx, " << event_id_ << ");\n";
     ss << "  return 0;\n";
