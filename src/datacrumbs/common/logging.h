@@ -183,17 +183,24 @@ inline void log_progress(const std::string& message, size_t current) {
   double elapsed = duration_cast<duration<double>>(now - start_time).count();
   double rate = (elapsed > 0.0) ? (current / elapsed) : 0.0;
   std::string rate_str;
-  if (rate >= 1e9)
+  std::string multiplier;
+  if (rate >= 1e9) {
     rate_str = std::to_string(rate / 1e9) + "G";
-  else if (rate >= 1e6)
+    multiplier = "G";
+  } else if (rate >= 1e6) {
     rate_str = std::to_string(rate / 1e6) + "M";
-  else if (rate >= 1e3)
+    multiplier = "M";
+  } else if (rate >= 1e3) {
     rate_str = std::to_string(rate / 1e3) + "K";
-  else
+    multiplier = "K";
+  } else {
     rate_str = std::to_string(rate);
+    multiplier = "";
+  }
 
   rate_str.resize(rate_str.find('.') != std::string::npos ? rate_str.find('.') + 3
                                                           : rate_str.size());
+  rate_str += multiplier;
   int hours = static_cast<int>(elapsed) / 3600;
   int minutes = (static_cast<int>(elapsed) % 3600) / 60;
   int seconds = static_cast<int>(elapsed) % 60;
@@ -205,17 +212,22 @@ inline void log_progress(const std::string& message, size_t current) {
   else
     snprintf(elapsed_str, sizeof(elapsed_str), "%.2fs", elapsed);
   std::string current_str;
-  if (current >= 1e9)
+  if (current >= 1e9) {
     current_str = std::to_string(static_cast<double>(current) / 1e9) + "G";
-  else if (current >= 1e6)
+    multiplier = "G";
+  } else if (current >= 1e6) {
+    multiplier = "M";
     current_str = std::to_string(static_cast<double>(current) / 1e6) + "M";
-  else if (current >= 1e3)
+  } else if (current >= 1e3) {
+    multiplier = "K";
     current_str = std::to_string(static_cast<double>(current) / 1e3) + "K";
-  else
+  } else {
     current_str = std::to_string(current);
-
+    multiplier = "";
+  }
   current_str.resize(current_str.find('.') != std::string::npos ? current_str.find('.') + 3
                                                                 : current_str.size());
+  current_str += multiplier;
   DC_LOG_PRINT_NO_NEW_LINE(
       "\r                            \r%s [%s events] | %s elapsed | %s events/s    ",
       message.c_str(), current_str.c_str(), elapsed_str, rate_str.c_str());

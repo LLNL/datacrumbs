@@ -9,6 +9,17 @@ struct general_event_t {
   unsigned long long dur;
 };
 
+#define MAX_STRING_LENGTH 80
+struct usdt_event_t {
+  unsigned int type;
+  unsigned long long id;
+  unsigned long long event_id;
+  unsigned long long ts;
+  unsigned long long dur;
+  char clazz[MAX_STRING_LENGTH];
+  char method[MAX_STRING_LENGTH];
+};
+
 struct fn_key_t {
   unsigned long long id;
   unsigned long long event_id;

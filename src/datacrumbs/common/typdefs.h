@@ -2,6 +2,6 @@
 
 #include <any>
 #include <string>
-#include <vector>
+#include <unordered_map>
 
-typedef std::vector<std::pair<std::string, std::any>> DataCrumbsArgs;
+typedef std::unordered_map<std::string, std::any> DataCrumbsArgs;

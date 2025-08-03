@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <any>
+#include <cmath>
 #include <condition_variable>
 #include <cstdio>
 #include <deque>
@@ -40,14 +41,6 @@ int main() {
 }
 */
 
-struct EventWithId {
-  struct general_event_t* event;
-  unsigned long long event_id;
-  DataCrumbsArgs* args;
-  EventWithId(struct general_event_t* e, uint64_t id,
-              DataCrumbsArgs* a)
-      : event(e), event_id(id), args(a) {}
-};
 namespace datacrumbs {
 
 class ChromeWriter {
@@ -67,8 +60,8 @@ class ChromeWriter {
       chmod(configManager_->trace_file_path.c_str(), 0640);
     }
     if (file_) {
-      buffer_ = new char[32 * 1024 * 1024];
-      std::setvbuf(file_, buffer_, _IOLBF, 32 * 1024 * 1024);
+      buffer_ = new char[4 * 1024];
+      std::setvbuf(file_, buffer_, _IOLBF, 4 * 1024);
       std::fprintf(file_, "[\n");
       first_event_ = true;
     }
@@ -85,13 +78,13 @@ class ChromeWriter {
     if (worker_.joinable()) worker_.join();
 
     if (file_) {
-      std::fprintf(file_, "\n]\n");
+      std::fprintf(file_, "]");
       std::fclose(file_);
     }
     delete[] buffer_;
   }
 
-  void push_event(EventWithId event) {
+  void push_event(EventWithId* event) {
     {
       std::lock_guard<std::mutex> lock(queue_mutex_);
       event_queue_.emplace_back(event);
@@ -99,75 +92,118 @@ class ChromeWriter {
     queue_cv_.notify_one();
   }
 
- private:
   // Serialize and write a single event to the file, including event_id as "id".
-  void write_event(const EventWithId& event_with_id) {
+  void write_event(EventWithId* event_with_id) {
     if (!file_) return;
     auto configManager_ = datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance();
-    auto event = event_with_id.event;
-    uint64_t event_id = event_with_id.event_id;
-    auto args = event_with_id.args;
+    uint64_t index = event_with_id->index;
+    auto args = event_with_id->args;
 
-    unsigned int pid = event->id;
-    auto it = configManager_->category_map.find(event->event_id);
+    unsigned int pid = event_with_id->tgid_pid;
+    unsigned int tid = event_with_id->tgid_pid >> 32;
+    auto it = configManager_->category_map.find(event_with_id->event_id);
     if (it != configManager_->category_map.end()) {
-      const auto& [probe_name, function_name] = it->second;
+      std::string probe_name;
+      std::string function_name;
+      if (event_with_id->type == 3) {
+        probe_name = "usdt";
+
+        if (args != nullptr) {
+          std::string clazz, method;
+          method = std::any_cast<std::string>((*args)["method"]);
+          clazz = std::any_cast<std::string>((*args)["clazz"]);
+          function_name = clazz + "." + method;
+          args->erase("clazz");
+          args->erase("method");
+        } else {
+          function_name = "unknown";
+        }
+      } else {
+        probe_name = it->second.first;
+        function_name = it->second.second;
+      }
       char buffer[1024];
+      unsigned long long ts_us = 0;
+      if (event_with_id->ts > std::numeric_limits<unsigned long long>::max() / 1000) {
+        ts_us = std::numeric_limits<unsigned long long>::max();
+      } else {
+        ts_us = static_cast<unsigned long long>(std::floor(event_with_id->ts / 1000.0));
+      }
+      unsigned long long dur_us = 0;
+      if (event_with_id->dur > std::numeric_limits<unsigned long long>::max() / 1000) {
+        dur_us = std::numeric_limits<unsigned long long>::max();
+      } else {
+        dur_us = static_cast<unsigned long long>(std::ceil(event_with_id->dur / 1000.0));
+      }
       int len = std::snprintf(
           buffer, sizeof(buffer),
-          R"({"id":%llu,"name":"%s","cat":"%s","ph":"X","ts":%llu,"dur":%llu,"pid":%d,"tid":%d)",
-          static_cast<unsigned long long>(event_id), function_name.c_str(), probe_name.c_str(),
-          static_cast<unsigned long long>(event->ts),
-          static_cast<unsigned long long>(event->dur / 1000), pid, pid);
+          R"({"id":%lu,"name":"%s","cat":"%s","ph":"X","ts":%llu,"dur":%llu,"pid":%d,"tid":%d)",
+          index, function_name.c_str(), probe_name.c_str(), ts_us, dur_us, pid, tid);
 
       std::string args_json = "{";
+
       bool first = true;
-      for (const auto& [key, value] : *args) {
-        if (!first) args_json += ",";
-        args_json += "\"";
-        args_json += key;
-        args_json += "\":";
-        if (value.type() == typeid(int)) {
-          args_json += std::to_string(std::any_cast<int>(value));
-        } else if (value.type() == typeid(unsigned int)) {
-          args_json += std::to_string(std::any_cast<unsigned int>(value));
-        } else if (value.type() == typeid(uint64_t)) {
-          args_json += std::to_string(std::any_cast<uint64_t>(value));
-        } else if (value.type() == typeid(float)) {
-          args_json += std::to_string(std::any_cast<float>(value));
-        } else if (value.type() == typeid(double)) {
-          args_json += std::to_string(std::any_cast<double>(value));
-        } else if (value.type() == typeid(const char*)) {
+      if (args != nullptr && !args->empty()) {
+        for (auto pair : *args) {
+          const std::string& key = pair.first;
+          const std::any& value = pair.second;
+          if (!first) args_json += ",";
           args_json += "\"";
-          args_json += std::any_cast<const char*>(value);
-          args_json += "\"";
-        } else if (value.type() == typeid(std::string)) {
-          args_json += "\"";
-          args_json += std::any_cast<std::string>(value);
-          args_json += "\"";
-        } else {
-          args_json += "\"<unsupported>\"";
+          args_json += key;
+          args_json += "\":";
+          if (value.type() == typeid(int)) {
+            args_json += std::to_string(std::any_cast<int>(value));
+          } else if (value.type() == typeid(unsigned long long)) {
+            args_json += std::to_string(std::any_cast<unsigned long long>(value));
+          } else if (value.type() == typeid(unsigned int)) {
+            args_json += std::to_string(std::any_cast<unsigned int>(value));
+          } else if (value.type() == typeid(uint64_t)) {
+            args_json += std::to_string(std::any_cast<uint64_t>(value));
+          } else if (value.type() == typeid(float)) {
+            args_json += std::to_string(std::any_cast<float>(value));
+          } else if (value.type() == typeid(double)) {
+            args_json += std::to_string(std::any_cast<double>(value));
+          } else if (value.type() == typeid(const char*)) {
+            args_json += "\"";
+            args_json += std::any_cast<const char*>(value);
+            args_json += "\"";
+          } else if (value.type() == typeid(std::string)) {
+            args_json += "\"";
+            args_json += std::any_cast<std::string>(value);
+            args_json += "\"";
+          } else {
+            args_json += "\"<unsupported>\"";
+          }
+          first = false;
         }
-        first = false;
       }
       args_json += "}";
 
       {
         std::lock_guard<std::mutex> lock(file_mutex_);
-        if (!first_event_) {
-          std::fprintf(file_, ",\n");
+        std::string event_json;
+        if (first) {
+          event_json = std::string(buffer, len) + "}\n";
         } else {
-          first_event_ = false;
+          event_json = std::string(buffer, len) + ",\"args\":" + args_json + "}\n";
         }
-        std::string event_json = std::string(buffer, len) + ",\"args\":" + args_json + "}";
+        DC_LOG_DEBUG("Writing event: %s", event_json.c_str());
         std::fwrite(event_json.c_str(), 1, event_json.size(), file_);
         std::fflush(file_);
       }
     }
+    if (args != nullptr) {
+      delete args;  // Clean up args after use
+    }
+    if (event_with_id != nullptr) {
+      delete event_with_id;  // Clean up event after writing
+    }
   }
+
+ private:
   void worker_loop() {
     while (true) {
-      EventWithId event_with_id(nullptr, 0, nullptr);
+      EventWithId* event_with_id = nullptr;
       {
         std::unique_lock<std::mutex> lock(queue_mutex_);
         queue_cv_.wait(lock, [this] { return !event_queue_.empty() || stop_flag_; });
@@ -181,7 +217,7 @@ class ChromeWriter {
           continue;
         }
       }
-      if (event_with_id.event != nullptr) {
+      if (event_with_id != nullptr) {
         write_event(event_with_id);
       }
     }
@@ -193,7 +229,7 @@ class ChromeWriter {
 
   std::mutex file_mutex_;
 
-  std::deque<EventWithId> event_queue_;
+  std::deque<EventWithId*> event_queue_;
   std::mutex queue_mutex_;
   std::condition_variable queue_cv_;
   std::thread worker_;

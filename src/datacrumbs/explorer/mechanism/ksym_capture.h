@@ -6,8 +6,8 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
-
 namespace datacrumbs {
 
 /**
@@ -44,10 +44,9 @@ class KSymCapture {
     DC_LOG_TRACE("KSymCapture: End getFunctionsByRegex");
     return result;
   }
+  std::unordered_set<std::string> functions_;
 
- private:
-  std::vector<std::string> functions_;  ///< List of function names loaded from kallsyms.
-
+ private:  ///< List of function names loaded from kallsyms.
   /**
    * @brief Loads function symbols from the specified kallsyms file.
    *        Only symbols of type 'T' or 't' are considered functions.
@@ -68,7 +67,7 @@ class KSymCapture {
       if (!(iss >> addr >> type >> name)) continue;
       // Only add functions (type 'T' or 't')
       if (type == "T" || type == "t") {
-        functions_.push_back(name);
+        functions_.insert(name);
         ++count;
       }
     }
