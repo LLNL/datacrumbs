@@ -20,7 +20,7 @@ class USDTFunctionExtractor {
     DC_LOG_TRACE("extractFunctionNames() called for provider: %s", provider_.c_str());
     if (provider_ == "python") {
       DC_LOG_DEBUG("Extracting USDT function names for Python provider");
-      return {"function__entry", "function__return"};
+      return {"function__entry"};
     } else {
       DC_LOG_WARN("Provider '%s' is not supported. Returning empty function list.",
                   provider_.c_str());

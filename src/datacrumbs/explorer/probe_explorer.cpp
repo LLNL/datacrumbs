@@ -108,6 +108,21 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         if (auto headerProbe = std::static_pointer_cast<HeaderCaptureProbe>(capture_probe)) {
           DC_LOG_DEBUG("Header Name: %s", headerProbe->file.c_str());
           functionNames = HeaderFunctionExtractor(headerProbe->file).extractFunctionNames();
+          if (capture_probe->probe_type == ProbeType::KPROBE) {
+            DC_LOG_DEBUG("KPROBE: Extracting symbols from header...");
+            const auto& ksym_functions =
+                datacrumbs::Singleton<KSymCapture>::get_instance()->functions_;
+            std::vector<std::string> validFunctionNames;
+            for (const auto& name : functionNames) {
+              if (ksym_functions.find(name) != ksym_functions.end()) {
+                validFunctionNames.push_back(name);
+              } else {
+                DC_LOG_WARN("Function '%s' not found in KSymCapture functions, skipping.",
+                            name.c_str());
+              }
+            }
+            functionNames = std::move(validFunctionNames);
+          }
         }
         break;
       case CaptureType::BINARY:
@@ -234,7 +249,9 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         functionNames = std::move(filteredNames);
       }
     }
-
+    if (capture_probe->probe_type != ProbeType::CUSTOM) {
+      std::sort(functionNames.begin(), functionNames.end());
+    }
     probe->functions = functionNames;
 
     // Validate the probe before adding

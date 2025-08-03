@@ -12,13 +12,15 @@ static inline __attribute__((always_inline)) int generic_trace_datacrumbs_start(
   if (start_ts != 0) tsp = *start_ts;
   bpf_map_update_elem(&pid_map, &id, &tsp, BPF_ANY);
   u32 pid = id;
-  bpf_printk("Tracing PID %d", pid);
+  (void)pid;
+  DBG_PRINTK("Tracing PID %d", pid);
   return 0;
 }
 static inline __attribute__((always_inline)) int generic_trace_datacrumbs_stop() {
   u64 id = bpf_get_current_pid_tgid();
   u32 pid = id;
-  bpf_printk("Stop tracing PID %d", pid);
+  (void)pid;
+  DBG_PRINTK("Stop tracing PID %d", pid);
   bpf_map_delete_elem(&pid_map, &id);
   return 0;
 }

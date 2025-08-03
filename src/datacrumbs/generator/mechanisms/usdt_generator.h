@@ -43,10 +43,18 @@ class USDTGenerator {
       // Log info about probe generation for Python provider.
       DC_LOG_DEBUG("Generating USDT probe for Python function: %s in binary: %s",
                    func_name_.c_str(), binary_.c_str());
-      ss << "SEC(\"usdt/" << binary_ << ":" << provider_ << ":" << func_name_ << "\")\n";
-      ss << "int BPF_USDT(" << sanitized_func_name << event_id_
-         << "_entry, void* cls, void* function) {\n";
-      ss << "  generic_entry(ctx, " << event_id_ << ");\n";
+      ss << "SEC(\"usdt/" << binary_ << ":" << provider_ << ":function__entry\")\n";
+      ss << "int BPF_USDT(python_function_entry, long cls, long function) {\n";
+      ss << "  usdt_entry(ctx, " << event_id_ << ");\n";
+      ss << "  return 0;\n";
+      ss << "}\n";
+
+      // Log info about probe generation for Python provider.
+      DC_LOG_DEBUG("Generating USDT probe for Python function: %s in binary: %s",
+                   func_name_.c_str(), binary_.c_str());
+      ss << "SEC(\"usdt/" << binary_ << ":" << provider_ << ":function__return\")\n";
+      ss << "int BPF_USDT(python_function_return, long cls, long function) {\n";
+      ss << "  usdt_exit(ctx, " << event_id_ << ", cls, function);\n";
       ss << "  return 0;\n";
       ss << "}\n";
     } else {

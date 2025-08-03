@@ -77,12 +77,13 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
  */
 class ArgumentParser {
  public:
-  std::string config_name;                   ///< Name of the configuration to load
-  std::optional<std::string> mode;           ///< Optional mode argument
-  std::optional<std::string> trace_log_dir;  ///< Optional trace log directory
-  std::optional<float> profiling_interval;   ///< Optional profiling interval
-  std::optional<std::string> config_path;    ///< Optional configuration file path
-  std::optional<std::string> user;           ///< Optional user argument
+  std::string config_name;                          ///< Name of the configuration to load
+  std::optional<std::string> mode;                  ///< Optional mode argument
+  std::optional<std::string> trace_log_dir;         ///< Optional trace log directory
+  std::optional<float> profiling_interval;          ///< Optional profiling interval
+  std::optional<std::string> config_path;           ///< Optional configuration file path
+  std::optional<std::string> user;                  ///< Optional user argument
+  std::optional<uint64_t> skip_event_threshold_us;  ///< Optional skip event threshold
 
   /**
    * @brief Constructor that parses command-line arguments.
