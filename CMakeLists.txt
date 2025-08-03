@@ -32,7 +32,10 @@ if (NOT DATACRUMBS_EXTERNALLY_CONFIGURED)
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all Libraries")
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
 endif ()
-
+add_executable(callgraph_creator
+    tools/callgraph.cpp
+    tools/cJSON.c
+)
 set(DFT_EBPF_SRC src/datacrumbs/library.c src/datacrumbs/library.h)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_library(${PROJECT_NAME} SHARED ${DFT_EBPF_SRC})
@@ -42,5 +45,9 @@ install(
         LIBRARY DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
         ARCHIVE DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
         RUNTIME DESTINATION ${DATACRUMBS_INSTALL_BIN_DIR}
+)
+install(
+    TARGETS callgraph_creator
+    RUNTIME DESTINATION ${DATACRUMBS_INSTALL_BINARYDIR}/tools
 )
 add_subdirectory(tests)
