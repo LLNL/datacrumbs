@@ -20,12 +20,20 @@ DATACRUMBS_MAP(pid_map, u64, u64, 1024);
 DATACRUMBS_MAP(fn_pid_map, struct fn_key_t, struct fn_value_t);
 DATACRUMBS_RINGBUF(output, 1 << 16);
 
+static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* key, u64* start_ts) {
+  key->id = bpf_get_current_pid_tgid();
+  start_ts = (u64*)bpf_map_lookup_elem(&pid_map, &key->id);
+  if (start_ts == 0 || key->id == 0) return 0;
+  return 1;
+}
+
 static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
-  key.id = bpf_get_current_pid_tgid();
-  u64* start_ts = bpf_map_lookup_elem(&pid_map, &key.id);
-  if (start_ts == 0 || key.id == 0) return 0;
-
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    bpf_printk("Skipping entry for pid:%d, event_id:%llu\n", (u32)key.id, event_id);
+    return 0;  // not tracing this pid
+  }
   key.event_id = event_id;
   struct fn_value_t fn = {};
   fn.ts = bpf_ktime_get_ns();
@@ -35,27 +43,41 @@ static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* c
 }
 static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
-  key.id = bpf_get_current_pid_tgid();
-  u64* start_ts = bpf_map_lookup_elem(&pid_map, &key.id);
-  if (start_ts == 0 || key.id == 0) return 0;
-  key.event_id += event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    bpf_printk("Skipping entry for pid:%d, event_id:%llu\n", (u32)key.id, event_id);
+    return 0;  // not tracing this pid
+  }
+  key.event_id = event_id;
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
   if (fn == 0) return 0;  // missed entry
-  struct general_event_t* stats_key;
-  stats_key = bpf_ringbuf_reserve(&output, sizeof(struct general_event_t), 0);
-  if (!stats_key) {
-    bpf_printk("Failed to reserve space in ring buffer for stats for pid:%d, event_id:%llu\n",
+  struct general_event_t* event;
+  event = bpf_ringbuf_reserve(&output, sizeof(struct general_event_t), 0);
+  if (!event) {
+    bpf_printk("Failed to reserve space in ring buffer for event for pid:%d, event_id:%llu\n",
                (u32)key.id, event_id);
     return 0;  // failed to reserve space
   }
-  stats_key->id = key.id;
-  stats_key->event_id = event_id;
-  struct general_event_t* stats = stats_key;
-  stats->ts = (fn->ts - *start_ts);
-  stats->dur = bpf_ktime_get_ns() - fn->ts;
-  bpf_ringbuf_submit(stats_key, 0);
+  event->type = 1;
+  event->id = key.id;
+  event->event_id = event_id;
+  event->ts = (fn->ts - start_ts);
+  event->dur = bpf_ktime_get_ns() - fn->ts;
+  bpf_ringbuf_submit(event, 0);
   bpf_printk("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, event_id);
   return 0;
+}
+
+static inline __attribute__((always_inline)) u64 get_hash(unsigned char* str, u64 len) {
+  u64 hash = 5381;
+  int c = *str;
+  int count = 0;
+  while (count < len && c) {
+    hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    c = *str++;
+    count++;
+  }
+  return hash;
 }
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";

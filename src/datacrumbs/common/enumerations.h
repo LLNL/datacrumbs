@@ -36,6 +36,7 @@ enum class ProbeType : uint8_t {
   KPROBE = 1,
   UPROBE = 2,
   USDT = 3,
+  CUSTOM = 4,
 };
 
 // Converts string to ProbeType enum. Throws if invalid.
@@ -53,6 +54,9 @@ inline void convert(const std::string& s, ProbeType& type) {
   } else if (s == "usdt") {
     type = ProbeType::USDT;
     DC_LOG_DEBUG("Converted string '%s' to ProbeType::USDT", s.c_str());
+  } else if (s == "custom") {
+    type = ProbeType::CUSTOM;
+    DC_LOG_DEBUG("Converted string '%s' to ProbeType::CUSTOM", s.c_str());
   } else {
     DC_LOG_INFO("Unknown ProbeType string: '%s'", s.c_str());
     throw std::invalid_argument("Unknown ProbeType: " + s +
@@ -67,6 +71,7 @@ enum class CaptureType : uint8_t {
   BINARY = 1,
   KSYM = 2,
   USDT = 3,
+  CUSTOM = 4,  // Custom capture type for user-defined probes
 };
 
 // Converts string to CaptureType enum. Throws if invalid.
@@ -84,10 +89,13 @@ inline void convert(const std::string& s, CaptureType& type) {
   } else if (s == "usdt") {
     type = CaptureType::USDT;
     DC_LOG_DEBUG("Converted string '%s' to CaptureType::USDT", s.c_str());
+  } else if (s == "custom") {
+    type = CaptureType::CUSTOM;
+    DC_LOG_DEBUG("Converted string '%s' to CaptureType::CUSTOM", s.c_str());
   } else {
     DC_LOG_INFO("Unknown CaptureType string: '%s'", s.c_str());
     throw std::invalid_argument("Unknown CaptureType: " + s +
-                                ". Valid types are: header, binary, ksym, or usdt.");
+                                ". Valid types are: header, binary, ksym, usdt, or custom.");
   }
   DC_LOG_TRACE("Exiting convert for CaptureType");
 }
