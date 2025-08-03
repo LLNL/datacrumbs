@@ -1,5 +1,34 @@
 [
   {
+    "type":4,
+    "name":"custom1",
+    "functions":[
+      "openat",
+      "read",
+      "write",
+      "close",
+      "fallocate",
+      "fdatasync",
+      "flock",
+      "fsync",
+      "ftruncate",
+      "lseek",
+      "pread64",
+      "preadv",
+      "preadv2",
+      "pwrite64",
+      "pwritev",
+      "pwritev2",
+      "readahead",
+      "readv",
+      "writev"
+    ],
+    "bpf_path":"\/home\/haridev\/datacrumbs\/etc\/datacrumbs\/plugins\/custom_probes\/sys_io\/sysio.bpf.c",
+    "start_event_id":100000,
+    "process_header":"\/home\/haridev\/datacrumbs\/etc\/datacrumbs\/plugins\/custom_probes\/sys_io\/sysio_process.h",
+    "event_type":2
+  },
+  {
     "type":0,
     "name":"sys",
     "functions":[

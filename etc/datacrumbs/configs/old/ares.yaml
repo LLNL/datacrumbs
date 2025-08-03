@@ -1,0 +1,51 @@
+name: ares
+install_dir: /home/${USER}/datacrumbs/install
+# mode options: `trace` or `profile`
+# currently only `trace` mode
+mode: trace
+file: /home/${USER}/logs/ares-trace.pfw
+# if no headers installed use regex as sys.*
+system:
+  - name: sys
+    header: /usr/src/linux-headers-5.15.0-142/include/linux/syscalls.h
+  - name: os_page_cache
+    header: /usr/src/linux-headers-5.15.0-142/include/linux/pagemap.h
+  - name: swap
+    header: /usr/src/linux-headers-5.15.0-142/include/linux/swap.h
+  - name: vfs
+    header: /usr/src/linux-headers-5.15.0-142/include/linux/fs.h
+  - name: bio
+    regex: bio.*
+  - name: shm
+    header: /usr/src/linux-headers-5.15.0-142/include/linux/shmem_fs.h
+  - name: fscache
+    header: /usr/src/linux-headers-5.15.0-142/include/linux/fscache.h
+  - name: mm
+    header: /usr/src/linux-headers-5.15.0-142/include/linux/mm.h
+  - name: xfs
+    regex: xfs.*
+  # similar for any FS type
+  # - name: ext4
+  #   regex: ext4.*
+  - name: iomap
+    regex: iomap.*
+  - name: iov
+    regex: iov.*
+io:
+  - name: libc
+    link: /usr/lib/x86_64-linux-gnu/libc.so.6
+  # - name: hdf5
+  #   link: /home/${USER}/datacrumbs/install/lib/libhdf5.so
+  - name: mpi
+    link: /mnt/repo/software/spack/spack/opt/spack/linux-ubuntu22.04-skylake_avx512/gcc-11.4.0/openmpi-5.0.5-uo523moga7ogcoyiaxci6lngvdfd3tde/lib/libmpi.so
+user:
+  - name: test_posix
+    link: /home/${USER}/datacrumbs/install/libexec/datacrumbs/bin/df_tracer_test
+    regex: ^(?!__).*
+profile:
+  interval_sec: 0.0001
+
+trace:
+  args: 1
+  # options: `ring_buffer` or `perf`
+  type: ring_buffer

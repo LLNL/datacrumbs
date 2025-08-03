@@ -66,6 +66,9 @@ class ConfigurationManager {
   // Derived configuration: path to the category map file
   std::filesystem::path category_map_path;
 
+  // Dervived configuration: category map for event IDs
+  std::unordered_map<uint64_t, std::pair<std::string, std::string>> category_map;
+
   /**
    * @brief Constructor that initializes the ConfigurationManager with command-line arguments.
    *
@@ -77,6 +80,10 @@ class ConfigurationManager {
    * @param argv Array of command-line argument strings
    */
   ConfigurationManager(int argc, char** argv);
+
+  ConfigurationManager() {
+    // Default constructor for internal use
+  }
 
  private:
   /**
@@ -93,6 +100,8 @@ class ConfigurationManager {
    * logs an error and exits the program. This ensures correct operation of the DataCrumbs library.
    */
   void validate_configurations();
+
+  void load_catergory_map();
 };
 
 }  // namespace datacrumbs

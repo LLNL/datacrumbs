@@ -35,7 +35,7 @@ class Singleton {
       return nullptr;
     }
     if (instance == nullptr) {
-      DC_LOG_INFO("Creating new instance of Singleton<%s>", typeid(T).name());
+      DC_LOG_DEBUG("Creating new instance of Singleton<%s>", typeid(T).name());
       instance = std::make_shared<T>(std::forward<Args>(args)...);
     } else {
       DC_LOG_DEBUG("Returning existing instance of Singleton<%s>", typeid(T).name());

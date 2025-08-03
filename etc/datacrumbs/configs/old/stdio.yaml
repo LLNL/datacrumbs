@@ -1,0 +1,18 @@
+name: default
+install_dir: build
+mode: trace
+file: trace-stdio.pfw
+user:
+  - name: app1
+    link: /home/cc/datacrumbs/build/tests/df_tracer_test_stdio
+    regex: .*
+  - name: mpi
+    link: /opt/spack/opt/spack/linux-ubuntu22.04-icelake/gcc-11.4.0/openmpi-5.0.5-jia45w3wv65epg4kwlx4vkqlsdm4acc7/lib/libmpi.so
+    regex: ^PMPI.*
+
+profile:
+  interval_sec: 0.0001
+
+trace:
+  args: 1
+  type: ring_buffer # ring_buffer
