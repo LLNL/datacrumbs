@@ -84,6 +84,8 @@
         "shared.h": "c",
         "common.h": "c",
         "format": "cpp",
-        "text_encoding": "cpp"
+        "text_encoding": "cpp",
+        "example.generic.bpf.h": "c",
+        "sysio.bpf.h": "c"
     }
 }

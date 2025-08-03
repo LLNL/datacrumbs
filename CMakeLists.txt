@@ -270,7 +270,8 @@ add_custom_target(datacrumbs_bpf_skel ALL DEPENDS ${BPF_SKEL_OUTPUT})
 add_dependencies(datacrumbs_bpf_skel datacrumbs_bpf)
 
 set(DATACRUMBS_PROCESS_EVENTS_SRC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/datacrumbs_process_events.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/event_processor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/writer/chrome_writer.cpp
     ${BPF_SKEL_OUTPUT}
 )
 include_directories(${CMAKE_INCLUDE_OUTPUT_DIRECTORY})

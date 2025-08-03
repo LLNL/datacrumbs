@@ -93,6 +93,9 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
       case ProbeType::KPROBE:
         probe = std::make_shared<KProbe>();
         break;
+      case ProbeType::CUSTOM:
+        probe = std::make_shared<CustomProbe>();
+        break;
       default:
         DC_LOG_ERROR("Unknown probe type encountered in extractProbes()");
         throw std::runtime_error("Unknown probe type encountered in extractProbes()");
@@ -141,6 +144,53 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         if (auto ksymProbe = std::static_pointer_cast<KernelCaptureProbe>(capture_probe)) {
           functionNames = datacrumbs::Singleton<KSymCapture>::get_instance()->getFunctionsByRegex(
               ksymProbe->regex);
+        }
+        break;
+      case CaptureType::CUSTOM:
+        DC_LOG_INFO("Extracting custom probes...");
+        if (auto customProbe = std::static_pointer_cast<CustomCaptureProbe>(capture_probe)) {
+          // Load custom BPF file and extract functions
+          if (!std::filesystem::exists(customProbe->bpf_file)) {
+            DC_LOG_ERROR("Custom BPF file does not exist: %s", customProbe->bpf_file.c_str());
+            continue;  // Skip this probe if the file is missing
+          }
+          if (!std::filesystem::exists(customProbe->probe_file)) {
+            DC_LOG_ERROR("Custom probe file does not exist: %s", customProbe->probe_file.c_str());
+            continue;  // Skip this probe if the file is missing
+          }
+          std::ifstream probe_ifs(customProbe->probe_file);
+          if (!probe_ifs.is_open()) {
+            DC_LOG_ERROR("Failed to open custom probe file: %s", customProbe->probe_file.c_str());
+            break;
+          }
+          std::string probe_content((std::istreambuf_iterator<char>(probe_ifs)),
+                                    std::istreambuf_iterator<char>());
+          json_object* probe_jobj = json_tokener_parse(probe_content.c_str());
+          if (probe_jobj && json_object_get_type(probe_jobj) == json_type_array) {
+            int arr_len = json_object_array_length(probe_jobj);
+            for (int i = 0; i < arr_len; ++i) {
+              json_object* entry = json_object_array_get_idx(probe_jobj, i);
+              if (!entry) continue;
+              json_object* funcs_obj = nullptr;
+              if (json_object_object_get_ex(entry, "functions", &funcs_obj) &&
+                  json_object_get_type(funcs_obj) == json_type_array) {
+                int func_len = json_object_array_length(funcs_obj);
+                for (int j = 0; j < func_len; ++j) {
+                  json_object* func_obj = json_object_array_get_idx(funcs_obj, j);
+                  if (func_obj && json_object_get_type(func_obj) == json_type_string) {
+                    functionNames.push_back(json_object_get_string(func_obj));
+                  }
+                }
+              }
+            }
+          }
+          if (probe_jobj) json_object_put(probe_jobj);
+          if (auto custom_probe = std::dynamic_pointer_cast<CustomProbe>(probe)) {
+            custom_probe->bpf_path = customProbe->bpf_file;
+            custom_probe->start_event_id = customProbe->start_event_id;
+            custom_probe->process_header = customProbe->process_header;
+            custom_probe->event_type = customProbe->event_type;
+          }
         }
         break;
       default:
@@ -221,9 +271,16 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::writeProbesToJson() {
       case ProbeType::USDT:
         jprobe = std::dynamic_pointer_cast<USDTProbe>(probe)->toJson();
         break;
+      case ProbeType::CUSTOM:
+        jprobe = std::dynamic_pointer_cast<CustomProbe>(probe)->toJson();
+        break;
       default:
         DC_LOG_ERROR("Unknown probe type encountered.");
         continue;  // Skip unknown types
+    }
+    if (!jprobe) {
+      DC_LOG_ERROR("Failed to serialize probe: %s", probe->name.c_str());
+      continue;  // Skip serialization failure
     }
     json_object_array_add(jarray, jprobe);
   }

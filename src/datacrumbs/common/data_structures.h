@@ -194,6 +194,77 @@ struct USDTProbe : public Probe {
   }
 };
 
+// Probe for USDT (User-level Statically Defined Tracing) probes
+struct CustomProbe : public Probe {
+ public:
+  CustomProbe()
+      : Probe(ProbeType::CUSTOM), bpf_path(), start_event_id(), process_header(), event_type(1) {
+    DC_LOG_TRACE("CustomProbe constructor called");
+  }
+  std::string bpf_path;        // Path to the BPF program
+  uint64_t start_event_id;     // Starting event ID for the probe
+  std::string process_header;  // Header file for the process
+  uint64_t event_type;         // Event type for the probe
+
+  // Validates the Custom probe's configuration
+  bool validate() const override {
+    DC_LOG_TRACE("CustomProbe::validate called");
+    if (!Probe::validate()) return false;
+    if (bpf_path.empty()) {
+      DC_LOG_DEBUG("CustomProbe bpf_path is empty");
+      return false;
+    }
+    if (start_event_id == 0) {
+      DC_LOG_DEBUG("CustomProbe start_event_id is not set");
+      return false;
+    }
+    if (process_header.empty()) {
+      DC_LOG_DEBUG("CustomProbe process_header is empty");
+      return false;
+    }
+    if (event_type == 0) {
+      DC_LOG_DEBUG("CustomProbe event_type is not set");
+      return false;
+    }
+    DC_LOG_DEBUG("CustomProbe validated successfully: %s", name.c_str());
+    return true;
+  }
+
+  // Serializes the USDT probe to a JSON object
+  json_object* toJson() const override {
+    DC_LOG_TRACE("CustomProbe::toJson called");
+    json_object* j = Probe::toJson();
+    json_object_object_add(j, "bpf_path", json_object_new_string(bpf_path.c_str()));
+    json_object_object_add(j, "start_event_id", json_object_new_int64(start_event_id));
+    json_object_object_add(j, "process_header", json_object_new_string(process_header.c_str()));
+    json_object_object_add(j, "event_type", json_object_new_int64(event_type));
+    return j;
+  }
+
+  // Deserializes a Custom probe from a JSON object
+  static CustomProbe fromJson(const json_object* j) {
+    DC_LOG_TRACE("CustomProbe::fromJson called");
+    CustomProbe p;
+    Probe base = Probe::fromJson(j);
+    p.type = base.type;
+    p.name = base.name;
+    p.functions = base.functions;
+
+    json_object* bpf_obj = json_object_object_get(j, "bpf_path");
+    if (bpf_obj) p.bpf_path = json_object_get_string(bpf_obj);
+
+    json_object* start_event_id_obj = json_object_object_get(j, "start_event_id");
+    if (start_event_id_obj) p.start_event_id = json_object_get_int64(start_event_id_obj);
+
+    json_object* process_header_obj = json_object_object_get(j, "process_header");
+    if (process_header_obj) p.process_header = json_object_get_string(process_header_obj);
+    json_object* event_type_obj = json_object_object_get(j, "event_type");
+    if (event_type_obj) p.event_type = json_object_get_int64(event_type_obj);
+
+    return p;
+  }
+};
+
 // Base class for capture probes (used for capturing symbols, headers, binaries, etc.)
 class CaptureProbe {
  public:
@@ -240,6 +311,24 @@ class USDTCaptureProbe : public CaptureProbe {
   }
   std::string binary_path;  // Path to the binary
   std::string provider;     // USDT provider name
+};
+
+class CustomCaptureProbe : public CaptureProbe {
+ public:
+  CustomCaptureProbe()
+      : CaptureProbe(CaptureType::CUSTOM),
+        bpf_file(),
+        probe_file(),
+        start_event_id(100000),
+        process_header(),
+        event_type(1) {
+    DC_LOG_TRACE("CustomCaptureProbe constructor called");
+  }
+  std::string bpf_file;        // Path to the custom bpf file
+  std::string probe_file;      // Path to the custom probe file
+  uint64_t start_event_id;     // Starting event ID for the probe
+  std::string process_header;  // Header file for the process
+  uint64_t event_type;         // Event type for the probe
 };
 
 }  // namespace datacrumbs

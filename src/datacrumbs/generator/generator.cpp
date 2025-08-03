@@ -3,6 +3,9 @@
 #include <datacrumbs/common/utils.h>
 #include <datacrumbs/generator/generator.h>
 
+#include <string>
+#include <unordered_set>
+#include <vector>
 namespace datacrumbs {
 
 // Constructor for ProbeGenerator
@@ -11,7 +14,6 @@ ProbeGenerator::ProbeGenerator(int argc, char** argv) {
   configManager_ = datacrumbs::Singleton<ConfigurationManager>::get_instance(argc, argv);
 }
 
-// Main function to generate probe files and category map
 int ProbeGenerator::run() {
   DC_LOG_TRACE("[ProbeGenerator] Starting run()");
 
@@ -19,6 +21,9 @@ int ProbeGenerator::run() {
     DC_LOG_ERROR("ConfigurationManager is not initialized.");
     return -1;
   }
+
+  // Global set to track unique function names
+  static std::unordered_set<std::string> global_function_names;
 
   // Get probes file path from configuration
   const auto& probesFile = configManager_->probe_file_path;
@@ -32,6 +37,7 @@ int ProbeGenerator::run() {
   }
 
   auto probe_files = std::vector<std::string>();
+  auto process_headers = std::vector<std::string>();
   int arr_len = json_object_array_length(probesJson);
   DC_LOG_INFO("[ProbeGenerator] Number of probes: %d", arr_len);
 
@@ -51,7 +57,21 @@ int ProbeGenerator::run() {
     for (size_t func_index = 0; func_index < probe.functions.size(); ++func_index) {
       const auto& func = probe.functions[func_index];
 
-      auto current_event_id = this->eventIdCounter_++;
+      // Check and insert into global set to avoid duplicates
+      if (!global_function_names.insert(func).second) {
+        DC_LOG_WARN(
+            "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from %s.",
+            func.c_str(), probe.name.c_str());
+        continue;
+      }
+
+      int current_event_id = 0;
+      if (probe.type != ProbeType::CUSTOM) {
+        current_event_id = this->eventIdCounter_++;
+      } else {
+        auto custom = CustomProbe::fromJson(jprobe);
+        current_event_id = custom.start_event_id + func_index;
+      }
 
       // Map event id to probe name and function name
       struct json_object* info = json_object_new_object();
@@ -91,6 +111,8 @@ int ProbeGenerator::run() {
           USDTGenerator usdt_gen(current_event_id, func, usdt.binary_path, usdt.provider);
           ss << usdt_gen.generate().str() << std::endl;
         } break;
+        case ProbeType::CUSTOM: {
+        } break;
         default: {
           DC_LOG_ERROR("Unknown probe type: %d", static_cast<int>(probe.type));
         }
@@ -99,12 +121,18 @@ int ProbeGenerator::run() {
       ++total_probes_generated;
     }
 
+    if (probe.type == ProbeType::CUSTOM) {
+      auto custom = CustomProbe::fromJson(jprobe);
+      probe_files.push_back(custom.bpf_path);
+      process_headers.push_back(custom.process_header);
+    }
     // Write generated code to file
     const char* gen_path = DATACRUMBS_SRC_GEN_PATH;
     if (!gen_path) {
       DC_LOG_ERROR("DATACRUMBS_SRC_GEN_PATH environment variable not set.");
     } else {
-      std::filesystem::create_directories(std::filesystem::path(gen_path) / "server/bpf");
+      std::filesystem::create_directories(std::filesystem::path(gen_path) /
+                                          "datacrumbs/server/bpf");
       std::string filename =
           (std::filesystem::path(gen_path) / "datacrumbs/server/bpf" / (probe.name + ".bpf.c"))
               .string();
@@ -135,6 +163,22 @@ int ProbeGenerator::run() {
       }
       generated_out.close();
       DC_LOG_INFO("[ProbeGenerator] All probe files included in: %s", generated_filename.c_str());
+    }
+    std::filesystem::create_directories(std::filesystem::path(gen_path) /
+                                        "datacrumbs/server/process");
+    std::string generated_process_filename =
+        (std::filesystem::path(gen_path) / "datacrumbs/server/process" / "generated_process.h")
+            .string();
+    std::ofstream generated_process_out(generated_process_filename);
+    if (!generated_process_out) {
+      DC_LOG_ERROR("Failed to open file for writing: %s", generated_process_filename.c_str());
+    } else {
+      for (const auto& process_header : process_headers) {
+        generated_process_out << "#include \"" << process_header << "\"" << std::endl;
+      }
+      generated_process_out.close();
+      DC_LOG_INFO("[ProbeGenerator] All process headers included in: %s",
+                  generated_process_filename.c_str());
     }
   }
 
@@ -182,7 +226,7 @@ int main(int argc, char** argv) {
   generator.run();
 
   timer.pauseTime();
-  DC_LOG_INFO("Total time elapsed for Probe Generator: %f seconds", timer.getElapsedTime());
+  DC_LOG_PRINT("Total time elapsed for Probe Generator: %f seconds", timer.getElapsedTime());
 
   return 0;
 }
