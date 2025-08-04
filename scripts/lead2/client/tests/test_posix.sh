@@ -7,7 +7,7 @@ mkdir -p $DATA_DIR
 NUM_FILES=1
 NUM_OPS=$1
 if [ -z "$1" ]; then
-  NUM_OPS=$((1))
+  NUM_OPS=$((128))
 fi
 SLEEP=0
 PROC=1
@@ -19,7 +19,7 @@ if [ -z "$2" ]; then
 fi
 
 for DIRECTIO in 0; do
-  for TSKB in $((1024*1024)); #1 4 16 64 256 1024 4096 16384 65536 262144
+  for TSKB in $((1024)); #1 4 16 64 256 1024 4096 16384 65536 262144
   do
   if [ "$TEST_CASE" -eq "0" ] || [ "$TEST_CASE" -eq "2" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Cleaning Data"
