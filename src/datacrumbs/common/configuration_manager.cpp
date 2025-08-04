@@ -82,6 +82,7 @@ class ArgumentParser {
   std::optional<std::string> trace_log_dir;         ///< Optional trace log directory
   std::optional<float> profiling_interval;          ///< Optional profiling interval
   std::optional<std::string> config_path;           ///< Optional configuration file path
+  std::optional<std::string> data_dir;              ///< Optional data directory
   std::optional<std::string> user;                  ///< Optional user argument
   std::optional<uint64_t> skip_event_threshold_us;  ///< Optional skip event threshold
 
@@ -107,8 +108,8 @@ class ArgumentParser {
         trace_log_dir = argv[++i];
         DC_LOG_DEBUG("[ArgumentParser] Trace log dir set to: %s", trace_log_dir->c_str());
       } else if (arg == "--data_dir" && i + 1 < argc) {
-        config_path = argv[++i];
-        DC_LOG_DEBUG("[ArgumentParser] Data directory set to: %s", config_path->c_str());
+        data_dir = argv[++i];
+        DC_LOG_DEBUG("[ArgumentParser] Data directory set to: %s", data_dir->c_str());
       } else if (arg == "--profiling_interval" && i + 1 < argc) {
         profiling_interval = std::stof(argv[++i]);
         DC_LOG_DEBUG("[ArgumentParser] Profiling interval set to: %f", *profiling_interval);
@@ -153,6 +154,12 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
   DC_LOG_TRACE("[ConfigurationManager] Initializing with arguments...");
   ArgumentParser parser(argc, argv);
   this->name = parser.config_name;
+  // Override config path if provided as argument
+  if (parser.config_path) {
+    this->path = *parser.config_path;
+    DC_LOG_DEBUG("[ConfigurationManager] Config path overridden by argument: %s",
+                 this->path.string().c_str());
+  }
   YAML::Node config;
   std::filesystem::path config_path = this->path / (this->name + ".yaml");
   DC_LOG_DEBUG("[ConfigurationManager] Loading configuration file: %s",
@@ -368,12 +375,11 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
       DC_LOG_DEBUG("[ConfigurationManager] No user specified in config, using default: %s",
                    this->user.c_str());
     }
-
     // Override config path if provided as argument
-    if (parser.config_path) {
-      this->path = *parser.config_path;
-      DC_LOG_DEBUG("[ConfigurationManager] Config path overridden by argument: %s",
-                   this->path.string().c_str());
+    if (parser.data_dir) {
+      this->data_dir = *parser.data_dir;
+      DC_LOG_DEBUG("[ConfigurationManager] Data directory overridden by argument: %s",
+                   this->data_dir.string().c_str());
     }
     // Override mode if provided as argument
     if (parser.mode) {

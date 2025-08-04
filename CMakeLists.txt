@@ -67,7 +67,25 @@ add_custom_target_with_clean(clean_all)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-set(configuration_variables --user $ENV{USER})
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBBPF libbpf)
+
+if(LIBBPF_VERSION VERSION_LESS "1.0.0")
+    message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf version 1.0.0 or newer is required, but found ${LIBBPF_VERSION}")
+endif()
+
+if(LIBBPF_FOUND)
+    set(LIBBPF_VERSION "${LIBBPF_VERSION}")
+    message(STATUS "[${UPPER_PROJECT_NAME}] Found libbpf version: ${LIBBPF_VERSION}")
+else()
+    message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf not found!")
+endif()
+
+# Ensure the process output directory exists
+file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/process/)
+file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/)
+
+set(configuration_variables --user $ENV{USER} --config_path ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs --data_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data --trace_log_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
 
 set(DATACRUMBS_CLIENT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.h)
 
