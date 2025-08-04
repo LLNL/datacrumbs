@@ -9,7 +9,7 @@
 namespace datacrumbs {
 
 // Constructor for ProbeGenerator
-ProbeGenerator::ProbeGenerator(int argc, char** argv) {
+ProbeGenerator::ProbeGenerator(int argc, char** argv) : eventIdCounter_(1000) {
   // Initialize ConfigurationManager singleton
   configManager_ = datacrumbs::Singleton<ConfigurationManager>::get_instance(argc, argv);
 }
@@ -43,7 +43,20 @@ int ProbeGenerator::run() {
 
   // Track total number of generated probes
   size_t total_probes_generated = 0;
-
+  // Map event id to probe name and function name
+  std::vector<std::pair<std::string, std::vector<std::string>>> probe_name_functions = {
+      {"sys", {"fork", "vfork"}}, {"libc", {"__GI___fork", "__GI___vfork"}}};
+  int event_id = 1;
+  for (const auto& [name, functions] : probe_name_functions) {
+    for (const auto& function : functions) {
+      struct json_object* info = json_object_new_object();
+      json_object_object_add(info, "probe_name", json_object_new_string(name.c_str()));
+      json_object_object_add(info, "function_name", json_object_new_string(function.c_str()));
+      categoryMap_[event_id] = info;
+      global_function_names.insert(function);
+      event_id++;
+    }
+  }
   // Iterate over each probe in the JSON array
   for (int i = 0; i < arr_len; ++i) {
     struct json_object* jprobe = json_object_array_get_idx(probesJson, i);
