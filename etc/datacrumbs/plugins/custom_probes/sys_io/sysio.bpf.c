@@ -41,14 +41,13 @@ static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs*
   }
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
   if (fn == 0) return 0;  // missed entry
+  DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
   struct sysio_event_t* event;
   DATACRUMBS_RB_RESERVE(output, struct sysio_event_t, event);
   event->type = 2;
   event->id = key.id;
   event->event_id = key.event_id;
   DATACRUMBS_COLLECT_TIME(event);
-  DATACRUMBS_SKIP_SMALL_EVENTS(event);
-
   event->size = 0;
   event->filename[0] = '\0';  // Initialize filename to empty
   event->size += PT_REGS_RC(ctx);
@@ -84,13 +83,13 @@ static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_r
   }
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
   if (fn == 0) return 0;  // missed entry
+  DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
   struct sysio_event_t* event;
   DATACRUMBS_RB_RESERVE(output, struct sysio_event_t, event);
   event->type = 2;
   event->id = key.id;
   event->event_id = key.event_id;
   DATACRUMBS_COLLECT_TIME(event);
-  DATACRUMBS_SKIP_SMALL_EVENTS(event);
   event->size = 0;
   event->filename[0] = '\0';  // Initialize filename to empty
   int* fd_ptr = bpf_map_lookup_elem(&latest_fd, &key);
@@ -149,6 +148,7 @@ int BPF_KRETPROBE(openat_exit) {
   }
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
   if (fn == 0) return 0;  // missed entry
+  DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
   struct sysio_event_t* event;
   DATACRUMBS_RB_RESERVE(output, struct sysio_event_t, event);
 
@@ -156,7 +156,6 @@ int BPF_KRETPROBE(openat_exit) {
   event->id = key.id;
   event->event_id = key.event_id;
   DATACRUMBS_COLLECT_TIME(event);
-  DATACRUMBS_SKIP_SMALL_EVENTS(event);
   event->size = 0;
   event->filename[0] = '\0';  // Initialize filename to empty
   struct filename_t* fname = bpf_map_lookup_elem(&latest_fname, &key);

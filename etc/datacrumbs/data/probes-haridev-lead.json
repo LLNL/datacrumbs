@@ -229,7 +229,6 @@
       "call_once@GLIBC_2.28",
       "callback",
       "cbc_crypt@GLIBC_2.2.5",
-      "cfree@GLIBC_2.2.5",
       "check_stdfiles_vtables",
       "clone3",
       "comma",

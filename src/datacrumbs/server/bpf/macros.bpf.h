@@ -78,11 +78,10 @@
 #ifndef DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS
 #define DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS 1000
 #endif
-#define DATACRUMBS_SKIP_SMALL_EVENTS(event)                                                      \
-  if (event->dur <                                                                               \
+#define DATACRUMBS_SKIP_SMALL_EVENTS(fn, te)                                                     \
+  if (te - fn->ts <                                                                              \
       DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS) { /* Skip events with duration less than 1ms */ \
-    DBG_PRINTK("Skipping small event with duration %llu ns", event->dur);                        \
-    bpf_ringbuf_discard(event, 0);                                                               \
+    DBG_PRINTK("Skipping small event with duration %llu ns", te - fn->ts);                       \
     return 0;                                                                                    \
   }
 

@@ -52,13 +52,13 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   }
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
   if (fn == 0) return 0;  // missed entry
+  DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
   struct general_event_t* event;
   DATACRUMBS_RB_RESERVE(output, struct general_event_t, event);
   event->type = 1;
   event->id = key.id;
   event->event_id = event_id;
   DATACRUMBS_COLLECT_TIME(event);
-  DATACRUMBS_SKIP_SMALL_EVENTS(event);
   bpf_ringbuf_submit(event, 0);
   DBG_PRINTK("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, event_id);
   return 0;
@@ -87,17 +87,14 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
     return 0;  // not tracing this pid
   }
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
-  if (fn == 0) {
-    DBG_PRINTK("USDT Exit Missed Entry called event_id:%llu pid:%d\n", event_id, (u32)key.id);
-    return 0;  // missed entry
-  }
+  if (fn == 0) return 0;  // missed entry
+  DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
   struct usdt_event_t* event;
   DATACRUMBS_RB_RESERVE(output, struct usdt_event_t, event);
   event->type = 3;
   event->id = key.id;
   event->event_id = event_id;
   DATACRUMBS_COLLECT_TIME(event);
-  DATACRUMBS_SKIP_SMALL_EVENTS(event);
   bpf_probe_read_user(&event->clazz, sizeof(event->clazz), (void*)clazz);
   bpf_probe_read_user(&event->method, sizeof(event->method), (void*)method);
   bpf_ringbuf_submit(event, 0);
