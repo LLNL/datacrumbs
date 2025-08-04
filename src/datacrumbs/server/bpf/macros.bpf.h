@@ -76,7 +76,7 @@
     return 0;                                                                                      \
   }
 #ifndef DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS
-#define DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS 5000
+#define DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS 1000
 #endif
 #define DATACRUMBS_SKIP_SMALL_EVENTS(fn, te)                                                     \
   if (te - fn->ts <                                                                              \
@@ -88,5 +88,9 @@
 #define DATACRUMBS_COLLECT_TIME(event) \
   event->ts = fn->ts;                  \
   event->dur = (te - fn->ts);
+
+#define DATACRUMBS_EVENT_SUBMIT(event) \
+  bpf_ringbuf_submit(event, 0);        \
+  DBG_PRINTK("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, event_id);
 
 #endif  // DATACRUMBS_SERVER_BPF_MACROS_BPF_H
