@@ -38,11 +38,6 @@ capture_probes:
     probe: kprobe
     type: header
     file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
-  - name: vfs
-    probe: kprobe
-    type: header
-    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fs.h
-    regex: ^vfs(?!.*cold).*
   - name: shm
     probe: kprobe
     type: header
