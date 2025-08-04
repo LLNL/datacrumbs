@@ -214,13 +214,12 @@ include_directories(${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 find_program(BPFTool_EXECUTABLE NAMES bpftool REQUIRED)
 
 set(VMLINUX_BTF_PATH "/sys/kernel/btf/vmlinux")
-set(VMLINUX_HEADER "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/bpf/vmlinux.h")
+set(VMLINUX_HEADER "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/vmlinux.h")
 
 add_custom_command(
     OUTPUT ${VMLINUX_HEADER}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/bpf
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Generating vmlinux.h from ${VMLINUX_BTF_PATH} (timing start)"
-    COMMAND ${CMAKE_COMMAND} -E time ${BPFTool_EXECUTABLE} btf dump file ${VMLINUX_BTF_PATH} format c > ${VMLINUX_HEADER}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/server/bpf
+    COMMAND ${BPFTool_EXECUTABLE} btf dump file ${VMLINUX_BTF_PATH} format c > ${VMLINUX_HEADER}
     DEPENDS ${VMLINUX_BTF_PATH}
     COMMENT "[${UPPER_PROJECT_NAME}] Generating vmlinux.h from ${VMLINUX_BTF_PATH} (timed)"
     VERBATIM
@@ -303,8 +302,8 @@ add_custom_target(clean_bpf
     ${BPF_SKEL_OUTPUT}
     ${VMLINUX_HEADER}
     ${CMAKE_BINARY_DIR}/bpf
-    ${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/bpf
-    ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/bpf
+    ${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/server/bpf
+    ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf
     COMMENT "Cleaning BPF build artifacts (ignoring if cannot remove)"
 )
 
