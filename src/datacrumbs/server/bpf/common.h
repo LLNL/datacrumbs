@@ -18,7 +18,7 @@
 
 DATACRUMBS_MAP(pid_map, u64, u64, 1024);
 DATACRUMBS_MAP(fn_pid_map, struct fn_key_t, struct fn_value_t);
-DATACRUMBS_RINGBUF(output, 1 << 16);
+DATACRUMBS_RINGBUF(output, 1024 * 1024 * 16U);  // 16MB ring buffer
 
 static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* key, u64* start_ts) {
   key->id = bpf_get_current_pid_tgid();
