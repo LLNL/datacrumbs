@@ -16,18 +16,29 @@
 #include <datacrumbs/server/bpf/macros.bpf.h>
 #include <datacrumbs/server/bpf/shared.h>
 
-DATACRUMBS_MAP(pid_map, u64, u64, 1024);
+DATACRUMBS_MAP(pid_map, u32, u64, 1024);
 DATACRUMBS_MAP(fn_pid_map, struct fn_key_t, struct fn_value_t);
 DATACRUMBS_RINGBUF(output, 1024 * 1024 * 16U);  // 16MB ring buffer
 
+#ifndef DATACRUMBS_TRACE_ALL
+#define DATACRUMBS_TRACE_ALL 0
+#endif
+
+#if defined(DATACRUMBS_TRACE_ALL) && (DATACRUMBS_TRACE_ALL == 1)
 static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* key, u64* start_ts) {
   key->id = bpf_get_current_pid_tgid();
-  u32 pid = key->id;
+  return 1;
+}
+#else
+static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* key, u64* start_ts) {
+  key->id = bpf_get_current_pid_tgid();
+  u32 pid = key->id & 0xFFFFFFFF;
   (void)pid;
-  start_ts = (u64*)bpf_map_lookup_elem(&pid_map, &key->id);
+  start_ts = (u64*)bpf_map_lookup_elem(&pid_map, &pid);
   if (start_ts == 0 || key->id == 0) return 0;
   return 1;
 }
+#endif
 
 #ifndef DATACRUMBS_TRACING_ENABLE
 #define DATACRUMBS_TRACING_ENABLE 1
@@ -101,6 +112,30 @@ static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx,
 #endif
 
 #if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+static inline __attribute__((always_inline)) void extract_filename(const char* fqname, int fq_size,
+                                                                   char* fname, int fname_size) {
+  int target_dot = 2;
+  int dot_count = 0;
+  int dot = 0;
+  // Scan backwards for the last and second last '.'
+  for (int i = fq_size - 1; i >= 0 && fq_size - i < fname_size; --i) {
+    if (fqname[i] == '.' || fqname[i] == '/') {
+      dot_count++;
+      if (dot_count == target_dot) {
+        dot = i + 1;
+        break;
+      }
+    }
+  }
+  int start = dot;
+  int j = 0;
+  int limit = fname_size - 1;
+  // Copy from after the last '.' to the output buffer, within fname_size
+  for (; start < fq_size - 1 && fqname[start] != '\0' && j < limit; ++start, ++j) {
+    fname[j] = fqname[start];
+  }
+  fname[j] = '\0';
+}
 static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
                                                            long clazz, long method) {
   u64 te = bpf_ktime_get_ns();
@@ -119,7 +154,10 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   event->id = key.id;
   event->event_id = event_id;
   DATACRUMBS_COLLECT_TIME(event);
-  bpf_probe_read_user(&event->clazz, sizeof(event->clazz), (void*)clazz);
+
+  char local_clazz[256];
+  bpf_probe_read_user(&local_clazz, sizeof(local_clazz), (void*)clazz);
+  extract_filename(local_clazz, sizeof(local_clazz), event->clazz, MAX_STRING_LENGTH);
   bpf_probe_read_user(&event->method, sizeof(event->method), (void*)method);
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;

@@ -111,10 +111,9 @@ static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_r
   return 0;
 }
 
-SEC("ksyscall/openat")
-int BPF_KSYSCALL(openat_entry, int dfd, const char* filename, int flags) {
+static inline __attribute__((always_inline)) int sysio_open_entry(struct pt_regs* ctx, u64 event_id,
+                                                                  const char* filename) {
   struct fn_key_t key = {};
-  u64 event_id = USER_EVENT_ID_START + 0;
   key.event_id = event_id;
   u64 start_ts;
   if (!need_tracing(&key, &start_ts)) {
@@ -134,11 +133,10 @@ int BPF_KSYSCALL(openat_entry, int dfd, const char* filename, int flags) {
   return 0;
 }
 
-SEC("kretsyscall/openat")
-int BPF_KRETPROBE(openat_exit) {
+static inline __attribute__((always_inline)) int sysio_open_exit(struct pt_regs* ctx,
+                                                                 u64 event_id) {
   u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
-  u64 event_id = USER_EVENT_ID_START + 0;
   key.event_id = event_id;
   u64 start_ts;
   if (!need_tracing(&key, &start_ts)) {
@@ -168,6 +166,16 @@ int BPF_KRETPROBE(openat_exit) {
   }
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
+}
+
+SEC("ksyscall/openat")
+int BPF_KSYSCALL(openat_entry, int dfd, const char* filename, int flags) {
+  return sysio_open_entry(ctx, USER_EVENT_ID_START + 0, filename);
+}
+
+SEC("kretsyscall/openat")
+int BPF_KRETPROBE(openat_exit) {
+  return sysio_open_exit(ctx, USER_EVENT_ID_START + 0);
 }
 
 SEC("ksyscall/read")
@@ -314,4 +322,26 @@ int BPF_KSYSCALL(writev_entry, int fd, u64 vec, u64 vlen) {
 SEC("kretsyscall/writev")
 int BPF_KRETPROBE(writev_exit) {
   return sysio_data_exit(ctx, USER_EVENT_ID_START + 18);
+}
+
+SEC("ksyscall/open")
+int BPF_KSYSCALL(open_entry, const char* filename, int flags, int mode) {
+  sysio_open_entry(ctx, USER_EVENT_ID_START + 19, filename);
+  return 0;
+}
+SEC("kretsyscall/open")
+int BPF_KRETPROBE(open_exit, struct pt_regs* regs) {
+  sysio_open_exit(ctx, USER_EVENT_ID_START + 19);
+  return 0;
+}
+
+SEC("ksyscall/openat2")
+int BPF_KSYSCALL(openat2_entry, int dfd, const char* filename, int flags) {
+  sysio_open_entry(ctx, USER_EVENT_ID_START + 20, filename);
+  return 0;
+}
+SEC("kretsyscall/openat2")
+int BPF_KRETPROBE(openat2_exit) {
+  sysio_open_exit(ctx, USER_EVENT_ID_START + 20);
+  return 0;
 }

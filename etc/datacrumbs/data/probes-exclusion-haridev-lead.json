@@ -12,6 +12,8 @@
     "type": 0,
     "name": "sys",
     "functions": [
+      "fork",
+      "sys",
       "ioctl",
       "newfstatat",
       "ni_syscall",

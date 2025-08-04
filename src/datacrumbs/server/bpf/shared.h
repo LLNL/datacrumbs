@@ -9,7 +9,7 @@ struct general_event_t {
   unsigned long long dur;
 };
 
-#define MAX_STRING_LENGTH 80
+#define MAX_STRING_LENGTH 32
 struct usdt_event_t {
   unsigned int type;
   unsigned long long id;

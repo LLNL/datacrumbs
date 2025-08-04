@@ -6,22 +6,22 @@
 #endif
 
 static inline __attribute__((always_inline)) int generic_trace_datacrumbs_start() {
-  u64 id = bpf_get_current_pid_tgid();
-  u64* start_ts = bpf_map_lookup_elem(&pid_map, &id);
   u64 tsp = bpf_ktime_get_ns();
+  u64 id = bpf_get_current_pid_tgid();
+  u32 pid = id & 0xFFFFFFFF;
+  u64* start_ts = bpf_map_lookup_elem(&pid_map, &pid);
   if (start_ts != 0) tsp = *start_ts;
-  bpf_map_update_elem(&pid_map, &id, &tsp, BPF_ANY);
-  u32 pid = id;
+  bpf_map_update_elem(&pid_map, &pid, &tsp, BPF_ANY);
   (void)pid;
   DBG_PRINTK("Tracing PID %d", pid);
   return 0;
 }
 static inline __attribute__((always_inline)) int generic_trace_datacrumbs_stop() {
   u64 id = bpf_get_current_pid_tgid();
-  u32 pid = id;
+  u32 pid = id & 0xFFFFFFFF;
   (void)pid;
   DBG_PRINTK("Stop tracing PID %d", pid);
-  bpf_map_delete_elem(&pid_map, &id);
+  bpf_map_delete_elem(&pid_map, &pid);
   return 0;
 }
 
@@ -35,4 +35,59 @@ int BPF_UPROBE(trace_datacrumbs_start) {
 SEC((DATACRUMBS_STOP))
 int BPF_UPROBE(trace_datacrumbs_stop) {
   return generic_trace_datacrumbs_stop();
+}
+
+static inline __attribute__((always_inline)) int generic_fork_exit(struct pt_regs* ctx,
+                                                                   u64 event_id) {
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (need_tracing(&key, &start_ts)) {
+    // u64 id = bpf_get_current_pid_tgid();
+    u64 tsp = bpf_ktime_get_ns();
+    u32 pid = PT_REGS_RC(ctx);
+    (void)pid;
+    if (pid != 0) {
+      DBG_PRINTK("Collect forked tracing PID %d", pid);
+      bpf_map_update_elem(&pid_map, &pid, &tsp, BPF_ANY);
+    }
+  }
+  return generic_exit(ctx, event_id);
+}
+
+SEC("ksyscall/fork")
+int BPF_KSYSCALL(fork_entry, struct pt_regs* regs) {
+  return generic_entry(ctx, 1);
+}
+
+SEC("kretsyscall/fork")
+int BPF_KRETPROBE(fork_exit, struct pt_regs* regs) {
+  return generic_fork_exit(ctx, 1);
+}
+
+SEC("ksyscall/vfork")
+int BPF_KSYSCALL(vfork_entry, struct pt_regs* regs) {
+  return generic_entry(ctx, 2);
+}
+SEC("kretsyscall/vfork")
+int BPF_KRETPROBE(vfork_exit, struct pt_regs* regs) {
+  return generic_fork_exit(ctx, 2);
+}
+
+SEC("uprobe//usr/lib64/libc.so.6:__GI___fork")
+int BPF_UPROBE(__GI___fork_entry) {
+  return generic_entry(ctx, 3);
+}
+SEC("uretprobe//usr/lib64/libc.so.6:__GI___fork")
+int BPF_URETPROBE(__GI___fork_exit) {
+  return generic_fork_exit(ctx, 3);
+}
+
+SEC("uprobe//usr/lib64/libc.so.6:__GI___vfork")
+int BPF_UPROBE(__GI___vfork_entry) {
+  return generic_entry(ctx, 4);
+}
+SEC("uretprobe//usr/lib64/libc.so.6:__GI___vfork")
+int BPF_URETPROBE(__GI___vfork_exit) {
+  return generic_fork_exit(ctx, 4);
 }
