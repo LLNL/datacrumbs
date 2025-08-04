@@ -20,11 +20,11 @@ capture_probes:
     probe: uprobe
     type: binary
     file: /usr/lib64/libc.so.6
-    regex: ^(?!.*dl)(?!.*_IO_)(?!.*svcerr)(?!.*serv)(?!.*query)(?!.*net)(?!.*dn)(?!.*passwd)(?!.*authunix)(?!.*addr)(?!.*locale)(?!.*tss)(?!.*encrypt)(?!.*decrypt)(?!.*secret)(?!.*thrd)(?!.*proto)(?!.*mtx)(?!.*sigvec)(?!.*clock)(?!.*clnt)(?!.*ns)(?!.*svc)(?!.*rpc)(?!.*login)(?!.*nft)(?!.*xprt)(?!.*mq)(?!.*timer)(?!.*cnd)(?!.*sem)(?!.*pthread)(?!.*xdr)(?!.*cold)(?!.*_rtld_)(?!__).*
-  - name: bio
-    probe: kprobe
-    type: ksym
-    regex: bio.*
+    regex: .*fork.*
+  # - name: bio
+  #   probe: kprobe
+  #   type: ksym
+  #   regex: bio.*
   - name: python
     probe: usdt
     type: usdt
@@ -34,32 +34,32 @@ capture_probes:
     probe: kprobe
     type: header
     file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/pagemap.h
-  - name: swap
-    probe: kprobe
-    type: header
-    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
-  - name: shm
-    probe: kprobe
-    type: header
-    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
-  - name: fscache
-    probe: kprobe
-    type: header
-    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fscache.h
+  # - name: swap
+  #   probe: kprobe
+  #   type: header
+  #   file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
+  # - name: shm
+  #   probe: kprobe
+  #   type: header
+  #   file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
+  # - name: fscache
+  #   probe: kprobe
+  #   type: header
+  #   file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fscache.h
   - name: xfs
     probe: kprobe
     type: ksym
     regex: ^xfs(?!.*cold).*
-  - name: ext4
-    probe: kprobe
-    type: ksym
-    regex: ^ext4(?!.*cold).*
-  - name: iomap
-    probe: kprobe
-    type: ksym
-    regex: ^iomap(?!.*cold).*
-  - name: test_posix
-    probe: uprobe
-    type: binary
-    file: /home/haridev/datacrumbs/build/bin/df_tracer_test
+  # - name: ext4
+  #   probe: kprobe
+  #   type: ksym
+  #   regex: ^ext4(?!.*cold).*
+  # - name: iomap
+  #   probe: kprobe
+  #   type: ksym
+  #   regex: ^iomap(?!.*cold).*
+  # - name: test_posix
+  #   probe: uprobe
+  #   type: binary
+  #   file: /home/haridev/datacrumbs/build/bin/df_tracer_test
 profiling_interval: 0.0001

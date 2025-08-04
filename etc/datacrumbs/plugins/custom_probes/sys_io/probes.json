@@ -21,7 +21,9 @@
             "pwritev2",
             "readahead",
             "readv",
-            "writev"
+            "writev",
+            "open",
+            "openat2"
         ]
     }
 ]
