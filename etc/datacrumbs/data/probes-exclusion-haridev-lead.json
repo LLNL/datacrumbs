@@ -12,6 +12,8 @@
     "type": 0,
     "name": "sys",
     "functions": [
+      "ioctl",
+      "newfstatat",
       "ni_syscall",
       "old_mmap",
       "old_select",
@@ -2892,6 +2894,7 @@
     "type": 1,
     "name": "os_page_cache",
     "functions": [
+      "filemap_write_and_wait_range",
       "fault_in_readable",
       "filemap_get_entry",
       "folio_unlock",

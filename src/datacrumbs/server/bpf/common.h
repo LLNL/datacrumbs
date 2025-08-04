@@ -29,6 +29,11 @@ static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* k
   return 1;
 }
 
+#ifndef DATACRUMBS_TRACING_ENABLE
+#define DATACRUMBS_TRACING_ENABLE 1
+#endif
+
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
 static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -42,6 +47,12 @@ static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* c
   DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
   return 0;
 }
+#else
+static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
+  return 0;
+}
+#endif
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
 static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
   u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
@@ -59,11 +70,16 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   event->id = key.id;
   event->event_id = event_id;
   DATACRUMBS_COLLECT_TIME(event);
-  bpf_ringbuf_submit(event, 0);
-  DBG_PRINTK("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, event_id);
+  DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
+#else
+static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
+  return 0;
+}
+#endif
 
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
 static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -77,6 +93,14 @@ static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx,
   DBG_PRINTK("USDT  Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
   return 0;
 }
+
+#else
+static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx, u64 event_id) {
+  return 0;
+}
+#endif
+
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
 static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
                                                            long clazz, long method) {
   u64 te = bpf_ktime_get_ns();
@@ -97,24 +121,15 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   DATACRUMBS_COLLECT_TIME(event);
   bpf_probe_read_user(&event->clazz, sizeof(event->clazz), (void*)clazz);
   bpf_probe_read_user(&event->method, sizeof(event->method), (void*)method);
-  bpf_ringbuf_submit(event, 0);
-  // bpf_ringbuf_output(&output, &event, sizeof(event), 0);
-  DBG_PRINTK("USDT Pushed pid:%d, event_id:%llu to %s.%s output\n", (u32)key.id, event_id,
-             event->clazz, event->method);
+  DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
 
-static inline __attribute__((always_inline)) u64 get_hash(unsigned char* str, u64 len) {
-  u64 hash = 5381;
-  int c = *str;
-  int count = 0;
-  while (count < len && c) {
-    hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-    c = *str++;
-    count++;
-  }
-  return hash;
+#else
+static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
+                                                           long clazz, long method) {
+  return 0;
 }
-
+#endif
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 #endif  // DATACRUMBS_SERVER_BPF_COMMON_H

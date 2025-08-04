@@ -67,8 +67,7 @@ static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs*
   } else {
     DBG_PRINTK("Not Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
   }
-  bpf_ringbuf_submit(event, 0);
-  DBG_PRINTK("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, key.event_id);
+  DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
 
@@ -108,8 +107,7 @@ static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_r
   } else {
     DBG_PRINTK("Not Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
   }
-  bpf_ringbuf_submit(event, 0);
-  DBG_PRINTK("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, key.event_id);
+  DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
 
@@ -168,8 +166,7 @@ int BPF_KRETPROBE(openat_exit) {
     DBG_PRINTK("Adding Found fd:%d, file:%s event_id:%llu\n", fd, fname->fname, key.event_id);
     bpf_map_update_elem(&fd_fname, &file_key, fname, BPF_ANY);
   }
-  bpf_ringbuf_submit(event, 0);
-  DBG_PRINTK("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, key.event_id);
+  DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
 

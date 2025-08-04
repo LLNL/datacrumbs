@@ -294,5 +294,5 @@ add_custom_target(extra_clean
     DEPENDS clean_bpf
     COMMENT "Extra clean: cleans BPF and related generated files"
 )
-
+add_subdirectory(tools)
 add_subdirectory(tests)
