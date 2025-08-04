@@ -657,7 +657,8 @@
       "fattach@GLIBC_2.2.5",
       "hol_entry_qcmp",
       "w_addmem",
-      "eval_expr_multdiv"
+      "eval_expr_multdiv",
+      "cfree@GLIBC_2.2.5"
     ],
     "binary_path": "\/usr\/lib64\/libc.so.6",
   },
