@@ -157,7 +157,12 @@ OUTPUT_FILE="$OUTPUT_DIR/${INPUT_BASENAME}.log"
     echo "=============================================================================================="
 
     for name in $(for n in "${!total_dur[@]}"; do
-        printf "%s|%d\n" "$n" "${total_dur[$n]}"
+        if [[ ${count[$n]} -gt 0 ]]; then
+            avg=$((total_dur[$n] / count[$n]))
+        else
+            avg=0
+        fi
+        printf "%s|%d\n" "$n" "$avg"
     done | sort -t'|' -k2,2n | cut -d'|' -f1); do
         avg_dur=0
         std_dur=0
