@@ -299,6 +299,7 @@
     "type": 2,
     "name": "libc",
     "functions": [
+      "fnmatch@@GLIBC_2.2.5",
       "sched_getaffinity@@GLIBC_2.3.4",
       "getgrnam_r@@GLIBC_2.2.5",
       "sysctl@GLIBC_2.2.5",
@@ -2891,6 +2892,9 @@
     "type": 1,
     "name": "os_page_cache",
     "functions": [
+      "fault_in_readable",
+      "filemap_get_entry",
+      "folio_unlock",
       "__filemap_add_folio",
       "__filemap_fdatawrite_range",
       "__filemap_get_folio",
