@@ -116,7 +116,7 @@ class ChromeWriter {
             auto dot_py = clazz.rfind(".py");
             if (dot_py != std::string::npos) {
               // Ends with .py, remove extension
-              clazz = clazz.substr(0, dot_py);
+              clazz = clazz.substr(0, dot_py - 2);
             }
             // Not ending with .py, extract after last . or /
             auto last_dot = clazz.find_last_of('.');
