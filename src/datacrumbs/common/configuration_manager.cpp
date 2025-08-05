@@ -121,7 +121,7 @@ class ArgumentParser {
         DC_LOG_DEBUG("[ArgumentParser] User set to: %s", user->c_str());
       } else if (arg == "--help" || arg == "-h") {
         DC_LOG_PRINT(
-            "Usage: %s <config_name> [--mode <mode>] [--trace_file_path <path>] "
+            "Usage: %s <config_name> [--mode <mode>] [--trace_log_dir <path>] "
             "[--profiling_interval <seconds>] [--config_path <path>] [--user <user>]",
             argv[0]);
         exit(0);
