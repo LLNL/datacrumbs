@@ -9,15 +9,17 @@ struct general_event_t {
   unsigned long long dur;
 };
 
-#define MAX_STRING_LENGTH 32
+#define MAX_CLASS_READ_LEN 256
+#define MAX_METHOD_LEN 32
+#define MAX_CLASS_LEN 32
 struct usdt_event_t {
   unsigned int type;
   unsigned long long id;
   unsigned long long event_id;
   unsigned long long ts;
   unsigned long long dur;
-  char clazz[MAX_STRING_LENGTH];
-  char method[MAX_STRING_LENGTH];
+  char clazz[MAX_CLASS_LEN];
+  char method[MAX_METHOD_LEN];
 };
 
 struct fn_key_t {

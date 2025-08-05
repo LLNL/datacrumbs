@@ -155,9 +155,19 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   event->event_id = event_id;
   DATACRUMBS_COLLECT_TIME(event);
 
-  char local_clazz[256];
-  bpf_probe_read_user(&local_clazz, sizeof(local_clazz), (void*)clazz);
-  extract_filename(local_clazz, sizeof(local_clazz), event->clazz, MAX_STRING_LENGTH);
+  char local_clazz[MAX_CLASS_READ_LEN];                                                // 100
+  long len = bpf_probe_read_user_str(&local_clazz, MAX_CLASS_READ_LEN, (void*)clazz);  // 90
+  if (len < 0) {
+    local_clazz[0] = '\0';  // Fallback to empty string on error
+  } else {
+    if (len > MAX_CLASS_LEN) {
+      long offset = len - MAX_CLASS_LEN - 1;  // Ensure we don't overflow 90 - 80 = 10
+      bpf_probe_read_str(&event->clazz, MAX_CLASS_LEN, (void*)(local_clazz + offset));
+    } else {
+      bpf_probe_read_str(&event->clazz, len, (void*)local_clazz);
+    }
+  }
+  // extract_filename(local_clazz, sizeof(local_clazz), event->clazz, MAX_STRING_LENGTH);
   bpf_probe_read_user(&event->method, sizeof(event->method), (void*)method);
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;

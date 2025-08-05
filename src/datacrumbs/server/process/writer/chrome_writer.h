@@ -112,6 +112,27 @@ class ChromeWriter {
           std::string clazz, method;
           method = std::any_cast<std::string>((*args)["method"]);
           clazz = std::any_cast<std::string>((*args)["clazz"]);
+          if (clazz.size() > 0) {
+            auto dot_py = clazz.rfind(".py");
+            if (dot_py != std::string::npos) {
+              // Ends with .py, remove extension
+              clazz = clazz.substr(0, dot_py);
+            }
+            // Not ending with .py, extract after last . or /
+            auto last_dot = clazz.find_last_of('.');
+            auto last_slash = clazz.find_last_of("/\\");
+            size_t pos = std::string::npos;
+            if (last_dot != std::string::npos && last_slash != std::string::npos) {
+              pos = std::max(last_dot, last_slash);
+            } else if (last_dot != std::string::npos) {
+              pos = last_dot;
+            } else if (last_slash != std::string::npos) {
+              pos = last_slash;
+            }
+            if (pos != std::string::npos && pos + 1 < clazz.size()) {
+              clazz = clazz.substr(pos + 1);
+            }
+          }
           function_name = clazz + "." + method;
           args->erase("clazz");
           args->erase("method");
