@@ -160,11 +160,29 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   if (len < 0) {
     local_clazz[0] = '\0';  // Fallback to empty string on error
   } else {
+    int contains_bootstrap = 0;
     if (len > MAX_CLASS_LEN) {
-      long offset = len - MAX_CLASS_LEN - 1;  // Ensure we don't overflow 90 - 80 = 10
-      bpf_probe_read_str(&event->clazz, MAX_CLASS_LEN, (void*)(local_clazz + offset));
+      long offset = len - MAX_CLASS_LEN;  // Ensure we don't overflow 90 - 80 = 10
+      for (int i = 0; i < MAX_CLASS_LEN && i + offset < len; ++i) {
+        if (local_clazz[i + offset] == '>') {
+          contains_bootstrap = 1;
+          break;
+        }
+        event->clazz[i] = local_clazz[i + offset];
+      }
     } else {
-      bpf_probe_read_str(&event->clazz, len, (void*)local_clazz);
+      for (int i = 0; i < len; ++i) {
+        if (local_clazz[i] == '>') {
+          contains_bootstrap = 1;
+          break;
+        }
+        event->clazz[i] = local_clazz[i];
+      }
+      if (contains_bootstrap) {
+        bpf_ringbuf_discard(event, 0);
+        return 0;  // Discard event if it contains '>'
+      }
+      // bpf_probe_read_str(&event->clazz, len, (void*)local_clazz);
     }
   }
   // extract_filename(local_clazz, sizeof(local_clazz), event->clazz, MAX_STRING_LENGTH);
