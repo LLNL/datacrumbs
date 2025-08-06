@@ -7,7 +7,7 @@ struct sysio_event_t {
   unsigned long long event_id;
   unsigned long long ts;
   unsigned long long dur;
-  char filename[256];
+  unsigned int fhash;
   unsigned long long size;
 };
 

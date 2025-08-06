@@ -219,9 +219,9 @@
     "probe_name":"xfs",
     "function_name":"xfs_inode_item_sort"
   },
-  "1231":{
+  "1515":{
     "probe_name":"xfs",
-    "function_name":"xfs_buf_bio_end_io"
+    "function_name":"xfs_inode_item_size"
   },
   "1230":{
     "probe_name":"xfs",
@@ -294,22 +294,6 @@
   "1213":{
     "probe_name":"xfs",
     "function_name":"xfs_alloc_update_counters"
-  },
-  "1212":{
-    "probe_name":"xfs",
-    "function_name":"xfs_alloc_update"
-  },
-  "1211":{
-    "probe_name":"xfs",
-    "function_name":"xfs_alloc_space_available"
-  },
-  "1210":{
-    "probe_name":"xfs",
-    "function_name":"xfs_alloc_set_aside"
-  },
-  "1209":{
-    "probe_name":"xfs",
-    "function_name":"xfs_alloc_schedule_autoreap"
   },
   "1208":{
     "probe_name":"xfs",
@@ -407,17 +391,49 @@
     "probe_name":"xfs",
     "function_name":"xfs_alloc_compute_aligned"
   },
+  "1212":{
+    "probe_name":"xfs",
+    "function_name":"xfs_alloc_update"
+  },
+  "103":{
+    "probe_name":"libc",
+    "function_name":"__GI___vfork"
+  },
   "1184":{
     "probe_name":"xfs",
     "function_name":"xfs_alloc_commit_autoreap"
+  },
+  "1211":{
+    "probe_name":"xfs",
+    "function_name":"xfs_alloc_space_available"
+  },
+  "102":{
+    "probe_name":"libc",
+    "function_name":"__GI___fork"
   },
   "1183":{
     "probe_name":"xfs",
     "function_name":"xfs_alloc_cntbt_iter"
   },
+  "1210":{
+    "probe_name":"xfs",
+    "function_name":"xfs_alloc_set_aside"
+  },
+  "101":{
+    "probe_name":"sys",
+    "function_name":"vfork"
+  },
   "1182":{
     "probe_name":"xfs",
     "function_name":"xfs_alloc_check_irec"
+  },
+  "1209":{
+    "probe_name":"xfs",
+    "function_name":"xfs_alloc_schedule_autoreap"
+  },
+  "100":{
+    "probe_name":"sys",
+    "function_name":"fork"
   },
   "1181":{
     "probe_name":"xfs",
@@ -619,22 +635,6 @@
     "probe_name":"os_page_cache",
     "function_name":"filemap_check_errors"
   },
-  "1131":{
-    "probe_name":"os_page_cache",
-    "function_name":"filemap_alloc_folio"
-  },
-  "1130":{
-    "probe_name":"os_page_cache",
-    "function_name":"filemap_add_folio"
-  },
-  "1129":{
-    "probe_name":"os_page_cache",
-    "function_name":"fault_in_writeable"
-  },
-  "1128":{
-    "probe_name":"os_page_cache",
-    "function_name":"fault_in_subpage_writeable"
-  },
   "1127":{
     "probe_name":"os_page_cache",
     "function_name":"fault_in_safe_writeable"
@@ -691,9 +691,21 @@
     "probe_name":"libc",
     "function_name":"__mq_notify_fork_subprocess"
   },
-  "1109":{
+  "1113":{
     "probe_name":"libc",
-    "function_name":"__libc_unwind_link_after_fork"
+    "function_name":"__malloc_fork_unlock_parent"
+  },
+  "1112":{
+    "probe_name":"libc",
+    "function_name":"__malloc_fork_unlock_child"
+  },
+  "1111":{
+    "probe_name":"libc",
+    "function_name":"__malloc_fork_lock_parent"
+  },
+  "1110":{
+    "probe_name":"libc",
+    "function_name":"__libc_vfork"
   },
   "1108":{
     "probe_name":"libc",
@@ -723,13 +735,25 @@
     "probe_name":"sys",
     "function_name":"unlink"
   },
-  "1033":{
+  "1101":{
     "probe_name":"sys",
-    "function_name":"getxattr"
+    "function_name":"truncate"
   },
-  "1028":{
+  "1032":{
     "probe_name":"sys",
-    "function_name":"fstat"
+    "function_name":"getdents"
+  },
+  "1031":{
+    "probe_name":"sys",
+    "function_name":"getcwd"
+  },
+  "1030":{
+    "probe_name":"sys",
+    "function_name":"fstatfs64"
+  },
+  "1029":{
+    "probe_name":"sys",
+    "function_name":"fstatfs"
   },
   "1027":{
     "probe_name":"sys",
@@ -763,105 +787,73 @@
     "probe_name":"sys",
     "function_name":"fchmodat2"
   },
-  "1032":{
-    "probe_name":"sys",
-    "function_name":"getdents"
-  },
-  "1113":{
-    "probe_name":"libc",
-    "function_name":"__malloc_fork_unlock_parent"
-  },
-  "4":{
-    "probe_name":"libc",
-    "function_name":"__GI___vfork"
-  },
-  "1086":{
-    "probe_name":"sys",
-    "function_name":"renameat"
-  },
   "1019":{
     "probe_name":"sys",
     "function_name":"fchmodat"
   },
-  "1031":{
-    "probe_name":"sys",
-    "function_name":"getcwd"
-  },
-  "1112":{
-    "probe_name":"libc",
-    "function_name":"__malloc_fork_unlock_child"
-  },
-  "3":{
-    "probe_name":"libc",
-    "function_name":"__GI___fork"
-  },
-  "1085":{
-    "probe_name":"sys",
-    "function_name":"rename"
-  },
-  "1002":{
-    "probe_name":"sys",
-    "function_name":"close_range"
-  },
-  "1001":{
-    "probe_name":"sys",
-    "function_name":"chdir"
-  },
-  "1000":{
-    "probe_name":"sys",
-    "function_name":"access"
+  "1131":{
+    "probe_name":"os_page_cache",
+    "function_name":"filemap_alloc_folio"
   },
   "1006":{
     "probe_name":"sys",
     "function_name":"dup2"
   },
+  "1002":{
+    "probe_name":"sys",
+    "function_name":"close_range"
+  },
   "1005":{
     "probe_name":"sys",
     "function_name":"dup"
   },
-  "1030":{
-    "probe_name":"sys",
-    "function_name":"fstatfs64"
+  "1130":{
+    "probe_name":"os_page_cache",
+    "function_name":"filemap_add_folio"
   },
-  "1111":{
-    "probe_name":"libc",
-    "function_name":"__malloc_fork_lock_parent"
-  },
-  "2":{
+  "1001":{
     "probe_name":"sys",
-    "function_name":"vfork"
-  },
-  "1084":{
-    "probe_name":"sys",
-    "function_name":"removexattr"
-  },
-  "1018":{
-    "probe_name":"sys",
-    "function_name":"fchmod"
+    "function_name":"chdir"
   },
   "1004":{
     "probe_name":"sys",
     "function_name":"creat"
   },
-  "1029":{
-    "probe_name":"sys",
-    "function_name":"fstatfs"
+  "1129":{
+    "probe_name":"os_page_cache",
+    "function_name":"fault_in_writeable"
   },
-  "1110":{
+  "1000":{
+    "probe_name":"sys",
+    "function_name":"access"
+  },
+  "1003":{
+    "probe_name":"sys",
+    "function_name":"copy_file_range"
+  },
+  "1028":{
+    "probe_name":"sys",
+    "function_name":"fstat"
+  },
+  "1109":{
     "probe_name":"libc",
-    "function_name":"__libc_vfork"
+    "function_name":"__libc_unwind_link_after_fork"
   },
-  "1":{
-    "probe_name":"sys",
-    "function_name":"fork"
+  "0":{
+    "probe_name":"M",
+    "function_name":"SH"
   },
-  "1083":{
+  "1082":{
     "probe_name":"sys",
-    "function_name":"remap_file_pages"
+    "function_name":"readlinkat"
   },
-  "1017":{
+  "1016":{
     "probe_name":"sys",
-    "function_name":"fchdir"
+    "function_name":"fanotify_mark"
+  },
+  "1128":{
+    "probe_name":"os_page_cache",
+    "function_name":"fault_in_subpage_writeable"
   },
   "1007":{
     "probe_name":"sys",
@@ -870,10 +862,6 @@
   "1076":{
     "probe_name":"sys",
     "function_name":"pipe"
-  },
-  "1003":{
-    "probe_name":"sys",
-    "function_name":"copy_file_range"
   },
   "1008":{
     "probe_name":"sys",
@@ -935,10 +923,6 @@
     "probe_name":"sys",
     "function_name":"munlockall"
   },
-  "1082":{
-    "probe_name":"sys",
-    "function_name":"readlinkat"
-  },
   "1014":{
     "probe_name":"sys",
     "function_name":"fadvise64_64"
@@ -946,6 +930,10 @@
   "1071":{
     "probe_name":"sys",
     "function_name":"munmap"
+  },
+  "1083":{
+    "probe_name":"sys",
+    "function_name":"remap_file_pages"
   },
   "1015":{
     "probe_name":"sys",
@@ -955,17 +943,33 @@
     "probe_name":"sys",
     "function_name":"newfstat"
   },
-  "1016":{
+  "1084":{
     "probe_name":"sys",
-    "function_name":"fanotify_mark"
+    "function_name":"removexattr"
   },
   "1073":{
     "probe_name":"sys",
     "function_name":"newlstat"
   },
+  "1085":{
+    "probe_name":"sys",
+    "function_name":"rename"
+  },
+  "1017":{
+    "probe_name":"sys",
+    "function_name":"fchdir"
+  },
   "1074":{
     "probe_name":"sys",
     "function_name":"newstat"
+  },
+  "1086":{
+    "probe_name":"sys",
+    "function_name":"renameat"
+  },
+  "1018":{
+    "probe_name":"sys",
+    "function_name":"fchmod"
   },
   "1075":{
     "probe_name":"sys",
@@ -974,6 +978,10 @@
   "1087":{
     "probe_name":"sys",
     "function_name":"rmdir"
+  },
+  "1033":{
+    "probe_name":"sys",
+    "function_name":"getxattr"
   },
   "1034":{
     "probe_name":"sys",
@@ -1159,9 +1167,9 @@
     "probe_name":"sys",
     "function_name":"sysfs"
   },
-  "1101":{
-    "probe_name":"sys",
-    "function_name":"truncate"
+  "1231":{
+    "probe_name":"xfs",
+    "function_name":"xfs_buf_bio_end_io"
   },
   "1232":{
     "probe_name":"xfs",
@@ -2378,9 +2386,5 @@
   "1514":{
     "probe_name":"xfs",
     "function_name":"xfs_inode_item_release"
-  },
-  "1515":{
-    "probe_name":"xfs",
-    "function_name":"xfs_inode_item_size"
   }
 }
