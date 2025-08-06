@@ -130,7 +130,7 @@ else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] yaml-cpp is needed for ${PROJECT_NAME} build")
 endif()
 
-find_package(LLVM REQUIRED CONFIG)
+find_package(LLVM 19.1.7 REQUIRED CONFIG)
 
 if(LLVM_FOUND)
     message(STATUS "[${UPPER_PROJECT_NAME}] found LLVM at ${LLVM_INCLUDE_DIRS}")
@@ -237,10 +237,18 @@ add_custom_command(
 
 add_custom_target(vmlinux_header ALL DEPENDS ${VMLINUX_HEADER})
 
-find_program(CLANG_EXECUTABLE NAMES clang REQUIRED)
+find_program(CLANG_EXECUTABLE  19.1.7 NAMES clang REQUIRED)
 
 if(NOT CLANG_EXECUTABLE)
     message(FATAL_ERROR "clang compiler not found!")
+else()
+    execute_process(
+        COMMAND ${CLANG_EXECUTABLE} --version
+        OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    message(STATUS "[${UPPER_PROJECT_NAME}] Found clang executable: ${CLANG_EXECUTABLE}")
+    message(STATUS "[${UPPER_PROJECT_NAME}] clang version: ${CLANG_VERSION_OUTPUT}")
 endif()
 
 set(BPF_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/main.bpf.c)
