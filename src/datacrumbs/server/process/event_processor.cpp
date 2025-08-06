@@ -173,7 +173,7 @@ class EventProcessor {
   }
   int finalize() {
     if (writer_) {
-      writer_.reset();
+      writer_->finalize();
     }
     return 0;
   }
@@ -330,6 +330,7 @@ int main(int argc, char** argv) {
   if (values) {
     free(values);
   }
+
   DC_LOG_PRINT("Finalizing DataCrumbs...");
   if (stop) {
     DC_LOG_INFO("Received SIGINT (Ctrl-C), exiting gracefully");
