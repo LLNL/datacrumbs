@@ -137,6 +137,18 @@ if(LLVM_FOUND)
     include_directories(${LLVM_INCLUDE_DIRS})
     link_directories(${LLVM_LIBRARY_DIRS})
     set(DEPENDENCY_LIB ${DEPENDENCY_LIB} ${LLVM_LIBRARIES} -lclang)
+    if(NOT CLANG_EXECUTABLE)
+        message(FATAL_ERROR "clang compiler not found!")
+    else()
+        execute_process(
+            COMMAND ${CLANG_EXECUTABLE} --version
+            OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        message(STATUS "[${UPPER_PROJECT_NAME}] Found clang executable: ${CLANG_EXECUTABLE}")
+        message(STATUS "[${UPPER_PROJECT_NAME}] clang version: ${CLANG_VERSION_OUTPUT}")
+endif()
+
 else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] LLVM is needed for ${PROJECT_NAME} build")
 endif()
@@ -237,19 +249,7 @@ add_custom_command(
 
 add_custom_target(vmlinux_header ALL DEPENDS ${VMLINUX_HEADER})
 
-find_program(CLANG_EXECUTABLE  19.1.7 NAMES clang REQUIRED)
 
-if(NOT CLANG_EXECUTABLE)
-    message(FATAL_ERROR "clang compiler not found!")
-else()
-    execute_process(
-        COMMAND ${CLANG_EXECUTABLE} --version
-        OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    message(STATUS "[${UPPER_PROJECT_NAME}] Found clang executable: ${CLANG_EXECUTABLE}")
-    message(STATUS "[${UPPER_PROJECT_NAME}] clang version: ${CLANG_VERSION_OUTPUT}")
-endif()
 
 set(BPF_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/main.bpf.c)
 set(BPF_OUTPUT ${CMAKE_BINARY_DIR}/bpf/datacrumbs.bpf.o)
