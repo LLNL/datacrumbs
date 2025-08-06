@@ -15,45 +15,36 @@ template <>
 bool datacrumbs::Singleton<datacrumbs::ChromeWriter>::stop_creating_instances = false;
 
 namespace datacrumbs {
-ChromeWriter::ChromeWriter() : stop_flag_(false) {
+ChromeWriter::ChromeWriter() : stop_flag_(false), chunk_size_(16 * 1024 * 1024) {
   auto configManager_ = datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance();
-  file_ = std::fopen(configManager_->trace_file_path.c_str(), "a+");
-
-  if (file_) {
-    auto pwd = getpwnam(configManager_->user.c_str());
-    uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
-    gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
-    // Set file ownership to configManager_->user
-    chown(configManager_->trace_file_path.c_str(), uid, gid);
-    // Optionally set permissions (e.g., rw-r-----)
-    chmod(configManager_->trace_file_path.c_str(), 0640);
-  }
-  if (file_) {
-    buffer_ = new char[4 * 1024];
-    std::setvbuf(file_, buffer_, _IOLBF, 4 * 1024);
-    std::fprintf(file_, "[\n");
-    first_event_ = true;
-  }
+  compressor_ = new ZlibCompression(configManager_->trace_file_path, chunk_size_);
+  // file_ = std::fopen(configManager_->trace_file_path.c_str(), "a+");
+  auto pwd = getpwnam(configManager_->user.c_str());
+  uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+  gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+  // Set file ownership to configManager_->user
+  chown(configManager_->trace_file_path.c_str(), uid, gid);
+  // Optionally set permissions (e.g., rw-r-----)
+  chmod(configManager_->trace_file_path.c_str(), 0640);
+  compressor_->compress("[\n");
+  first_event_ = true;
   worker_ = std::thread([this]() { this->worker_loop(); });
 }
 
 // Destructor flushes and closes the file, and joins the worker thread.
-ChromeWriter::~ChromeWriter() {
+ChromeWriter::~ChromeWriter() {}
+void ChromeWriter::finalize() {
   {
     std::lock_guard<std::mutex> lock(queue_mutex_);
     stop_flag_ = true;
   }
   queue_cv_.notify_one();
   if (worker_.joinable()) worker_.join();
-
-  if (file_) {
-    std::fprintf(file_, "]");
-    std::fclose(file_);
-  }
-  delete[] buffer_;
+  compressor_->compress("]");
+  compressor_->finalize();
 }
 
-void push_event(EventWithId* event) {
+void ChromeWriter::push_event(EventWithId* event) {
   {
     std::lock_guard<std::mutex> lock(queue_mutex_);
     event_queue_.emplace_back(event);
@@ -63,7 +54,6 @@ void push_event(EventWithId* event) {
 
 // Serialize and write a single event to the file, including event_id as "id".
 void ChromeWriter::write_event(EventWithId* event_with_id) {
-  if (!file_) return;
   index_++;
   auto configManager_ = datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance();
   uint64_t index = event_with_id->index;
@@ -169,8 +159,7 @@ void ChromeWriter::write_event(EventWithId* event_with_id) {
         event_json = std::string(buffer, len) + ",\"args\":" + args_json + "}\n";
       }
       DC_LOG_DEBUG("Writing event: %s", event_json.c_str());
-      std::fwrite(event_json.c_str(), 1, event_json.size(), file_);
-      std::fflush(file_);
+      compressor_->compress(event_json);
     }
   }
   if (args != nullptr) {
