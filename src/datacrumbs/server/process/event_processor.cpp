@@ -26,6 +26,7 @@
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 static datacrumbs::EventWithId* get_data_1(void* data, uint64_t index) {
@@ -155,6 +156,11 @@ class EventProcessor {
     return 0;
   }
   int update_filename(const char* filename, unsigned int hash) {
+    if (processed_hashes_.find(hash) != processed_hashes_.end()) {
+      DC_LOG_DEBUG("Filename %s with hash %u already processed, skipping", filename, hash);
+      return 0;  // Skip if already processed
+    }
+    processed_hashes_.insert(hash);  // Mark this hash as processed
     auto args = new DataCrumbsArgs();
     args->emplace("value", std::string(filename));
     args->emplace("hash", hash);
@@ -177,7 +183,8 @@ class EventProcessor {
   std::shared_ptr<datacrumbs::ChromeWriter> writer_;
 
  private:
-  std::atomic<uint64_t> event_index{0};  // Atomic index for event processing
+  std::atomic<uint64_t> event_index{0};                // Atomic index for event processing
+  std::unordered_set<unsigned int> processed_hashes_;  // Set to track processed PIDs
 };
 
 }  // namespace datacrumbs
@@ -195,10 +202,28 @@ static int handle_event(void* ctx, void* data, size_t data_sz) {
 
 inline static int lookup_and_delete(int map_fd, datacrumbs::EventProcessor* event_processor,
                                     struct string_t* keys, unsigned int* values,
-                                    unsigned int batch_size, struct string_t* in_batch,
-                                    struct string_t* out_batch) {
+                                    unsigned int batch_size, struct string_t* in_batch) {
   int ret =
       bpf_map_lookup_and_delete_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
+  if (ret < 0 && errno != ENOENT) {
+    perror("bpf_map_lookup_batch");
+    return -1;
+  }
+  // Process the retrieved keys and values
+  for (int i = 0; i < batch_size; ++i) {
+    event_processor->update_filename(keys[i].str, values[i]);
+  }
+  // Check if the end of the map has been reached
+  if (ret < 0 && errno == ENOENT) {
+    return -1;
+  }
+  return 0;
+}
+
+inline static int lookup(int map_fd, datacrumbs::EventProcessor* event_processor,
+                         struct string_t* keys, unsigned int* values, unsigned int batch_size,
+                         struct string_t* in_batch) {
+  int ret = bpf_map_lookup_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
   if (ret < 0 && errno != ENOENT) {
     perror("bpf_map_lookup_batch");
     return -1;
@@ -279,11 +304,9 @@ int main(int argc, char** argv) {
   unsigned int* values = (unsigned int*)malloc(batch_size * sizeof(unsigned int));
   // Initialize in_batch to NULL for the first iteration
   struct string_t* in_batch = NULL;
-  struct string_t* out_batch = NULL;
 
   while (!stop) {
-    lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch,
-                      out_batch);
+    lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch);
     err = ring_buffer__poll(rb, 10);
     // Ctrl-C gives -EINTR
     if (err == -EINTR) {
@@ -297,8 +320,8 @@ int main(int argc, char** argv) {
     }
   }
   DC_LOG_PRINT("Collecting string metadata from file_map...");
-  while (lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch,
-                           out_batch) != -1) {
+  while (lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch) !=
+         -1) {
     // Continue until no more keys are found
   }
   if (keys) {
