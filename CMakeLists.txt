@@ -151,6 +151,16 @@ else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] json-c is needed for ${PROJECT_NAME} build")
 endif()
 
+find_package(ZLIB REQUIRED)
+
+if(ZLIB_FOUND)
+    message(STATUS "[${UPPER_PROJECT_NAME}] found zlib at ${ZLIB_INCLUDE_DIRS}")
+    include_directories(${ZLIB_INCLUDE_DIRS})
+    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} ZLIB::ZLIB)
+else()
+    message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] zlib is needed for ${PROJECT_NAME} build")
+endif()
+
 add_executable(${PROJECT_NAME}_explorer ${DATACRUMBS_EXPLORER_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(${PROJECT_NAME}_explorer ${DEPENDENCY_LIB})
 install(

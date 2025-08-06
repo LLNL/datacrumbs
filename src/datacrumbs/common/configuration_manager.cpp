@@ -464,7 +464,7 @@ void ConfigurationManager::derive_configurations() {
   std::string raw = ss.str();
   auto encoded =
       datacrumbs::utils::base64_encode(std::vector<unsigned char>(raw.begin(), raw.end()));
-  std::string trace_file_name = "trace_" + user + "_" + encoded + ".pfw";
+  std::string trace_file_name = "trace_" + user + "_" + encoded + ".pfw.gz";
   this->trace_file_path = this->trace_log_dir / trace_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Trace file path: %s",
                this->trace_file_path.string().c_str());

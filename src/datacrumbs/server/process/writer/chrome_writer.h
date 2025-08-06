@@ -6,6 +6,7 @@
 #include <datacrumbs/common/singleton.h>
 #include <datacrumbs/common/typedefs.h>
 #include <datacrumbs/server/bpf/shared.h>
+#include <datacrumbs/server/process/compress/zlib_compressor.h>
 #include <pwd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -56,11 +57,11 @@ class ChromeWriter {
   // Serialize and write a single event to the file, including event_id as "id".
   void write_event(EventWithId* event_with_id);
 
+  void finalize();
+
  private:
   void worker_loop();
 
-  FILE* file_ = nullptr;
-  char* buffer_ = nullptr;
   bool first_event_ = true;
 
   std::mutex file_mutex_;
@@ -71,6 +72,8 @@ class ChromeWriter {
   std::thread worker_;
   bool stop_flag_;
   unsigned long index_;
+  ZlibCompression* compressor_;
+  size_t chunk_size_;
 };
 
 }  // namespace datacrumbs
