@@ -178,7 +178,7 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
   }
 
   // Parse YAML configuration if loaded successfully
-  if (config != nullptr) {
+  if (config) {
     DC_LOG_TRACE("[ConfigurationManager] Parsing configuration YAML...");
     // Parse mode from YAML
     if (config[DC_YAML_MODE]) {
