@@ -57,37 +57,37 @@ static inline __attribute__((always_inline)) int generic_fork_exit(struct pt_reg
 
 SEC("ksyscall/fork")
 int BPF_KSYSCALL(fork_entry, struct pt_regs* regs) {
-  return generic_entry(ctx, 1);
+  return generic_entry(ctx, 100);
 }
 
 SEC("kretsyscall/fork")
 int BPF_KRETPROBE(fork_exit, struct pt_regs* regs) {
-  return generic_fork_exit(ctx, 1);
+  return generic_fork_exit(ctx, 100);
 }
 
 SEC("ksyscall/vfork")
 int BPF_KSYSCALL(vfork_entry, struct pt_regs* regs) {
-  return generic_entry(ctx, 2);
+  return generic_entry(ctx, 101);
 }
 SEC("kretsyscall/vfork")
 int BPF_KRETPROBE(vfork_exit, struct pt_regs* regs) {
-  return generic_fork_exit(ctx, 2);
+  return generic_fork_exit(ctx, 101);
 }
 
 SEC("uprobe//usr/lib64/libc.so.6:__GI___fork")
 int BPF_UPROBE(__GI___fork_entry) {
-  return generic_entry(ctx, 3);
+  return generic_entry(ctx, 102);
 }
 SEC("uretprobe//usr/lib64/libc.so.6:__GI___fork")
 int BPF_URETPROBE(__GI___fork_exit) {
-  return generic_fork_exit(ctx, 3);
+  return generic_fork_exit(ctx, 102);
 }
 
 SEC("uprobe//usr/lib64/libc.so.6:__GI___vfork")
 int BPF_UPROBE(__GI___vfork_entry) {
-  return generic_entry(ctx, 4);
+  return generic_entry(ctx, 103);
 }
 SEC("uretprobe//usr/lib64/libc.so.6:__GI___vfork")
 int BPF_URETPROBE(__GI___vfork_exit) {
-  return generic_fork_exit(ctx, 4);
+  return generic_fork_exit(ctx, 103);
 }

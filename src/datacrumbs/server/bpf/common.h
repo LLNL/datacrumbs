@@ -19,10 +19,33 @@
 DATACRUMBS_MAP(pid_map, u32, u64, 1024);
 DATACRUMBS_MAP(fn_pid_map, struct fn_key_t, struct fn_value_t);
 DATACRUMBS_RINGBUF(output, 1024 * 1024 * 16U);  // 16MB ring buffer
+DATACRUMBS_MAP(file_map, char[MAX_STR_READ_LEN], u32, 1024);
 
 #ifndef DATACRUMBS_TRACE_ALL
 #define DATACRUMBS_TRACE_ALL 0
 #endif
+
+static inline __attribute__((always_inline)) u32 hash_str(const char* str, size_t len) {
+  u32 hash = 5381;
+#pragma unroll
+  for (int i = 0; i < 128; ++i) {
+    if (i >= len) break;
+    hash = ((hash << 5) + hash) + str[i];  // hash * 33 + c
+  }
+  return hash;
+}
+
+static inline __attribute__((always_inline)) u32 hash_and_store(struct string_t *str,
+                                                                size_t len) {
+  u32* existing = bpf_map_lookup_elem(&file_map, str);
+  if (existing) {
+    return *existing;  // Return existing hash
+  }
+  u32 hash = hash_str(str->str, len);
+  // Store new hash
+  bpf_map_update_elem(&file_map, str, &hash, BPF_ANY);
+  return hash;
+}
 
 #if defined(DATACRUMBS_TRACE_ALL) && (DATACRUMBS_TRACE_ALL == 1)
 static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* key, u64* start_ts) {
@@ -112,30 +135,7 @@ static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx,
 #endif
 
 #if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
-static inline __attribute__((always_inline)) void extract_filename(const char* fqname, int fq_size,
-                                                                   char* fname, int fname_size) {
-  int target_dot = 2;
-  int dot_count = 0;
-  int dot = 0;
-  // Scan backwards for the last and second last '.'
-  for (int i = fq_size - 1; i >= 0 && fq_size - i < fname_size; --i) {
-    if (fqname[i] == '.' || fqname[i] == '/') {
-      dot_count++;
-      if (dot_count == target_dot) {
-        dot = i + 1;
-        break;
-      }
-    }
-  }
-  int start = dot;
-  int j = 0;
-  int limit = fname_size - 1;
-  // Copy from after the last '.' to the output buffer, within fname_size
-  for (; start < fq_size - 1 && fqname[start] != '\0' && j < limit; ++start, ++j) {
-    fname[j] = fqname[start];
-  }
-  fname[j] = '\0';
-}
+
 static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
                                                            long clazz, long method) {
   u64 te = bpf_ktime_get_ns();
@@ -154,39 +154,14 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   event->id = key.id;
   event->event_id = event_id;
   DATACRUMBS_COLLECT_TIME(event);
-
-  char local_clazz[MAX_CLASS_READ_LEN];                                                // 100
-  long len = bpf_probe_read_user_str(&local_clazz, MAX_CLASS_READ_LEN, (void*)clazz);  // 90
-  if (len < 0) {
-    local_clazz[0] = '\0';  // Fallback to empty string on error
-  } else {
-    int contains_bootstrap = 0;
-    if (len > MAX_CLASS_LEN) {
-      long offset = len - MAX_CLASS_LEN;  // Ensure we don't overflow 90 - 80 = 10
-      for (int i = 0; i < MAX_CLASS_LEN && i + offset < len; ++i) {
-        if (local_clazz[i + offset] == '>') {
-          contains_bootstrap = 1;
-          break;
-        }
-        event->clazz[i] = local_clazz[i + offset];
-      }
-    } else {
-      for (int i = 0; i < len; ++i) {
-        if (local_clazz[i] == '>') {
-          contains_bootstrap = 1;
-          break;
-        }
-        event->clazz[i] = local_clazz[i];
-      }
-      if (contains_bootstrap) {
-        bpf_ringbuf_discard(event, 0);
-        return 0;  // Discard event if it contains '>'
-      }
-      // bpf_probe_read_str(&event->clazz, len, (void*)local_clazz);
-    }
-  }
-  // extract_filename(local_clazz, sizeof(local_clazz), event->clazz, MAX_STRING_LENGTH);
-  bpf_probe_read_user(&event->method, sizeof(event->method), (void*)method);
+  struct string_t local_str = {};                                            // 100
+  long len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)clazz);  // 90
+  u32 class_hash = hash_and_store(&local_str, len);
+  event->class_hash = class_hash;                                              // 100
+  len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)method);  // 90
+  
+  u32 method_hash = hash_and_store(&local_str, len);
+  event->method_hash = method_hash;  // 100
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }

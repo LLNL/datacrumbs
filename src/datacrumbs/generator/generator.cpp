@@ -13,7 +13,6 @@ ProbeGenerator::ProbeGenerator(int argc, char** argv) : eventIdCounter_(1000) {
   // Initialize ConfigurationManager singleton
   configManager_ = datacrumbs::Singleton<ConfigurationManager>::get_instance(argc, argv);
 }
-
 int ProbeGenerator::run() {
   DC_LOG_TRACE("[ProbeGenerator] Starting run()");
 
@@ -46,17 +45,20 @@ int ProbeGenerator::run() {
   // Map event id to probe name and function name
   std::vector<std::pair<std::string, std::vector<std::string>>> probe_name_functions = {
       {"sys", {"fork", "vfork"}}, {"libc", {"__GI___fork", "__GI___vfork"}}};
-  int event_id = 1;
+  int event_id = 100;
   for (const auto& [name, functions] : probe_name_functions) {
     for (const auto& function : functions) {
-      struct json_object* info = json_object_new_object();
-      json_object_object_add(info, "probe_name", json_object_new_string(name.c_str()));
-      json_object_object_add(info, "function_name", json_object_new_string(function.c_str()));
-      categoryMap_[event_id] = info;
+      int status = update_event(name, function, event_id);
+      if (status != 0) {
+        DC_LOG_ERROR("[ProbeGenerator] Failed to update event for %s.%s (event_id: %d)",
+                     name.c_str(), function.c_str(), event_id);
+      }
       global_function_names.insert(function);
       event_id++;
     }
   }
+  update_event("M", "SH", 0);
+
   // Iterate over each probe in the JSON array
   for (int i = 0; i < arr_len; ++i) {
     struct json_object* jprobe = json_object_array_get_idx(probesJson, i);
