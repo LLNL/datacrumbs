@@ -2,7 +2,7 @@
 
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>
-#include <datacrumbs/common/typdefs.h>
+#include <datacrumbs/common/typedefs.h>
 #include <json-c/json.h>
 
 #include <string>
@@ -10,6 +10,7 @@
 
 namespace datacrumbs {
 struct EventWithId {
+  char event_type;
   unsigned long long index;
   unsigned int type;
   unsigned long long tgid_pid;
@@ -17,10 +18,11 @@ struct EventWithId {
   unsigned long long ts;
   unsigned long long dur;
   DataCrumbsArgs* args;
-  EventWithId(unsigned long long _index, unsigned int _type, unsigned long long _tgid_pid,
-              unsigned long long _event_id, unsigned long long _ts, unsigned long long _dur,
-              DataCrumbsArgs* _args)
-      : index(_index),
+  EventWithId(char _event_type, unsigned long long _index, unsigned int _type,
+              unsigned long long _tgid_pid, unsigned long long _event_id, unsigned long long _ts,
+              unsigned long long _dur, DataCrumbsArgs* _args)
+      : event_type(_event_type),
+        index(_index),
         type(_type),
         tgid_pid(_tgid_pid),
         event_id(_event_id),
@@ -29,7 +31,8 @@ struct EventWithId {
         args(_args) {}
   // Copy constructor
   EventWithId(const EventWithId& other)
-      : index(other.index),
+      : event_type(other.event_type),
+        index(other.index),
         type(other.type),
         tgid_pid(other.tgid_pid),
         event_id(other.event_id),
@@ -39,7 +42,8 @@ struct EventWithId {
 
   // Move constructor
   EventWithId(EventWithId&& other) noexcept
-      : index(other.index),
+      : event_type(other.event_type),
+        index(other.index),
         type(other.type),
         tgid_pid(other.tgid_pid),
         event_id(other.event_id),

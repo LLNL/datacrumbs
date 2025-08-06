@@ -2,16 +2,13 @@
 
 #include <datacrumbs/server/bpf/common.h>
 
-struct filename_t {
-  char fname[256];
-};
 struct file_t {
   u64 id;
   int fd;
 };
 
-DATACRUMBS_MAP(latest_fname, struct fn_key_t, struct filename_t);
-DATACRUMBS_MAP(fd_fname, struct file_t, struct filename_t);
+DATACRUMBS_MAP(latest_fname, struct fn_key_t, u32);
+DATACRUMBS_MAP(fd_fname, struct file_t, u32);
 DATACRUMBS_MAP(latest_fd, struct fn_key_t, int);
 #define USER_EVENT_ID_START 100000
 
@@ -49,7 +46,7 @@ static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs*
   event->event_id = key.event_id;
   DATACRUMBS_COLLECT_TIME(event);
   event->size = 0;
-  event->filename[0] = '\0';  // Initialize filename to empty
+  event->fhash = 0;  // Initialize fhash to empty
   event->size += PT_REGS_RC(ctx);
   int* fd_ptr = bpf_map_lookup_elem(&latest_fd, &key);
   if (fd_ptr != 0) {
@@ -57,12 +54,12 @@ static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs*
     struct file_t file_key = {};
     file_key.id = key.id;
     file_key.fd = *fd_ptr;
-    struct filename_t* fname = bpf_map_lookup_elem(&fd_fname, &file_key);
-    if (fname != 0) {
-      DBG_PRINTK("Found fd:%d, file:%s, event_id:%llu\n", *fd_ptr, fname->fname, key.event_id);
-      __builtin_memcpy(event->filename, fname->fname, sizeof(event->filename));
+    u32* fhash = bpf_map_lookup_elem(&fd_fname, &file_key);
+    if (fhash != 0) {
+      event->fhash = *fhash;
+      DBG_PRINTK("Found fd:%d, file:%u, event_id:%llu\n", *fd_ptr, *fhash, key.event_id);
     } else {
-      DBG_PRINTK("Not Found fd:%d, file:%s, event_id:%llu\n", *fd_ptr, fname->fname, key.event_id);
+      DBG_PRINTK("Not Found fd:%d, file:%u, event_id:%llu\n", *fd_ptr, *fhash, key.event_id);
     }
   } else {
     DBG_PRINTK("Not Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
@@ -90,19 +87,19 @@ static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_r
   event->event_id = key.event_id;
   DATACRUMBS_COLLECT_TIME(event);
   event->size = 0;
-  event->filename[0] = '\0';  // Initialize filename to empty
+  event->fhash = 0;  // Initialize fhash to empty
   int* fd_ptr = bpf_map_lookup_elem(&latest_fd, &key);
   if (fd_ptr != 0) {
     DBG_PRINTK("Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
     struct file_t file_key = {};
     file_key.id = key.id;
     file_key.fd = *fd_ptr;
-    struct filename_t* fname = bpf_map_lookup_elem(&fd_fname, &file_key);
-    if (fname != 0) {
-      DBG_PRINTK("Found fd:%d, file:%s, event_id:%llu\n", *fd_ptr, fname->fname, key.event_id);
-      __builtin_memcpy(event->filename, fname->fname, sizeof(event->filename));
+    u32* fhash = bpf_map_lookup_elem(&fd_fname, &file_key);
+    if (fhash != 0) {
+      event->fhash = *fhash;
+      DBG_PRINTK("Found fd:%d, file:%u, event_id:%llu\n", *fd_ptr, *fhash, key.event_id);
     } else {
-      DBG_PRINTK("Not Found fd:%d, file:%s, event_id:%llu\n", *fd_ptr, fname->fname, key.event_id);
+      DBG_PRINTK("Not Found fd:%d, file:%u, event_id:%llu\n", *fd_ptr, *fhash, key.event_id);
     }
   } else {
     DBG_PRINTK("Not Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
@@ -120,16 +117,15 @@ static inline __attribute__((always_inline)) int sysio_open_entry(struct pt_regs
     return 0;  // not tracing this pid
   }
   DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, key.event_id);
-  struct filename_t fname_i;
-  u64 filename_len = sizeof(fname_i.fname);
-  int len = bpf_probe_read_user_str(&fname_i.fname, filename_len, filename);
-  (void)len;
-  bpf_map_update_elem(&latest_fname, &key, &fname_i, BPF_ANY);
+  struct string_t fname_i;
+  int len = bpf_probe_read_user_str(&fname_i.str, MAX_STR_READ_LEN, filename);
+  u32 fhash = hash_and_store(&fname_i, len);
+  bpf_map_update_elem(&latest_fname, &key, &fhash, BPF_ANY);
   struct fn_value_t fn = {};
   fn.ts = bpf_ktime_get_ns();
   bpf_map_update_elem(&fn_pid_map, &key, &fn, BPF_ANY);
-  DBG_PRINTK("Pushed filename:%s with len: %dfor pid:%d, event_id:%llu to map\n", fname_i.fname,
-             len, (u32)key.id, key.event_id);
+  DBG_PRINTK("Pushed filename:%s with len: %dfor pid:%d, event_id:%llu to map\n", fname_i.str, len,
+             (u32)key.id, key.event_id);
   return 0;
 }
 
@@ -153,16 +149,16 @@ static inline __attribute__((always_inline)) int sysio_open_exit(struct pt_regs*
   event->event_id = key.event_id;
   DATACRUMBS_COLLECT_TIME(event);
   event->size = 0;
-  event->filename[0] = '\0';  // Initialize filename to empty
-  struct filename_t* fname = bpf_map_lookup_elem(&latest_fname, &key);
-  if (fname != 0) {
-    __builtin_memcpy(event->filename, fname->fname, sizeof(event->filename));
+  event->fhash = 0;  // Initialize fhash to empty
+  u32* fhash = bpf_map_lookup_elem(&latest_fname, &key);
+  if (fhash != 0) {
+    event->fhash = *fhash;
     struct file_t file_key = {};
     int fd = PT_REGS_RC(ctx);
     file_key.id = key.id;
     file_key.fd = fd;
-    DBG_PRINTK("Adding Found fd:%d, file:%s event_id:%llu\n", fd, fname->fname, key.event_id);
-    bpf_map_update_elem(&fd_fname, &file_key, fname, BPF_ANY);
+    DBG_PRINTK("Adding Found fd:%d, file:%u event_id:%llu\n", fd, *fhash, key.event_id);
+    bpf_map_update_elem(&fd_fname, &file_key, fhash, BPF_ANY);
   }
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;

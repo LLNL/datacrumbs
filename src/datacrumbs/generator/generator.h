@@ -64,6 +64,14 @@ class ProbeGenerator {
    */
   void writeCategoryMap();
 
+  int update_event(const std::string& probe_name, const std::string& function_name, int event_id) {
+    struct json_object* info = json_object_new_object();
+    json_object_object_add(info, "probe_name", json_object_new_string(probe_name.c_str()));
+    json_object_object_add(info, "function_name", json_object_new_string(function_name.c_str()));
+    categoryMap_[event_id] = info;
+    return 0;
+  }
+
   // Path to the probes file
   std::string probesFile_;
   // Path to the category map file

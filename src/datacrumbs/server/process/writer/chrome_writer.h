@@ -4,7 +4,7 @@
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/singleton.h>
-#include <datacrumbs/common/typdefs.h>
+#include <datacrumbs/common/typedefs.h>
 #include <datacrumbs/server/bpf/shared.h>
 #include <pwd.h>
 #include <sys/stat.h>
@@ -95,6 +95,7 @@ class ChromeWriter {
   // Serialize and write a single event to the file, including event_id as "id".
   void write_event(EventWithId* event_with_id) {
     if (!file_) return;
+    index_++;
     auto configManager_ = datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance();
     uint64_t index = event_with_id->index;
     auto args = event_with_id->args;
@@ -107,33 +108,12 @@ class ChromeWriter {
       std::string function_name;
       if (event_with_id->type == 3) {
         probe_name = "usdt";
+        unsigned int method = 0, clazz = 0;
 
         if (args != nullptr) {
-          std::string clazz, method;
-          method = std::any_cast<std::string>((*args)["method"]);
-          clazz = std::any_cast<std::string>((*args)["clazz"]);
-          if (clazz.size() > 0) {
-            auto dot_py = clazz.rfind(".py");
-            if (dot_py != std::string::npos) {
-              // Ends with .py, remove extension
-              clazz = clazz.substr(0, dot_py - 2);
-            }
-            // Not ending with .py, extract after last . or /
-            auto last_dot = clazz.find_last_of('.');
-            auto last_slash = clazz.find_last_of("/\\");
-            size_t pos = std::string::npos;
-            if (last_dot != std::string::npos && last_slash != std::string::npos) {
-              pos = std::max(last_dot, last_slash);
-            } else if (last_dot != std::string::npos) {
-              pos = last_dot;
-            } else if (last_slash != std::string::npos) {
-              pos = last_slash;
-            }
-            if (pos != std::string::npos && pos + 1 < clazz.size()) {
-              clazz = clazz.substr(pos + 1);
-            }
-          }
-          function_name = clazz + "." + method;
+          method = std::any_cast<unsigned int>((*args)["method"]);
+          clazz = std::any_cast<unsigned int>((*args)["clazz"]);
+          function_name = std::to_string(clazz) + "." + std::to_string(method);
           args->erase("clazz");
           args->erase("method");
         } else {
@@ -156,10 +136,21 @@ class ChromeWriter {
       } else {
         dur_us = static_cast<unsigned long long>(std::ceil(event_with_id->dur / 1000.0));
       }
-      int len = std::snprintf(
-          buffer, sizeof(buffer),
-          R"({"id":%lu,"name":"%s","cat":"%s","ph":"X","ts":%llu,"dur":%llu,"pid":%d,"tid":%d)",
-          index, function_name.c_str(), probe_name.c_str(), ts_us, dur_us, pid, tid);
+      int len = 0;
+      if (event_with_id->event_type == METADATA_EVENT) {
+        len = std::snprintf(buffer, sizeof(buffer), R"({"id":%lu,"name":"%s","cat":"%s","ph":"%c")",
+                            index_, function_name.c_str(), probe_name.c_str(),
+                            event_with_id->event_type, ts_us, pid, tid);
+      } else if (event_with_id->event_type == NORMAL_EVENT) {
+        // Normal even
+        len = std::snprintf(
+            buffer, sizeof(buffer),
+            R"({"id":%lu,"name":"%s","cat":"%s","ph":"%c","ts":%llu,"dur":%llu,"pid":%d,"tid":%d)",
+            index_, function_name.c_str(), probe_name.c_str(), event_with_id->event_type, ts_us,
+            dur_us, pid, tid);
+      } else {
+        return;
+      }
 
       std::string args_json = "{";
 
@@ -255,6 +246,7 @@ class ChromeWriter {
   std::condition_variable queue_cv_;
   std::thread worker_;
   bool stop_flag_;
+  unsigned long index_;
 };
 
 }  // namespace datacrumbs
