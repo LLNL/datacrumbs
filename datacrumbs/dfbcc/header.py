@@ -69,14 +69,7 @@ class BCCHeader(ABC):
         }
         """
         
-        self.usdt_data_structures = f"""        
-        #define MAX_STRING_LENGTH {MAX_STRING_LENGTH}
-        """
         
-        self.usdt_events_ds = """
-        BPF_HASH(pid_map, u32, u64); // map for apps to collect data
-        BPF_HASH(fn_pid_map, struct fn_key_t, struct fn_t); // collect start time and ip for apps
-        """
 
     def __str__(self) -> str:
-        return self.includes + self.data_structures + self.usdt_data_structures + self.events_ds + self.util
+        return self.includes + self.data_structures + self.events_ds + self.util

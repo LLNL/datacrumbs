@@ -16,6 +16,7 @@ class BCCFunctions:
     entry_struct_str: str
     exit_struct_str: str
     custom: bool
+    address: int
 
     def __init__(
         self,
@@ -27,6 +28,7 @@ class BCCFunctions:
         entry_cmd: str = "",
         exit_cmd_stats: str = "",
         exit_cmd_key: str = "",
+        address: int = None
     ) -> None:
         self.name = name
         self.regex = regex
@@ -42,6 +44,7 @@ class BCCFunctions:
             self.custom = False
         else:
             self.custom = True
+        self.address = address
         
     def get_str_from_args(self, args):
         args_str = ""
@@ -92,6 +95,8 @@ class BCCFunctions:
             val["entry_args"] = self.entry_args.replace(" ", "").replace("\t", "")
         if self.custom:
             val["custom"] = self.custom
+        if self.address:
+            val["address"] = self.address
         return val
 
     @staticmethod
@@ -105,6 +110,7 @@ class BCCFunctions:
             exit_cmd_stats=data.get("exit_cmd_stats", ""),
             exit_cmd_key=data.get("exit_cmd_key", ""),
             entry_args=data.get("entry_args", ""),
+            address=data.get("address", None),
         )
     
     def get_class(self):

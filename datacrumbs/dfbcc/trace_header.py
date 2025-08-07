@@ -25,7 +25,4 @@ class BCCTraceHeader(BCCHeader):
             
 
     def __str__(self) -> str:
-        return self.includes + self.data_structures + self.usdt_data_structures + self.include_general_struct + self.events_ds + self.util
-    
-    def get_usdt_header(self) -> str:
-        return self.includes + self.data_structures + self.usdt_data_structures + self.events_ds
+        return self.includes + self.data_structures  + self.include_general_struct + self.events_ds + self.util
