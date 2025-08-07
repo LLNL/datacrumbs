@@ -35,9 +35,17 @@ if(NOT DATACRUMBS_EXTERNALLY_CONFIGURED)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
     set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec)
 endif()
-
+function(print_all_variables)
+  message(STATUS "CMake Variables:")
+  get_cmake_property(_variableNames VARIABLES)
+  list(SORT _variableNames)
+  foreach (_variableName ${_variableNames})
+    message(STATUS "${_variableName}=${${_variableName}}")
+  endforeach()
+endfunction()
 option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
 option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" ON)
+option(BPFTOOL_EXECUTABLE "Path to bpftool executable" "")
 
 # Optionally allow user to specify host name via CMake option
 option(DATACRUMBS_HOST "Host name for datacrumbs (numbers will be stripped if not set)" "")
@@ -74,10 +82,12 @@ pkg_check_modules(LIBBPF libbpf)
 if(LIBBPF_VERSION VERSION_LESS "1.0.0")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf version 1.0.0 or newer is required, but found ${LIBBPF_VERSION}")
 endif()
-
+# print_all_variables()
 if(LIBBPF_FOUND)
     set(LIBBPF_VERSION "${LIBBPF_VERSION}")
     message(STATUS "[${UPPER_PROJECT_NAME}] Found libbpf version: ${LIBBPF_VERSION}")
+    include_directories(${LIBBPF_INCLUDEDIR})
+    link_directories(${LIBBPF_LIBDIR})
 else()
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf not found!")
 endif()
@@ -235,7 +245,9 @@ include_directories(${DATACRUMBS_INSTALL_LIBEXEC})
 include_directories(${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 
 # Generate vmlinux.h using bpftool before building datacrumbs_bpf
-find_program(BPFTool_EXECUTABLE NAMES bpftool REQUIRED)
+if(NOT BPFTOOL_EXECUTABLE)
+    find_program(BPFTOOL_EXECUTABLE NAMES bpftool REQUIRED)
+endif()
 
 set(VMLINUX_BTF_PATH "/sys/kernel/btf/vmlinux")
 set(VMLINUX_HEADER "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/vmlinux.h")
@@ -243,7 +255,7 @@ set(VMLINUX_HEADER "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/vmli
 add_custom_command(
     OUTPUT ${VMLINUX_HEADER}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/server/bpf
-    COMMAND ${BPFTool_EXECUTABLE} btf dump file ${VMLINUX_BTF_PATH} format c > ${VMLINUX_HEADER}
+    COMMAND ${BPFTOOL_EXECUTABLE} btf dump file ${VMLINUX_BTF_PATH} format c > ${VMLINUX_HEADER}
     DEPENDS ${VMLINUX_BTF_PATH}
     COMMENT "[${UPPER_PROJECT_NAME}] Generating vmlinux.h from ${VMLINUX_BTF_PATH} (timed)"
     VERBATIM
@@ -281,7 +293,7 @@ add_custom_command(
     OUTPUT ${BPF_OUTPUT}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bpf
     COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Compiling BPF program: ${BPF_SOURCE} (timing start)"
-    COMMAND ${CMAKE_COMMAND} -E time ${CLANG_EXECUTABLE} -target bpf -DDATACRUMBS_BUILD_CLIENT_SO=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so -DDATACRUMBS_INSTALL_CLIENT_SO=${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so -D__TARGET_ARCH_${DATACRUMBS_ARCH} -I${CMAKE_INCLUDE_OUTPUT_DIRECTORY} -I${CMAKE_LIBEXEC_OUTPUT_DIRECTORY} -I${DATACRUMBS_INSTALL_LIBEXEC} -I${CMAKE_CURRENT_SOURCE_DIR}/include -I${CMAKE_CURRENT_SOURCE_DIR}/src -Wall -g -O2 -c ${BPF_SOURCE} -o ${BPF_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E time ${CLANG_EXECUTABLE} -target bpf -DDATACRUMBS_BUILD_CLIENT_SO=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so -I${LIBBPF_INCLUDEDIR} -DDATACRUMBS_INSTALL_CLIENT_SO=${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so -D__TARGET_ARCH_${DATACRUMBS_ARCH} -I${CMAKE_INCLUDE_OUTPUT_DIRECTORY} -I${CMAKE_LIBEXEC_OUTPUT_DIRECTORY} -I${DATACRUMBS_INSTALL_LIBEXEC} -I${CMAKE_CURRENT_SOURCE_DIR}/include -I${CMAKE_CURRENT_SOURCE_DIR}/src -Wall -g -O2 -c ${BPF_SOURCE} -o ${BPF_OUTPUT}
     DEPENDS ${BPF_SOURCE}
     COMMENT "Compiling BPF program: ${BPF_SOURCE} (timed)"
     VERBATIM
@@ -296,7 +308,7 @@ set(BPF_SKEL_OUTPUT ${CMAKE_BINARY_DIR}/include/datacrumbs/bpf/datacrumbs.skel.h
 add_custom_command(
     OUTPUT ${BPF_SKEL_OUTPUT}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/include/datacrumbs/bpf
-    COMMAND ${BPFTool_EXECUTABLE} gen skeleton ${BPF_OUTPUT} > ${BPF_SKEL_OUTPUT}
+    COMMAND ${BPFTOOL_EXECUTABLE} gen skeleton ${BPF_OUTPUT} > ${BPF_SKEL_OUTPUT}
     DEPENDS ${BPF_OUTPUT}
     COMMENT "Generating BPF skeleton: ${BPF_SKEL_OUTPUT}"
     VERBATIM
@@ -313,7 +325,7 @@ set(DATACRUMBS_PROCESS_EVENTS_SRC
 )
 include_directories(${CMAKE_INCLUDE_OUTPUT_DIRECTORY})
 add_executable(${PROJECT_NAME} ${DATACRUMBS_PROCESS_EVENTS_SRC} ${DATACRUMBS_COMMON_SRC})
-target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB} -l:libbpf.so -lelf -lz)
+target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB} -l:libbpf.so -lelf -lz -lpthread)
 add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel)
 
 add_custom_target(clean_bpf

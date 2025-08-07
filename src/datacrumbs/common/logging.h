@@ -16,7 +16,7 @@
 
 // Set default log level if not defined by CMake
 #ifndef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 #endif
 
 #include <cstdarg>
