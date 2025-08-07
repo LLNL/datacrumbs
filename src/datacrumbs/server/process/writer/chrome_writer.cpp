@@ -99,7 +99,7 @@ void ChromeWriter::write_event(EventWithId* event_with_id) {
     if (event_with_id->event_type == METADATA_EVENT) {
       len = std::snprintf(buffer, sizeof(buffer), R"({"id":%lu,"name":"%s","cat":"%s","ph":"%c")",
                           index_, function_name.c_str(), probe_name.c_str(),
-                          event_with_id->event_type, ts_us, pid, tid);
+                          event_with_id->event_type);
     } else if (event_with_id->event_type == NORMAL_EVENT) {
       // Normal even
       len = std::snprintf(
