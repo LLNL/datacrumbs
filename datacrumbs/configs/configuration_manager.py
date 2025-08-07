@@ -177,9 +177,7 @@ class ConfigurationManager:
             if getattr(self, field, None) is None:
                 raise ValueError(f"Configuration validation failed: '{field}' is not set.")
         self.tool_logger.info("Configuration validation passed successfully.")
-
     def create_log_file(self, log_file_name: str, log_level: int = logging.INFO):
-
         try:
             os.remove(log_file_name)
         except OSError:
@@ -199,8 +197,7 @@ class ConfigurationManager:
         if not args.log_file:
             args.log_file = os.path.join(self.project_root, "datacrumbs.log")
         if args.log_file:
-            self.create_log_file(args.log_file,log_level=args.log_level)
-
+            self.create_log_file(args.log_file, args.log_level)
         self.load_from_yaml(args.module)
         self.override_with_args(args)
         self.derive()
