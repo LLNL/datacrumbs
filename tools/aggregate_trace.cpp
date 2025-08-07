@@ -37,15 +37,19 @@ struct Stats {
   }
 };
 
+#include <zlib.h>
+
+constexpr size_t CHUNK_SIZE = 16 * 1024 * 1024; // 16MB
+
 int main(int argc, char* argv[]) {
   if (argc < 2) {
-    cerr << "Usage: " << argv[0] << " <jsonlines_file>" << endl;
+    cerr << "Usage: " << argv[0] << " <gzipped_jsonlines_file>" << endl;
     return 1;
   }
 
-  ifstream infile(argv[1]);
+  gzFile infile = gzopen(argv[1], "rb");
   if (!infile) {
-    cerr << "Failed to open file: " << argv[1] << endl;
+    cerr << "Failed to open gzipped file: " << argv[1] << endl;
     return 1;
   }
 
@@ -60,13 +64,21 @@ int main(int argc, char* argv[]) {
   ofstream outfile(output_path);
   if (!outfile) {
     cerr << "Failed to open output file: " << output_path << endl;
+    gzclose(infile);
     return 1;
   }
 
   map<pair<string, string>, Stats> stats_map;
   string line;
   bool first_line = true;
-  while (getline(infile, line)) {
+  std::vector<char> buf(CHUNK_SIZE);
+  while (true) {
+    char* res = gzgets(infile, buf.data(), buf.size());
+    if (!res) break;
+    line = buf.data();
+    // Remove trailing newline if present
+    if (!line.empty() && line.back() == '\n') line.pop_back();
+
     if (first_line) {
       first_line = false;
       if (line == "[") continue;
@@ -96,6 +108,8 @@ int main(int argc, char* argv[]) {
 
     json_object_put(jobj);
   }
+  gzclose(infile);
+
   // Collect stats into a vector for sorting by sum (total duration)
   vector<pair<pair<string, string>, Stats>> stats_vec(stats_map.begin(), stats_map.end());
   std::sort(stats_vec.begin(), stats_vec.end(), [](const auto& a, const auto& b) {
