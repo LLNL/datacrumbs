@@ -1,7 +1,6 @@
 #!/bin/bash
 
 DATACRUMBS_SO=${DATACRUMBS_INSTALL_DIR}/lib/libdatacrumbs_client.so
-export DATACRUMBS_USDT_ENABLE=1
 echo "$(date '+%Y-%m-%d %H:%M:%S') DATACRUMBS_SO=${DATACRUMBS_SO}"
 PYTHON_DIR=/usr/bin/python3.9 #$(spack location -i python@3.10.16)
 echo "$(date '+%Y-%m-%d %H:%M:%S') Run Py test ${PYTHON_DIR}"
