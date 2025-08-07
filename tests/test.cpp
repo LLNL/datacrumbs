@@ -224,7 +224,7 @@ int main(int argc, char* argv[]) {
   double total_read_time;
   MPI_Reduce(&read_time, &total_read_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   if (my_rank == 0) {
-    printf("%d,%d,%d,%d,%f,%f,%f,%f\n", comm_size, test_flag, ops, ts, total_open_time / comm_size,
+    printf("%d,%d,%d,%ld,%f,%f,%f,%f\n", comm_size, test_flag, ops, ts, total_open_time / comm_size,
            total_close_time / comm_size, total_write_time / comm_size, total_read_time / comm_size);
   }
   MPI_Finalize();

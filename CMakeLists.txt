@@ -130,15 +130,16 @@ else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] yaml-cpp is needed for ${PROJECT_NAME} build")
 endif()
 
-find_package(LLVM 19.1.7 REQUIRED CONFIG)
+find_package(LLVM 19.1.7 REQUIRED CONFIG COMPONENTS Clang)
 
 if(LLVM_FOUND)
     message(STATUS "[${UPPER_PROJECT_NAME}] found LLVM at ${LLVM_INCLUDE_DIRS}")
     include_directories(${LLVM_INCLUDE_DIRS})
     link_directories(${LLVM_LIBRARY_DIRS})
     set(DEPENDENCY_LIB ${DEPENDENCY_LIB} ${LLVM_LIBRARIES} -lclang)
-    if(NOT CLANG_EXECUTABLE)
-        message(FATAL_ERROR "clang compiler not found!")
+    set(CLANG_EXECUTABLE ${LLVM_TOOLS_BINARY_DIR}/clang)
+    if(NOT EXISTS ${CLANG_EXECUTABLE})
+        message(FATAL_ERROR "clang executable not found at ${CLANG_EXECUTABLE}. Please check your LLVM installation.")
     else()
         execute_process(
             COMMAND ${CLANG_EXECUTABLE} --version
