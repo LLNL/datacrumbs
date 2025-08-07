@@ -67,7 +67,7 @@
 #define DATACRUMBS_RB_RESERVE(name, type, event)                                   \
   event = bpf_ringbuf_reserve(&name, sizeof(type), 0);                             \
   if (!event) {                                                                    \
-    DBG_PRINTK("Failed to reserve space for event:%llu in ring buffer", event_id); \                                            \
+    DBG_PRINTK("Failed to reserve space for event:%llu in ring buffer", event_id); \
     return 0;                                                                      \
   }
 #ifndef DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS
