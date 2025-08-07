@@ -1,0 +1,18 @@
+name: default
+install_dir: build
+mode: trace
+file: trace-mpiio.pfw
+user:
+  - name: ior
+    link: /opt/spack/opt/spack/linux-ubuntu22.04-icelake/gcc-11.4.0/ior-4.0.0-arszr4x4i7xuua4opbyx73oqq7tlzljo/bin/ior
+    regex: .*
+  - name: mpi
+    link: /opt/spack/opt/spack/linux-ubuntu22.04-icelake/gcc-11.4.0/openmpi-5.0.5-jia45w3wv65epg4kwlx4vkqlsdm4acc7/lib/libmpi.so
+    regex: ^PMPI.*
+
+profile:
+  interval_sec: 0.0001
+
+trace:
+  args: 1
+  type: ring_buffer # ring_buffer
