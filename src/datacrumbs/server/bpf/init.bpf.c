@@ -5,6 +5,10 @@
 #pragma message("DATACRUMBS_BUILD_CLIENT_SO = " STR(DATACRUMBS_BUILD_CLIENT_SO))
 #endif
 
+#ifndef DATACRUMBS_LIBC_SO
+#define DATACRUMBS_LIBC_SO "/lib64/libc.so.6"
+#endif
+
 static inline __attribute__((always_inline)) int generic_trace_datacrumbs_start() {
   u64 tsp = bpf_ktime_get_ns();
   u64 id = bpf_get_current_pid_tgid();
@@ -74,20 +78,26 @@ int BPF_KRETPROBE(vfork_exit, struct pt_regs* regs) {
   return generic_fork_exit(ctx, 101);
 }
 
-SEC("uprobe//usr/lib64/libc.so.6:__GI___fork")
+#ifdef __GI___fork
+#define GI_FORK "uprobe/" STR(DATACRUMBS_LIBC_SO) ":__GI___fork"
+SEC(GI_FORK)
 int BPF_UPROBE(__GI___fork_entry) {
   return generic_entry(ctx, 102);
 }
-SEC("uretprobe//usr/lib64/libc.so.6:__GI___fork")
+
+#define GI_FORK_RET "uretprobe/" STR(DATACRUMBS_LIBC_SO) ":__GI___fork"
+SEC(GI_FORK_RET)
 int BPF_URETPROBE(__GI___fork_exit) {
   return generic_fork_exit(ctx, 102);
 }
-
-SEC("uprobe//usr/lib64/libc.so.6:__GI___vfork")
+#define GI_VFORK "uprobe/" STR(DATACRUMBS_LIBC_SO) ":__GI___vfork"
+SEC(GI_VFORK)
 int BPF_UPROBE(__GI___vfork_entry) {
   return generic_entry(ctx, 103);
 }
-SEC("uretprobe//usr/lib64/libc.so.6:__GI___vfork")
+#define GI_VFORK_RET "uretprobe/" STR(DATACRUMBS_LIBC_SO) ":__GI___vfork"
+SEC(GI_VFORK_RET)
 int BPF_URETPROBE(__GI___vfork_exit) {
   return generic_fork_exit(ctx, 103);
 }
+#endif

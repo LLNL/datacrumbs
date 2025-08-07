@@ -5,6 +5,6 @@ capture_probes:
   - name: sys
     probe: syscalls
     type: header
-    file: /usr/src/linux-hwe-6.5-headers-6.5.0-44/include/linux/syscalls.h
+    file: /usr/src/linux-headers-5.15.0-101/include/linux/syscalls.h
     regex: sys_.*
 profiling_interval: 0.0001

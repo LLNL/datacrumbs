@@ -85,7 +85,6 @@
       "newfstat",
       "newlstat",
       "newstat",
-      "ni_posix_timers",
       "open",
       "openat",
       "openat2",
