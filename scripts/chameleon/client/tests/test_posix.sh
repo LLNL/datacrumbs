@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DATACRUMBS_SO=${DATACRUMBS_INSTALL_DIR}/lib/libdatacrumbs.so
+DATACRUMBS_SO=${DATACRUMBS_INSTALL_DIR}/lib/libdatacrumbs_client.so
 echo "$(date '+%Y-%m-%d %H:%M:%S') DATACRUMBS_SO=${DATACRUMBS_SO}"
 DATA_DIR=${DATACRUMBS_DIR}/data
 mkdir -p $DATA_DIR
@@ -27,7 +27,7 @@ do
   TS=$((TSKB * 1024))
   if [ "$TEST_CASE" -eq "0" ] || [ "$TEST_CASE" -eq "2" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Starting write test: NUM_FILES=${NUM_FILES}, NUM_OPS=${NUM_OPS}, TS=${TS}, DATA_DIR=${DATA_DIR}, DIRECTIO=${DIRECTIO}"
-    cmd=(${DATACRUMBS_INSTALL_DIR}/libexec/datacrumbs/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 0 ${DIRECTIO} 0)
+    cmd=(${DATACRUMBS_INSTALL_DIR}/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 0 ${DIRECTIO} 0)
     echo "${cmd[@]}"
     LD_PRELOAD=${DATACRUMBS_SO} "${cmd[@]}"
     echo "$(date '+%Y-%m-%d %H:%M:%S') Finished write test"
@@ -39,7 +39,7 @@ do
   if [ "$TEST_CASE" -eq "1" ] || [ "$TEST_CASE" -eq "2" ]; then
     sleep 5
     echo "$(date '+%Y-%m-%d %H:%M:%S') Starting read test: NUM_FILES=${NUM_FILES}, NUM_OPS=${NUM_OPS}, TS=${TS}, DATA_DIR=${DATA_DIR}, DIRECTIO=${DIRECTIO}"
-    cmd=( ${DATACRUMBS_INSTALL_DIR}/libexec/datacrumbs/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 1 ${DIRECTIO} 0)
+    cmd=( ${DATACRUMBS_INSTALL_DIR}/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 1 ${DIRECTIO} 0)
     echo "${cmd[@]}"
     LD_PRELOAD=${DATACRUMBS_SO} "${cmd[@]}"
     echo "$(date '+%Y-%m-%d %H:%M:%S') Finished read test"
