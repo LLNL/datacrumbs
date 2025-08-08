@@ -42,21 +42,6 @@ int ProbeGenerator::run() {
 
   // Track total number of generated probes
   size_t total_probes_generated = 0;
-  // Map event id to probe name and function name
-  std::vector<std::pair<std::string, std::vector<std::string>>> probe_name_functions = {
-      {"sys", {"fork", "vfork"}}, {"libc", {"__GI___fork", "__GI___vfork"}}};
-  int event_id = 100;
-  for (const auto& [name, functions] : probe_name_functions) {
-    for (const auto& function : functions) {
-      int status = update_event(name, function, event_id);
-      if (status != 0) {
-        DC_LOG_ERROR("[ProbeGenerator] Failed to update event for %s.%s (event_id: %d)",
-                     name.c_str(), function.c_str(), event_id);
-      }
-      global_function_names.insert(function);
-      event_id++;
-    }
-  }
   update_event("M", "SH", 0);
 
   // Iterate over each probe in the JSON array
