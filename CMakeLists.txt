@@ -35,25 +35,33 @@ if(NOT DATACRUMBS_EXTERNALLY_CONFIGURED)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
     set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec)
 endif()
+
 function(print_all_variables)
-  message(STATUS "CMake Variables:")
-  get_cmake_property(_variableNames VARIABLES)
-  list(SORT _variableNames)
-  foreach (_variableName ${_variableNames})
-    message(STATUS "${_variableName}=${${_variableName}}")
-  endforeach()
+    message(STATUS "CMake Variables:")
+    get_cmake_property(_variableNames VARIABLES)
+    list(SORT _variableNames)
+
+    foreach(_variableName ${_variableNames})
+        message(STATUS "${_variableName}=${${_variableName}}")
+    endforeach()
 endfunction()
+
 option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
 option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" ON)
 option(BPFTOOL_EXECUTABLE "Path to bpftool executable" "")
+
 if(BPFTOOL_EXECUTABLE STREQUAL "OFF")
     set(BPFTOOL_EXECUTABLE "")
 endif()
+
 option(DATACRUMBS_LOG_LEVEL "Set log level (0=PRINT, 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG, 5=TRACE)" 3)
+
 if(DATACRUMBS_LOG_LEVEL STREQUAL "OFF")
     set(DATACRUMBS_LOG_LEVEL 3)
 endif()
+
 message(STATUS "[${UPPER_PROJECT_NAME}] DATACRUMBS_LOG_LEVEL is ${DATACRUMBS_LOG_LEVEL}")
+
 # Optionally allow user to specify host name via CMake option
 option(DATACRUMBS_HOST "Host name for datacrumbs (numbers will be stripped if not set)" "")
 
@@ -84,6 +92,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 find_library(LIBC_SO NAMES libc.so.6 libc.so PATHS /lib /usr/lib /lib64 /usr/lib64 /usr/local/lib /usr/local/lib64 /usr/lib/x86_64-linux-gnu NO_DEFAULT_PATH)
+
 if(LIBC_SO)
     message(STATUS "[${UPPER_PROJECT_NAME}] Found libc: ${LIBC_SO}")
 else()
@@ -96,6 +105,7 @@ pkg_check_modules(LIBBPF libbpf)
 if(LIBBPF_VERSION VERSION_LESS "1.0.0")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf version 1.0.0 or newer is required, but found ${LIBBPF_VERSION}")
 endif()
+
 # print_all_variables()
 if(LIBBPF_FOUND)
     set(LIBBPF_VERSION "${LIBBPF_VERSION}")
@@ -163,6 +173,7 @@ if(LLVM_FOUND)
     link_directories(${LLVM_LIBRARY_DIRS})
     set(DEPENDENCY_LIB ${DEPENDENCY_LIB} ${LLVM_LIBRARIES} -lclang)
     set(CLANG_EXECUTABLE ${LLVM_TOOLS_BINARY_DIR}/clang)
+
     if(NOT EXISTS ${CLANG_EXECUTABLE})
         message(FATAL_ERROR "clang executable not found at ${CLANG_EXECUTABLE}. Please check your LLVM installation.")
     else()
@@ -173,7 +184,7 @@ if(LLVM_FOUND)
         )
         message(STATUS "[${UPPER_PROJECT_NAME}] Found clang executable: ${CLANG_EXECUTABLE}")
         message(STATUS "[${UPPER_PROJECT_NAME}] clang version: ${CLANG_VERSION_OUTPUT}")
-endif()
+    endif()
 
 else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] LLVM is needed for ${PROJECT_NAME} build")
@@ -265,9 +276,11 @@ if(BPFTOOL_EXECUTABLE AND NOT BPFTOOL_EXECUTABLE STREQUAL "OFF")
     message(STATUS "[${UPPER_PROJECT_NAME}] Using user-specified bpftool executable: ${BPFTOOL_EXECUTABLE}")
 else()
     find_program(BPFTOOL_EXECUTABLE NAMES bpftool)
+
     if(NOT BPFTOOL_EXECUTABLE)
         message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] bpftool executable not found! Please install bpftool or specify its path via BPFTOOL_EXECUTABLE.")
     endif()
+
     message(STATUS "[${UPPER_PROJECT_NAME}] Found bpftool executable: ${BPFTOOL_EXECUTABLE}")
 endif()
 
@@ -284,8 +297,6 @@ add_custom_command(
 )
 
 add_custom_target(vmlinux_header ALL DEPENDS ${VMLINUX_HEADER})
-
-
 
 set(BPF_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/main.bpf.c)
 set(BPF_OUTPUT ${CMAKE_BINARY_DIR}/bpf/datacrumbs.bpf.o)
@@ -376,6 +387,6 @@ add_test(NAME datacrumbs_pretest COMMAND bash -c "ulimit -n 4096")
 set_tests_properties(datacrumbs PROPERTIES DEPENDS datacrumbs_pretest)
 
 add_test(NAME test_simple_dd
-    COMMAND bash -c "dd if=/dev/zero of=${CMAKE_BINARY_DIR}/bin/datacrumbs_client_preload_test.img bs=1M count=16"
+    COMMAND bash -c "dd if=/dev/zero of=/tmp/img_temp.bat bs=1M count=16"
 )
 set_tests_properties(test_simple_dd PROPERTIES ENVIRONMENT "LD_PRELOAD=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so")
