@@ -3,9 +3,9 @@
 #include <datacrumbs/common/logging.h>  // Logging macros
 
 #include <algorithm>
+#include <regex>
 #include <sstream>
 #include <string>
-
 namespace datacrumbs {
 
 /**
@@ -49,10 +49,17 @@ class UProbeGenerator {
     ss << "  generic_entry(ctx, " << event_id_ << ");\n";
     ss << "  return 0;\n";
     ss << "}\n";
+    bool is_fork = std::regex_search(func_name_, std::regex(".*fork.*"));
+    std::string exit_func;
+    if (is_fork) {
+      exit_func = "generic_fork_exit";
+    } else {
+      exit_func = "generic_exit";
+    }
     // Generate uretprobe section and function
     ss << "SEC(\"uretprobe/" << provider_ << ":" << func_name_ << "\")\n";
     ss << "int BPF_URETPROBE(" << sanitized_func_name << event_id_ << "_exit) {\n";
-    ss << "  generic_exit(ctx, " << event_id_ << ");\n";
+    ss << "  " << exit_func << "(ctx, " << event_id_ << ");\n";
     ss << "  return 0;\n";
     ss << "}\n";
 
