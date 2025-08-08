@@ -51,6 +51,7 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
 #define DC_YAML_PROFILING_INTERVAL "profiling_interval"
 #define DC_YAML_CAPTURE_PROBES "capture_probes"
 #define DC_YAML_USER "user"
+#define DC_YAML_INCLUSION_PATH "inclusion_path"
 
 /**
  * Default configuration paths (can be overridden by build system)
@@ -85,6 +86,7 @@ class ArgumentParser {
   std::optional<std::string> data_dir;              ///< Optional data directory
   std::optional<std::string> user;                  ///< Optional user argument
   std::optional<uint64_t> skip_event_threshold_us;  ///< Optional skip event threshold
+  std::optional<std::string> inclusion_path;        ///< Optional inclusion path
 
   /**
    * @brief Constructor that parses command-line arguments.
@@ -119,10 +121,14 @@ class ArgumentParser {
       } else if (arg == "--user" && i + 1 < argc) {
         user = argv[++i];
         DC_LOG_DEBUG("[ArgumentParser] User set to: %s", user->c_str());
+      } else if (arg == "--inclusion_path" && i + 1 < argc) {
+        inclusion_path = argv[++i];
+        DC_LOG_DEBUG("[ArgumentParser] Inclusion path set to: %s", inclusion_path->c_str());
       } else if (arg == "--help" || arg == "-h") {
         DC_LOG_PRINT(
             "Usage: %s <config_name> [--mode <mode>] [--trace_log_dir <path>] "
-            "[--profiling_interval <seconds>] [--config_path <path>] [--user <user>]",
+            "[--profiling_interval <seconds>] [--config_path <path>] [--user <user>] [--data_dir "
+            "<path>] [--inclusion_path <path>]",
             argv[0]);
         exit(0);
       } else {
@@ -375,6 +381,12 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
       DC_LOG_DEBUG("[ConfigurationManager] No user specified in config, using default: %s",
                    this->user.c_str());
     }
+    // Parse inclusion path from YAML
+    if (config[DC_YAML_INCLUSION_PATH]) {
+      this->inclusion_path = config[DC_YAML_INCLUSION_PATH].as<std::string>();
+      DC_LOG_DEBUG("[ConfigurationManager] Inclusion path set from config: %s",
+                   this->inclusion_path.c_str());
+    }
     // Override config path if provided as argument
     if (parser.data_dir) {
       this->data_dir = *parser.data_dir;
@@ -406,6 +418,12 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
       DC_LOG_DEBUG("[ConfigurationManager] No user specified, using default: %s",
                    this->user.c_str());
     }
+    // Override inclusion path if provided as argument
+    if (parser.inclusion_path) {
+      this->inclusion_path = *parser.inclusion_path;
+      DC_LOG_DEBUG("[ConfigurationManager] Inclusion path overridden by argument: %s",
+                   parser.inclusion_path->c_str());
+    }
   }
   // Derive additional configuration values and validate
   derive_configurations();
@@ -413,6 +431,7 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
 
   // Log final configuration for debugging
   DC_LOG_INFO("[ConfigurationManager] Final configuration:");
+  DC_LOG_INFO("  Path: %s", this->path.string().c_str());
   DC_LOG_INFO("  Name: %s", this->name.c_str());
   DC_LOG_INFO("  Mode: %d", static_cast<int>(this->mode));
   DC_LOG_INFO("  Trace log dir: %s", this->trace_log_dir.string().c_str());
@@ -424,6 +443,11 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
   DC_LOG_INFO("  Profiling interval: %f", this->profiling_interval);
   DC_LOG_INFO("  User: %s", this->user.c_str());
   DC_LOG_INFO("  Capture probes: %d", static_cast<int>(this->capture_probes.size()));
+  if (this->inclusion_path.empty()) {
+    DC_LOG_INFO("  Inclusion path: Not set");
+  } else {
+    DC_LOG_INFO("  Inclusion path: %s", this->inclusion_path.c_str());
+  }
   for (const auto& probe : this->capture_probes) {
     DC_LOG_INFO("    Probe: name=%s, type=%d, probe_type=%d, regex=%s", probe->name.c_str(),
                 static_cast<int>(probe->type), static_cast<int>(probe->probe_type),

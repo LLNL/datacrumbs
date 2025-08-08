@@ -389,6 +389,6 @@ add_test(NAME datacrumbs_pretest COMMAND bash -c "ulimit -n 4096")
 set_tests_properties(datacrumbs PROPERTIES DEPENDS datacrumbs_pretest)
 
 add_test(NAME test_simple_dd
-    COMMAND bash -c "dd if=/dev/zero of=${CMAKE_BINARY_DIR}/bin/datacrumbs_client_preload_test.img bs=1M count=16"
+    COMMAND bash -c "dd if=/dev/zero of=/tmp/img_temp.bat bs=1M count=16"
 )
 set_tests_properties(test_simple_dd PROPERTIES ENVIRONMENT "LD_PRELOAD=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so")
