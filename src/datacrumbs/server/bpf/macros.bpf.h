@@ -47,6 +47,31 @@
 
 #define DATACRUMBS_MAP(...) DATACRUMBS_MAP_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 
+#define DATACRUMBS_TRIE_3_ARGS(name, map_key, map_value) \
+  struct {                                               \
+    __uint(type, BPF_MAP_TYPE_LPM_TRIE);                 \
+    __uint(key_size, sizeof(map_key));                   \
+    __uint(value_size, sizeof(map_value));               \
+    __uint(max_entries, 10000);                          \
+    __uint(map_flags, BPF_F_NO_PREALLOC);                \
+    __uint(pinning, LIBBPF_PIN_BY_NAME);                 \
+  } name SEC(".maps");
+
+#define DATACRUMBS_TRIE_4_ARGS(name, map_key, map_value, size) \
+  struct {                                                     \
+    __uint(type, BPF_MAP_TYPE_LPM_TRIE);                       \
+    __uint(max_entries, size);                                 \
+    __type(key, map_key);                                      \
+    __type(value, map_value);                                  \
+    __uint(map_flags, BPF_F_NO_PREALLOC);                      \
+    __uint(pinning, LIBBPF_PIN_BY_NAME);                       \
+  } name SEC(".maps");
+
+#define DATACRUMBS_TRIE_MACRO_CHOOSER(...) \
+  GET_5TH_ARG(__VA_ARGS__, DATACRUMBS_TRIE_4_ARGS, DATACRUMBS_TRIE_3_ARGS, )
+
+#define DATACRUMBS_TRIE(...) DATACRUMBS_TRIE_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+
 /**
  * Helper Macros
  */

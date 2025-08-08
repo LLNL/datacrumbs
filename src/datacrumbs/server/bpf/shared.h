@@ -35,6 +35,7 @@ struct fn_t {
 };
 
 struct string_t {
+  unsigned int len;
   char str[MAX_STR_READ_LEN];
 };
 

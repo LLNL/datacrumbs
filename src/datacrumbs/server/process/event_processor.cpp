@@ -278,6 +278,68 @@ int main(int argc, char** argv) {
     datacrumbs_bpf__destroy(skel);
     return 1;
   }
+  int inclusion_trie = bpf_obj_get("/sys/fs/bpf/inclusion_path_trie");
+  if (inclusion_trie < 0) {
+    DC_LOG_ERROR("Failed to get inclusion path trie: %d", inclusion_trie);
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
+  struct string_t* cur_key = NULL;
+  struct string_t next_key = {};
+  unsigned int value;
+  for (;;) {
+    err = bpf_map_get_next_key(inclusion_trie, cur_key, &next_key);
+    if (err) break;
+    bpf_map_delete_elem(inclusion_trie, &next_key);
+    cur_key = &next_key;
+  }
+
+  // Get inclusion_path from configuration manager and build inclusion_list
+  std::unordered_map<unsigned int, string_t> inclusion_list;
+  inclusion_list.insert({1, {2, "/"}});  // Reserve index 1 for empty string
+  std::string inclusion_paths = event_processor.configManager_->inclusion_path;
+  if (!inclusion_paths.empty()) {
+    std::stringstream ss(inclusion_paths);
+    std::string path;
+    unsigned int idx = 2;
+    while (std::getline(ss, path, ':')) {
+      if (!path.empty()) {
+        string_t s;
+        size_t copy_len = path.size();
+        if (copy_len % 8 != 0) {
+          copy_len = (copy_len / 8) * 8;
+          if (copy_len == 0) copy_len = 2;
+        }
+        if (copy_len > sizeof(s.str) - 1) copy_len = sizeof(s.str) - 1;
+        strncpy(s.str, path.c_str(), copy_len);
+        s.str[copy_len - 1] = '\0';
+        s.len = copy_len;
+        inclusion_list[idx++] = s;
+      }
+    }
+  }
+  for (const auto& pair : inclusion_list) {
+    if (bpf_map_update_elem(inclusion_trie, &pair.second, &pair.first, BPF_ANY) < 0) {
+      DC_LOG_ERROR("Failed to update inclusion path trie for %s", pair.second.str);
+      datacrumbs_bpf__destroy(skel);
+      return 1;
+    }
+    DC_LOG_DEBUG("Added inclusion path: %s", path.c_str());
+  }
+  cur_key = NULL;
+  next_key = {};
+  for (;;) {
+    err = bpf_map_get_next_key(inclusion_trie, cur_key, &next_key);
+    if (err) break;
+
+    bpf_map_lookup_elem(inclusion_trie, &next_key, &value);
+
+    /* Use key and value here */
+    DC_LOG_INFO("Trie key: %s, len: %u, value: %u", next_key.str, next_key.len, value);
+
+    cur_key = &next_key;
+  }
+
   // Prepare context for event handler
   // Create ring buffer for event processing
   rb = ring_buffer__new(bpf_map__fd(skel->maps.output), handle_event, &event_processor, NULL);
