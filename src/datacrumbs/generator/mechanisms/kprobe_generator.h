@@ -3,9 +3,9 @@
 #include <datacrumbs/common/logging.h>  // Logging macros
 
 #include <algorithm>
+#include <regex>
 #include <sstream>
 #include <string>
-
 namespace datacrumbs {
 
 /**
@@ -43,6 +43,7 @@ class KProbeGenerator {
     std::replace(sanitized_func_name.begin(), sanitized_func_name.end(), '@', '_');
     DC_LOG_DEBUG("Sanitized function name: %s", sanitized_func_name.c_str());
 
+
     std::stringstream ss;
     // Generate kprobe entry code
     ss << "SEC(\"kprobe/" << func_name_ << "\")\n";
@@ -50,10 +51,17 @@ class KProbeGenerator {
     ss << "  generic_entry(ctx, " << event_id_ << ");\n";
     ss << "  return 0;\n";
     ss << "}\n";
+    bool is_fork = std::regex_search(func_name_, std::regex(".*fork.*"));
+    std::string exit_func;
+    if (is_fork) {
+      exit_func = "generic_fork_exit";
+    } else {
+      exit_func = "generic_exit";
+    }
     // Generate kretprobe exit code
     ss << "SEC(\"kretprobe/" << func_name_ << "\")\n";
     ss << "int BPF_KRETPROBE(" << sanitized_func_name << event_id_ << "_exit) {\n";
-    ss << "  generic_exit(ctx, " << event_id_ << ");\n";
+    ss << "  " << exit_func << "(ctx, " << event_id_ << ");\n";
     ss << "  return 0;\n";
     ss << "}\n";
 

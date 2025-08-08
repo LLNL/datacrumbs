@@ -20,7 +20,7 @@ capture_probes:
     probe: uprobe
     type: binary
     file: /usr/lib64/libc.so.6
-    regex: ^(?!.*dl)(?!.*_IO_)(?!.*svcerr)(?!.*serv)(?!.*query)(?!.*net)(?!.*dn)(?!.*passwd)(?!.*authunix)(?!.*addr)(?!.*locale)(?!.*tss)(?!.*encrypt)(?!.*decrypt)(?!.*secret)(?!.*thrd)(?!.*proto)(?!.*mtx)(?!.*sigvec)(?!.*clock)(?!.*clnt)(?!.*ns)(?!.*svc)(?!.*rpc)(?!.*login)(?!.*nft)(?!.*xprt)(?!.*mq)(?!.*timer)(?!.*cnd)(?!.*sem)(?!.*pthread)(?!.*xdr)(?!.*cold)(?!.*_rtld_)(?!__).*
+    regex: .*fork.*
   # - name: bio
   #   probe: kprobe
   #   type: ksym
