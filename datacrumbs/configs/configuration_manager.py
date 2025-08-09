@@ -9,7 +9,8 @@ from datacrumbs.common.utils import convert_or_fail
 from datacrumbs.common.enumerations import Mode, TraceType
 import yaml
 import argparse
-
+import os
+import socket
 
 class ConfigurationManager:
     # singleton instance
@@ -56,6 +57,15 @@ class ConfigurationManager:
         self.io_probes_file = f"{self.project_root}/datacrumbs/data/{self.module}/io_probes_file.json"
         self.user_probes_file = f"{self.project_root}/datacrumbs/data/{self.module}/user_probes_file.json"
         self.category_fn_map = f"{self.project_root}/datacrumbs/data/{self.module}/category_fn_map.json"
+        # Extract file path parts
+        base, ext = os.path.splitext(self.profile_file)
+        # Get hostname and PID
+        hostname = socket.gethostname()
+        pid = os.getpid()        
+        # Construct new filename
+        new_file = f"{base}_{hostname}_{pid}{ext}"
+        # Update the attribute
+        self.profile_file = new_file
     
     def load_from_yaml(self, yaml_file_name: str):
         """
@@ -167,7 +177,9 @@ class ConfigurationManager:
             if getattr(self, field, None) is None:
                 raise ValueError(f"Configuration validation failed: '{field}' is not set.")
         self.tool_logger.info("Configuration validation passed successfully.")
-    def create_log_file(self, log_file_name: str,log_level):
+
+    def create_log_file(self, log_file_name: str, log_level: int = logging.INFO):
+
         try:
             os.remove(log_file_name)
         except OSError:
@@ -188,8 +200,10 @@ class ConfigurationManager:
             args.log_file = os.path.join(self.project_root, "datacrumbs.log")
         if args.log_file:
             self.create_log_file(args.log_file,log_level=args.log_level)
+
         self.load_from_yaml(args.module)
         self.override_with_args(args)
+        self.derive()
         self.validate_config()
         self.tool_logger.info("Configuration loaded and overridden successfully.")
         self.pretty_print_config()
@@ -227,5 +241,4 @@ class ConfigurationManager:
         if "trace" in config:
             if "type" in config["trace"]:
                 self.trace_type = TraceType.get_enum(config["trace"]["type"])
-        self.derive()
         return self

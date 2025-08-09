@@ -1,0 +1,29 @@
+[
+    {
+        "type": 0,
+        "name": "sys",
+        "functions": [
+            "openat",
+            "read",
+            "write",
+            "close",
+            "fallocate",
+            "fdatasync",
+            "flock",
+            "fsync",
+            "ftruncate",
+            "lseek",
+            "pread64",
+            "preadv",
+            "preadv2",
+            "pwrite64",
+            "pwritev",
+            "pwritev2",
+            "readahead",
+            "readv",
+            "writev",
+            "open",
+            "openat2"
+        ]
+    }
+]

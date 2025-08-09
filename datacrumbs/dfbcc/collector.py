@@ -150,47 +150,4 @@ class BCCCollector(ABC):
         ).replace(
             "DFFNLOOKUP", self.lookup_fn
         )
-        self.usdt_filter_pid = self.filter_pid # """
-        #     u64 id = bpf_get_current_pid_tgid();
-        #     u32 pid = id;
-        #     u64 start_ts = USDT_START_TS;
-        #     if (pid != USDT_PID)
-        #         return 0;
-        # """
-        self.usdt_functions = """
         
-        DFEVENTSTRUCT
-        
-        int trace_DFCAT_entry(struct pt_regs *ctx DFENTRYARGS) {
-            DFFILTERPID
-            
-            DFFNENTRY
-            
-            DFENTRYCMD
-            
-            return 0;
-        }
-
-        int trace_DFCAT_exit(struct pt_regs *ctx) {
-            DFFILTERPID
-            
-            DFFNLOOKUP
-            
-            DFCAPTUREEVENTKEY
-            
-            DFEXITCMDKEY
-            
-            DFCAPTUREEVENTVALUE
-            
-            DFEXITCMDSTATS
-            
-            DFSUBMITEVENT
-            return 0;
-        }
-        """.replace(
-            "DFFILTERPID", self.usdt_filter_pid
-        ).replace(
-            "DFFNENTRY", self.capture_entry_fn
-        ).replace(
-            "DFFNLOOKUP", self.lookup_fn
-        )
