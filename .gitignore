@@ -71,3 +71,4 @@ poc/bpf-core/example
 poc/bpf-core/example.skel.h
 file
 dlio_env
+poc/bpf-core/vmlinux.h
