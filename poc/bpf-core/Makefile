@@ -5,13 +5,13 @@ BPF_OBJ = ${TARGET:=.bpf.o}
 USER_C = ${TARGET:=.c}
 USER_SKEL = ${TARGET:=.skel.h}
 
-all: $(TARGET) $(BPF_OBJ) find-map
+all: $(TARGET) $(BPF_OBJ)
 .PHONY: all 
 
 $(TARGET): $(USER_C) $(USER_SKEL) 
 	gcc -Wall -o $(TARGET) $(USER_C) -L../libbpf/src -l:libbpf.so -lelf -lz
 
-%.bpf.o:  example.kprobe.bpf.c  example.syscall.bpf.c  example.uprobe.bpf.c  example.usdt.bpf.c   vmlinux.h
+%.bpf.o:  example.bpf.c
 	clang \
 	    -target bpf \
         -D __TARGET_ARCH_$(ARCH) \
@@ -28,7 +28,3 @@ vmlinux.h:
 clean:
 	- rm $(BPF_OBJ)
 	- rm $(TARGET)
-	- rm find-map
-
-find-map: find-map.c
-	gcc -Wall -o find-map find-map.c -L../libbpf/src -l:libbpf.a -lelf -lz

@@ -1,0 +1,36 @@
+name: lead2
+install_dir: /workspaces/datacrumbs/install
+mode: tracer
+trace_file_path: /scratch/haridev/logs/lead2-trace.pfw
+capture_probes:
+  - name: custom1
+    start_event_id: 100000
+    probe: custom
+    type: custom
+    file: /workspaces/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/sysio.bpf.c
+    probes: /workspaces/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/probes.json
+    process_header: /workspaces/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/sysio_process.h
+    event_type: 2
+  - name: libc
+    probe: uprobe
+    type: binary
+    file: /usr/lib64/libc.so.6
+    regex: .*fork.*
+  - name: python
+    probe: usdt
+    type: usdt
+    binary_path: /lib64/libpython3.6m.so.1.0
+    provider: python
+  - name: os_page_cache
+    probe: kprobe
+    type: header
+    file: /usr/src/kernels/4.18.0-348.7.1.el8_5.aarch64/include/linux/pagemap.h
+  - name: shm
+    probe: kprobe
+    type: header
+    file: /usr/src/kernels/4.18.0-348.7.1.el8_5.aarch64/include/linux/shmem_fs.h
+  - name: iomap
+    probe: kprobe
+    type: ksym
+    regex: ^iomap(?!.*cold).*
+profiling_interval: 0.0001
