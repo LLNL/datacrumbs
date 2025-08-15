@@ -381,7 +381,15 @@ add_custom_target(extra_clean
 )
 add_subdirectory(tools)
 add_subdirectory(tests)
+install(
+    TARGETS callgraph_creator
+    RUNTIME DESTINATION ${DATACRUMBS_INSTALL_BINARYDIR}/tools
+)
 
+add_executable(callgraph_creator
+    tools/callgraph.cpp
+    tools/cJSON.c
+)
 enable_testing()
 
 add_test(NAME datacrumbs COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs ${DATACRUMBS_HOST} ${configuration_variables})
