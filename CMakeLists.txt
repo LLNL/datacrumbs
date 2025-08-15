@@ -77,19 +77,10 @@ else()
     set(ENABLE_PROBE_GENERATOR OFF)
 endif()
 
-# Helper macro to prepend clean_bpf_before_run to custom targets
-macro(add_custom_target_with_clean name)
-    add_custom_target(${name}
-        COMMAND ${CMAKE_COMMAND} --build . --target extra_clean
-        COMMAND ${ARGN}
-        COMMENT "Running ${name} with BPF clean"
-    )
-endmacro()
-
-add_custom_target_with_clean(clean_all)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+include_directories(${CMAKE_BINARY_DIR}/include)
 
 find_library(LIBC_SO NAMES libc.so.6 libc.so PATHS /lib /usr/lib /lib64 /usr/lib64 /usr/local/lib /usr/local/lib64 /usr/lib/x86_64-linux-gnu NO_DEFAULT_PATH)
 
@@ -116,6 +107,7 @@ else()
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf not found!")
 endif()
 
+
 # Ensure the process output directory exists
 file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/process/)
 file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/)
@@ -125,7 +117,7 @@ set(configuration_variables --user $ENV{USER} --config_path ${CMAKE_CURRENT_SOUR
 set(DATACRUMBS_CLIENT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.h)
 
 add_library(${PROJECT_NAME}_client SHARED ${DATACRUMBS_CLIENT_SRC})
-add_dependencies(${PROJECT_NAME}_client clean_all)
+add_dependencies(${PROJECT_NAME}_client clean_bpf)
 install(
     TARGETS ${PROJECT_NAME}_client
     EXPORT ${DATACRUMBS_EXPORTED_TARGETS}
@@ -159,8 +151,7 @@ find_package(yaml-cpp REQUIRED)
 if(${yaml-cpp_FOUND})
     message(STATUS "[${UPPER_PROJECT_NAME}] found yaml-cpp at ${YAML_CPP_INCLUDE_DIR}")
     include_directories(${YAML_CPP_INCLUDE_DIR})
-    set(YAML_CPP_LIBRARY_DIR "${YAML_CPP_CMAKE_DIR}/../../")
-    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${YAML_CPP_LIBRARY_DIR} ${YAML_CPP_LIBRARIES})
+    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} yaml-cpp)
 else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] yaml-cpp is needed for ${PROJECT_NAME} build")
 endif()
@@ -210,6 +201,7 @@ else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] zlib is needed for ${PROJECT_NAME} build")
 endif()
 
+# print_all_variables()
 add_executable(${PROJECT_NAME}_explorer ${DATACRUMBS_EXPLORER_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(${PROJECT_NAME}_explorer ${DEPENDENCY_LIB})
 target_compile_definitions(${PROJECT_NAME}_explorer PRIVATE -DDATACRUMBS_LOG_LEVEL=${DATACRUMBS_LOG_LEVEL})
@@ -240,6 +232,8 @@ add_custom_target(run_explorer
     DEPENDS ${PROJECT_NAME}_explorer
     COMMENT "Running ${PROJECT_NAME}_explorer with argument '${DATACRUMBS_HOST}'"
 )
+
+add_dependencies(run_explorer ${PROJECT_NAME}_client)
 
 set(DATACRUMBS_GENERATOR_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/generator/generator.cpp
@@ -328,7 +322,7 @@ add_custom_command(
     OUTPUT ${BPF_OUTPUT}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bpf
     COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Compiling BPF program: ${BPF_SOURCE} (timing start)"
-    COMMAND ${CMAKE_COMMAND} -E time ${CLANG_EXECUTABLE} -target bpf -DDATACRUMBS_LOG_LEVEL=${DATACRUMBS_LOG_LEVEL} -DDATACRUMBS_LIBC_SO=${LIBC_SO} -DDATACRUMBS_BUILD_CLIENT_SO=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so -I${LIBBPF_INCLUDEDIR} -DDATACRUMBS_INSTALL_CLIENT_SO=${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so -D__TARGET_ARCH_${DATACRUMBS_ARCH} -I${CMAKE_INCLUDE_OUTPUT_DIRECTORY} -I${CMAKE_LIBEXEC_OUTPUT_DIRECTORY} -I${DATACRUMBS_INSTALL_LIBEXEC} -I${CMAKE_CURRENT_SOURCE_DIR}/include -I${CMAKE_CURRENT_SOURCE_DIR}/src -Wall -g -O2 -c ${BPF_SOURCE} -o ${BPF_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E time ${CLANG_EXECUTABLE} -target bpf -DDATACRUMBS_LOG_LEVEL=${DATACRUMBS_LOG_LEVEL} -DDATACRUMBS_LIBC_SO=${LIBC_SO} -DDATACRUMBS_BUILD_CLIENT_SO=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so -I${CMAKE_BINARY_DIR}/include -I${LIBBPF_INCLUDEDIR} -DDATACRUMBS_INSTALL_CLIENT_SO=${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so -D__TARGET_ARCH_${DATACRUMBS_ARCH} -I${CMAKE_INCLUDE_OUTPUT_DIRECTORY} -I${CMAKE_LIBEXEC_OUTPUT_DIRECTORY} -I${DATACRUMBS_INSTALL_LIBEXEC} -I${CMAKE_CURRENT_SOURCE_DIR}/include -I${CMAKE_CURRENT_SOURCE_DIR}/src -Wall -g -O2 -c ${BPF_SOURCE} -o ${BPF_OUTPUT}
     DEPENDS ${BPF_SOURCE}
     COMMENT "Compiling BPF program: ${BPF_SOURCE} (timed)"
     VERBATIM
@@ -368,28 +362,23 @@ add_custom_target(clean_bpf
     COMMAND ${CMAKE_COMMAND} -E rm -rf
     ${BPF_OUTPUT}
     ${BPF_SKEL_OUTPUT}
-    ${VMLINUX_HEADER}
     ${CMAKE_BINARY_DIR}/bpf
-    ${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/server/bpf
     ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf
     COMMENT "Cleaning BPF build artifacts (ignoring if cannot remove)"
 )
 
-add_custom_target(extra_clean
-    DEPENDS clean_bpf
-    COMMENT "Extra clean: cleans BPF and related generated files"
-)
 add_subdirectory(tools)
 add_subdirectory(tests)
-install(
-    TARGETS callgraph_creator
-    RUNTIME DESTINATION ${DATACRUMBS_INSTALL_BINARYDIR}/tools
-)
+# add_executable(callgraph_creator
+#     tools/callgraph.cpp
+#     tools/cJSON.c
+# )
+# install(
+#     TARGETS callgraph_creator
+#     RUNTIME DESTINATION ${DATACRUMBS_INSTALL_BINARYDIR}/tools
+# )
 
-add_executable(callgraph_creator
-    tools/callgraph.cpp
-    tools/cJSON.c
-)
+
 enable_testing()
 
 add_test(NAME datacrumbs COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs ${DATACRUMBS_HOST} ${configuration_variables})
