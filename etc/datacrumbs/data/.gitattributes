@@ -1,0 +1,3 @@
+*.json filter=lineignore
+*.pfw filter=lineignore
+*.pfw.gz filter=lineignore

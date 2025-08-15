@@ -222,8 +222,3 @@ static inline __attribute__((always_inline)) int generic_fork_exit(struct pt_reg
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 #endif  // DATACRUMBS_SERVER_BPF_COMMON_H
-
-/**
- *  Not Found string:/tmp/dlio/data/unet3d/train/img_137_of_168.npz value:1
-        Found string:/tmp/dlio/data/unet3d/train/img_131_of_168.npz value:3
- */
