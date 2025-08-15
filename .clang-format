@@ -1,15 +1,7 @@
-ColumnLimit: 0
-Language: C
-MaxEmptyLinesToKeep: 0
-IndentWidth: 1
-SpacesInParentheses: false
-SpacesInSquareBrackets: false
-SpaceBeforeAssignmentOperators: false
-BreakBeforeBraces: Custom
-BraceWrapping:
-  AfterFunction: false
-  AfterControlStatement: false
-  BeforeCatch: false
-  BeforeElse: false
-  IndentBraces: false
-SpaceAfterCStyleCast: false
+BasedOnStyle: Google
+IndentWidth: 2
+ColumnLimit: 100
+AllowShortFunctionsOnASingleLine: Inline
+DerivePointerAlignment: false
+PointerAlignment: Left
+UseTab: Never

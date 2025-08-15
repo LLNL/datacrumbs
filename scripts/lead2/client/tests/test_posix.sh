@@ -1,15 +1,15 @@
 #!/bin/bash
 
-DATACRUMBS_SO=${DATACRUMBS_INSTALL_DIR}/lib/libdatacrumbs.so
+DATACRUMBS_SO=${DATACRUMBS_INSTALL_DIR}/lib/libdatacrumbs_client.so
 echo "$(date '+%Y-%m-%d %H:%M:%S') DATACRUMBS_SO=${DATACRUMBS_SO}"
-DATA_DIR=/scratch/haridev/data
+DATA_DIR=/tmp/test_data
 mkdir -p $DATA_DIR
 NUM_FILES=1
 NUM_OPS=$1
 if [ -z "$1" ]; then
-  NUM_OPS=$((1))
+  NUM_OPS=$((128))
 fi
-SLEEP=5
+SLEEP=0
 PROC=1
 DIRECTIO=1
 TEST_CASE=2 #write=0 read=1 both=2
@@ -19,7 +19,7 @@ if [ -z "$2" ]; then
 fi
 
 for DIRECTIO in 0; do
-  for TSKB in $((1024*1024)); #1 4 16 64 256 1024 4096 16384 65536 262144
+  for TSKB in $((1024)); #1 4 16 64 256 1024 4096 16384 65536 262144
   do
   if [ "$TEST_CASE" -eq "0" ] || [ "$TEST_CASE" -eq "2" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') Cleaning Data"
@@ -34,7 +34,7 @@ for DIRECTIO in 0; do
     fi
     if [ "$TEST_CASE" -eq "0" ] || [ "$TEST_CASE" -eq "2" ]; then
       echo "$(date '+%Y-%m-%d %H:%M:%S') Starting write test: NUM_FILES=${NUM_FILES}, NUM_OPS=${NUM_OPS}, TS=${TS}, DATA_DIR=${DATA_DIR}, DIRECTIO=${DIRECTIO} SLEEP=${SLEEP}"
-      cmd=(${DATACRUMBS_INSTALL_DIR}/libexec/datacrumbs/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 0 ${DIRECTIO} ${SLEEP})
+      cmd=(${DATACRUMBS_INSTALL_DIR}/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 0 ${DIRECTIO} ${SLEEP})
       echo "${cmd[@]}"
       LD_PRELOAD=${DATACRUMBS_SO} "${cmd[@]}"
       echo "$(date '+%Y-%m-%d %H:%M:%S') Finished write test"
@@ -46,7 +46,7 @@ for DIRECTIO in 0; do
     if [ "$TEST_CASE" -eq "1" ] || [ "$TEST_CASE" -eq "2" ]; then
       sleep 5
       echo "$(date '+%Y-%m-%d %H:%M:%S') Starting read test: NUM_FILES=${NUM_FILES}, NUM_OPS=${NUM_OPS}, TS=${TS}, DATA_DIR=${DATA_DIR}, DIRECTIO=${DIRECTIO}"
-      cmd=( ${DATACRUMBS_INSTALL_DIR}/libexec/datacrumbs/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 1 ${DIRECTIO} ${SLEEP})
+      cmd=( ${DATACRUMBS_INSTALL_DIR}/bin/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 1 ${DIRECTIO} ${SLEEP})
       echo "${cmd[@]}"
       LD_PRELOAD=${DATACRUMBS_SO} "${cmd[@]}"
       echo "$(date '+%Y-%m-%d %H:%M:%S') Finished read test"
