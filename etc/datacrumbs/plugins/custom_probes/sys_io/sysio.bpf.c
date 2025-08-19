@@ -119,6 +119,12 @@ static inline __attribute__((always_inline)) int sysio_open_entry(struct pt_regs
   DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, key.event_id);
   struct string_t fname_i;
   int len = bpf_probe_read_user_str(&fname_i.str, MAX_STR_READ_LEN, filename);
+  fname_i.len = len;
+  int found = prefix_search(&inclusion_path_trie, &fname_i);
+  if (!found) {
+    DBG_PRINTK("Skipping openat for %s as it is not in inclusion path trie\n", fname_i.str);
+    return 0;  // Skip if not in inclusion path
+  }
   u32 fhash = hash_and_store(&fname_i, len);
   bpf_map_update_elem(&latest_fname, &key, &fhash, BPF_ANY);
   struct fn_value_t fn = {};

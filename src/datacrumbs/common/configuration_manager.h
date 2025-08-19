@@ -54,6 +54,8 @@ class ConfigurationManager {
   // Profiling-specific configuration: interval for profiling in seconds
   float profiling_interval;
 
+  std::string inclusion_path;  // Path to the inclusion file
+
   // Derived configuration: path to the trace file
   std::filesystem::path trace_file_path;
 

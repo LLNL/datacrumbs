@@ -86,6 +86,7 @@
         "format": "cpp",
         "text_encoding": "cpp",
         "example.generic.bpf.h": "c",
-        "sysio.bpf.h": "c"
+        "sysio.bpf.h": "c",
+        "macros.bpf.h": "c"
     }
 }

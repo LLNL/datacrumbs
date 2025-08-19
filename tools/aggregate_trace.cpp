@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "decompression.h"
+
 using namespace std;
 
 struct Stats {
@@ -39,13 +41,7 @@ struct Stats {
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
-    cerr << "Usage: " << argv[0] << " <jsonlines_file>" << endl;
-    return 1;
-  }
-
-  ifstream infile(argv[1]);
-  if (!infile) {
-    cerr << "Failed to open file: " << argv[1] << endl;
+    cerr << "Usage: " << argv[0] << " <gzipped_jsonlines_file>" << endl;
     return 1;
   }
 
@@ -64,38 +60,77 @@ int main(int argc, char* argv[]) {
   }
 
   map<pair<string, string>, Stats> stats_map;
-  string line;
-  bool first_line = true;
-  while (getline(infile, line)) {
-    if (first_line) {
-      first_line = false;
-      if (line == "[") continue;
+
+  try {
+    datacrumbs::GzipChunkReader reader(argv[1]);
+    bool first_line = true;
+    std::string chunk, leftover;
+    while (reader.nextChunk(chunk)) {
+      leftover += chunk;
+      size_t pos = 0;
+      while (true) {
+        size_t newline = leftover.find('\n', pos);
+        if (newline == std::string::npos) break;
+        std::string line = leftover.substr(pos, newline - pos);
+        pos = newline + 1;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+
+        if (first_line) {
+          first_line = false;
+          if (line == "[") continue;
+        }
+        if (line == "]") continue;
+        if (line.empty()) continue;
+
+        struct json_object* jobj = json_tokener_parse(line.c_str());
+        if (!jobj) {
+          cerr << "Skipping invalid JSON: " << line << endl;
+          continue;
+        }
+
+        struct json_object *jcat, *jname, *jdur;
+        if (!json_object_object_get_ex(jobj, "cat", &jcat) ||
+            !json_object_object_get_ex(jobj, "name", &jname) ||
+            !json_object_object_get_ex(jobj, "dur", &jdur)) {
+          json_object_put(jobj);
+          continue;
+        }
+
+        string cat = json_object_get_string(jcat);
+        string name = json_object_get_string(jname);
+        int dur = json_object_get_int(jdur);
+
+        stats_map[{cat, name}].add(dur);
+
+        json_object_put(jobj);
+      }
+      leftover = leftover.substr(pos);
     }
-    if (line == "]") continue;
-    if (line.empty()) continue;
-
-    struct json_object* jobj = json_tokener_parse(line.c_str());
-    if (!jobj) {
-      cerr << "Skipping invalid JSON: " << line << endl;
-      continue;
+    // Handle any remaining data in leftover
+    if (!leftover.empty()) {
+      std::string line = leftover;
+      if (!line.empty() && line.back() == '\r') line.pop_back();
+      if (line != "]" && !line.empty()) {
+        struct json_object* jobj = json_tokener_parse(line.c_str());
+        if (jobj) {
+          struct json_object *jcat, *jname, *jdur;
+          if (json_object_object_get_ex(jobj, "cat", &jcat) &&
+              json_object_object_get_ex(jobj, "name", &jname) &&
+              json_object_object_get_ex(jobj, "dur", &jdur)) {
+            string cat = json_object_get_string(jcat);
+            string name = json_object_get_string(jname);
+            int dur = json_object_get_int(jdur);
+            stats_map[{cat, name}].add(dur);
+          }
+          json_object_put(jobj);
+        }
+      }
     }
-
-    struct json_object *jcat, *jname, *jdur;
-    if (!json_object_object_get_ex(jobj, "cat", &jcat) ||
-        !json_object_object_get_ex(jobj, "name", &jname) ||
-        !json_object_object_get_ex(jobj, "dur", &jdur)) {
-      json_object_put(jobj);
-      continue;
-    }
-
-    string cat = json_object_get_string(jcat);
-    string name = json_object_get_string(jname);
-    int dur = json_object_get_int(jdur);
-
-    stats_map[{cat, name}].add(dur);
-
-    json_object_put(jobj);
+  } catch (const std::exception& ex) {
+    cerr << ex.what() << endl;
+    return 1;
   }
+
   // Collect stats into a vector for sorting by sum (total duration)
   vector<pair<pair<string, string>, Stats>> stats_vec(stats_map.begin(), stats_map.end());
   std::sort(stats_vec.begin(), stats_vec.end(), [](const auto& a, const auto& b) {
