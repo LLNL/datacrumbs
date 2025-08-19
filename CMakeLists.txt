@@ -145,13 +145,19 @@ set(DATACRUMBS_EXPLORER_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/mechanism/ksym_capture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/explorer/mechanism/usdt_functions.h
 )
+set(DEPENDENCY_LIBRARY_DIRS "")
 set(DEPENDENCY_LIB ${CMAKE_EXE_LINKER_FLAGS} $ENV{LDFLAGS})
 find_package(yaml-cpp REQUIRED)
 
 if(${yaml-cpp_FOUND})
     message(STATUS "[${UPPER_PROJECT_NAME}] found yaml-cpp at ${YAML_CPP_INCLUDE_DIR}")
     include_directories(${YAML_CPP_INCLUDE_DIR})
-    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} yaml-cpp)
+    if (NOT DEFINED YAML_CPP_LIBRARY_DIR)
+        get_filename_component(YAML_CPP_LIBRARY_DIR "${YAML_CPP_CMAKE_DIR}/../../" ABSOLUTE)
+        message(STATUS "[${UPPER_PROJECT_NAME}] YAML_CPP_LIBRARY_DIR is not defined")
+    endif()
+    list(APPEND DEPENDENCY_LIBRARY_DIRS ${YAML_CPP_LIBRARY_DIR})
+    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${YAML_CPP_LIBRARY_DIR} -lyaml-cpp)
 else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] yaml-cpp is needed for ${PROJECT_NAME} build")
 endif()
@@ -200,6 +206,12 @@ if(ZLIB_FOUND)
 else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] zlib is needed for ${PROJECT_NAME} build")
 endif()
+
+message(STATUS "[${UPPER_PROJECT_NAME}] DEPENDENCY_LIB is: ${DEPENDENCY_LIB}")
+# Set RPATH to all dependency library dirs
+list(REMOVE_DUPLICATES DEPENDENCY_LIBRARY_DIRS)
+set(CMAKE_INSTALL_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
+set(CMAKE_BUILD_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
 
 # print_all_variables()
 add_executable(${PROJECT_NAME}_explorer ${DATACRUMBS_EXPLORER_SRC} ${DATACRUMBS_COMMON_SRC})
