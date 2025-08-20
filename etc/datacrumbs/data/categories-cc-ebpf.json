@@ -1,345 +1,101 @@
 {
-  "1125":{
-    "probe_name":"sys",
-    "function_name":"writev"
-  },
-  "1124":{
-    "probe_name":"sys",
-    "function_name":"write"
-  },
-  "1123":{
+  "1105":{
     "probe_name":"sys",
     "function_name":"vfork"
   },
-  "1122":{
+  "1036":{
     "probe_name":"sys",
-    "function_name":"ustat"
+    "function_name":"inotify_rm_watch"
   },
-  "1121":{
+  "1035":{
     "probe_name":"sys",
-    "function_name":"unlinkat"
+    "function_name":"inotify_init1"
   },
-  "1120":{
+  "1034":{
     "probe_name":"sys",
-    "function_name":"unlink"
+    "function_name":"inotify_init"
   },
-  "1119":{
+  "1033":{
     "probe_name":"sys",
-    "function_name":"truncate"
+    "function_name":"inotify_add_watch"
   },
-  "1118":{
+  "1032":{
     "probe_name":"sys",
-    "function_name":"sysfs"
+    "function_name":"getxattr"
   },
-  "1117":{
+  "1031":{
     "probe_name":"sys",
-    "function_name":"syncfs"
+    "function_name":"getdents"
   },
-  "1116":{
+  "1030":{
     "probe_name":"sys",
-    "function_name":"sync_file_range2"
+    "function_name":"getcwd"
   },
-  "1115":{
+  "1029":{
     "probe_name":"sys",
-    "function_name":"sync_file_range"
-  },
-  "1114":{
-    "probe_name":"sys",
-    "function_name":"sync"
-  },
-  "1113":{
-    "probe_name":"sys",
-    "function_name":"symlinkat"
-  },
-  "1112":{
-    "probe_name":"sys",
-    "function_name":"symlink"
-  },
-  "1111":{
-    "probe_name":"sys",
-    "function_name":"statx"
-  },
-  "1110":{
-    "probe_name":"sys",
-    "function_name":"statfs64"
-  },
-  "1109":{
-    "probe_name":"sys",
-    "function_name":"statfs"
-  },
-  "1108":{
-    "probe_name":"sys",
-    "function_name":"stat"
-  },
-  "1107":{
-    "probe_name":"sys",
-    "function_name":"setxattr"
-  },
-  "1106":{
-    "probe_name":"sys",
-    "function_name":"sendfile64"
-  },
-  "1105":{
-    "probe_name":"sys",
-    "function_name":"rmdir"
-  },
-  "1104":{
-    "probe_name":"sys",
-    "function_name":"renameat"
-  },
-  "1103":{
-    "probe_name":"sys",
-    "function_name":"rename"
-  },
-  "1102":{
-    "probe_name":"sys",
-    "function_name":"removexattr"
-  },
-  "1101":{
-    "probe_name":"sys",
-    "function_name":"remap_file_pages"
-  },
-  "1100":{
-    "probe_name":"sys",
-    "function_name":"readv"
-  },
-  "1099":{
-    "probe_name":"sys",
-    "function_name":"readlinkat"
-  },
-  "1098":{
-    "probe_name":"sys",
-    "function_name":"readlink"
-  },
-  "1097":{
-    "probe_name":"sys",
-    "function_name":"read"
-  },
-  "1096":{
-    "probe_name":"sys",
-    "function_name":"pwritev2"
-  },
-  "1095":{
-    "probe_name":"sys",
-    "function_name":"pwritev"
-  },
-  "1094":{
-    "probe_name":"sys",
-    "function_name":"pwrite64"
-  },
-  "1093":{
-    "probe_name":"sys",
-    "function_name":"process_vm_writev"
-  },
-  "1092":{
-    "probe_name":"sys",
-    "function_name":"process_vm_readv"
-  },
-  "1091":{
-    "probe_name":"sys",
-    "function_name":"process_mrelease"
-  },
-  "1090":{
-    "probe_name":"sys",
-    "function_name":"process_madvise"
-  },
-  "1089":{
-    "probe_name":"sys",
-    "function_name":"preadv2"
-  },
-  "1088":{
-    "probe_name":"sys",
-    "function_name":"preadv"
-  },
-  "1087":{
-    "probe_name":"sys",
-    "function_name":"pread64"
-  },
-  "1086":{
-    "probe_name":"sys",
-    "function_name":"pipe"
-  },
-  "1085":{
-    "probe_name":"sys",
-    "function_name":"pidfd_open"
-  },
-  "1084":{
-    "probe_name":"sys",
-    "function_name":"openat2"
-  },
-  "1083":{
-    "probe_name":"sys",
-    "function_name":"openat"
-  },
-  "1082":{
-    "probe_name":"sys",
-    "function_name":"open"
-  },
-  "1081":{
-    "probe_name":"sys",
-    "function_name":"newstat"
-  },
-  "1080":{
-    "probe_name":"sys",
-    "function_name":"newlstat"
-  },
-  "1079":{
-    "probe_name":"sys",
-    "function_name":"newfstat"
-  },
-  "1078":{
-    "probe_name":"sys",
-    "function_name":"munmap"
-  },
-  "1077":{
-    "probe_name":"sys",
-    "function_name":"munlockall"
-  },
-  "1076":{
-    "probe_name":"sys",
-    "function_name":"munlock"
-  },
-  "1075":{
-    "probe_name":"sys",
-    "function_name":"msync"
-  },
-  "1074":{
-    "probe_name":"sys",
-    "function_name":"mremap"
-  },
-  "1073":{
-    "probe_name":"sys",
-    "function_name":"mprotect"
-  },
-  "1072":{
-    "probe_name":"sys",
-    "function_name":"move_pages"
-  },
-  "1071":{
-    "probe_name":"sys",
-    "function_name":"mmap_pgoff"
-  },
-  "1070":{
-    "probe_name":"sys",
-    "function_name":"mlockall"
-  },
-  "1069":{
-    "probe_name":"sys",
-    "function_name":"mlock"
-  },
-  "1068":{
-    "probe_name":"sys",
-    "function_name":"mknodat"
-  },
-  "1067":{
-    "probe_name":"sys",
-    "function_name":"mknod"
-  },
-  "1066":{
-    "probe_name":"sys",
-    "function_name":"mkdirat"
-  },
-  "1065":{
-    "probe_name":"sys",
-    "function_name":"mkdir"
-  },
-  "1064":{
-    "probe_name":"sys",
-    "function_name":"mincore"
-  },
-  "1063":{
-    "probe_name":"sys",
-    "function_name":"migrate_pages"
-  },
-  "1062":{
-    "probe_name":"sys",
-    "function_name":"mbind"
-  },
-  "1061":{
-    "probe_name":"sys",
-    "function_name":"madvise"
-  },
-  "1060":{
-    "probe_name":"sys",
-    "function_name":"lstat"
-  },
-  "1059":{
-    "probe_name":"sys",
-    "function_name":"lsetxattr"
-  },
-  "1058":{
-    "probe_name":"sys",
-    "function_name":"lseek"
+    "function_name":"fstatfs64"
   },
   "1027":{
     "probe_name":"sys",
-    "function_name":"flistxattr"
+    "function_name":"fstat"
   },
   "1026":{
     "probe_name":"sys",
-    "function_name":"fgetxattr"
+    "function_name":"fsetxattr"
   },
   "1025":{
     "probe_name":"sys",
-    "function_name":"fdatasync"
+    "function_name":"fremovexattr"
   },
   "1024":{
     "probe_name":"sys",
-    "function_name":"fcntl"
+    "function_name":"flistxattr"
   },
   "1023":{
     "probe_name":"sys",
-    "function_name":"fchownat"
+    "function_name":"fgetxattr"
   },
   "1022":{
     "probe_name":"sys",
-    "function_name":"fchown"
+    "function_name":"fcntl"
   },
   "1021":{
     "probe_name":"sys",
-    "function_name":"fchmodat"
+    "function_name":"fchownat"
   },
   "1020":{
     "probe_name":"sys",
-    "function_name":"fchmod"
+    "function_name":"fchown"
   },
   "1019":{
     "probe_name":"sys",
-    "function_name":"fchdir"
+    "function_name":"fchmodat"
   },
-  "1018":{
+  "1009":{
     "probe_name":"sys",
-    "function_name":"fanotify_mark"
+    "function_name":"exit"
   },
-  "1017":{
+  "1078":{
     "probe_name":"sys",
-    "function_name":"fanotify_init"
+    "function_name":"process_mrelease"
   },
-  "1014":{
+  "1008":{
     "probe_name":"sys",
-    "function_name":"fadvise64"
+    "function_name":"eventfd2"
   },
-  "1013":{
+  "1077":{
     "probe_name":"sys",
-    "function_name":"faccessat2"
+    "function_name":"process_madvise"
   },
-  "1012":{
+  "1005":{
     "probe_name":"sys",
-    "function_name":"faccessat"
+    "function_name":"dup"
   },
-  "1015":{
+  "1004":{
     "probe_name":"sys",
-    "function_name":"fadvise64_64"
+    "function_name":"creat"
   },
-  "1016":{
-    "probe_name":"sys",
-    "function_name":"fallocate"
-  },
-  "0":{
-    "probe_name":"M",
-    "function_name":"SH"
-  },
-  "1003":{
+  "1002":{
     "probe_name":"sys",
     "function_name":"close_range"
   },
@@ -351,160 +107,408 @@
     "probe_name":"sys",
     "function_name":"access"
   },
-  "1002":{
-    "probe_name":"sys",
-    "function_name":"close"
-  },
-  "1004":{
-    "probe_name":"sys",
-    "function_name":"copy_file_range"
-  },
-  "1005":{
-    "probe_name":"sys",
-    "function_name":"creat"
-  },
-  "1006":{
-    "probe_name":"sys",
-    "function_name":"dup"
-  },
   "1007":{
-    "probe_name":"sys",
-    "function_name":"dup2"
-  },
-  "1008":{
     "probe_name":"sys",
     "function_name":"dup3"
   },
-  "1009":{
+  "1076":{
     "probe_name":"sys",
-    "function_name":"eventfd2"
+    "function_name":"pipe"
   },
-  "1010":{
+  "1003":{
     "probe_name":"sys",
-    "function_name":"exit"
-  },
-  "1011":{
-    "probe_name":"sys",
-    "function_name":"exit_group"
+    "function_name":"copy_file_range"
   },
   "1028":{
     "probe_name":"sys",
-    "function_name":"flock"
-  },
-  "1029":{
-    "probe_name":"sys",
-    "function_name":"fremovexattr"
-  },
-  "1030":{
-    "probe_name":"sys",
-    "function_name":"fsetxattr"
-  },
-  "1031":{
-    "probe_name":"sys",
-    "function_name":"fstat"
-  },
-  "1032":{
-    "probe_name":"sys",
     "function_name":"fstatfs"
   },
-  "1033":{
-    "probe_name":"sys",
-    "function_name":"fstatfs64"
+  "0":{
+    "probe_name":"M",
+    "function_name":"SH"
   },
-  "1034":{
+  "1016":{
     "probe_name":"sys",
-    "function_name":"fsync"
+    "function_name":"fanotify_mark"
   },
-  "1035":{
+  "1010":{
     "probe_name":"sys",
-    "function_name":"ftruncate"
+    "function_name":"exit_group"
   },
-  "1036":{
+  "1067":{
     "probe_name":"sys",
-    "function_name":"getcwd"
+    "function_name":"mremap"
+  },
+  "100012":{
+    "probe_name":"custom1",
+    "function_name":"preadv2"
+  },
+  "1079":{
+    "probe_name":"sys",
+    "function_name":"process_vm_readv"
+  },
+  "1006":{
+    "probe_name":"sys",
+    "function_name":"dup2"
+  },
+  "1011":{
+    "probe_name":"sys",
+    "function_name":"faccessat"
+  },
+  "1068":{
+    "probe_name":"sys",
+    "function_name":"msync"
+  },
+  "100013":{
+    "probe_name":"custom1",
+    "function_name":"pwrite64"
+  },
+  "1080":{
+    "probe_name":"sys",
+    "function_name":"process_vm_writev"
+  },
+  "1012":{
+    "probe_name":"sys",
+    "function_name":"faccessat2"
+  },
+  "1069":{
+    "probe_name":"sys",
+    "function_name":"munlock"
+  },
+  "100014":{
+    "probe_name":"custom1",
+    "function_name":"pwritev"
+  },
+  "1081":{
+    "probe_name":"sys",
+    "function_name":"readlink"
+  },
+  "1013":{
+    "probe_name":"sys",
+    "function_name":"fadvise64"
+  },
+  "1070":{
+    "probe_name":"sys",
+    "function_name":"munlockall"
+  },
+  "100015":{
+    "probe_name":"custom1",
+    "function_name":"pwritev2"
+  },
+  "1082":{
+    "probe_name":"sys",
+    "function_name":"readlinkat"
+  },
+  "1014":{
+    "probe_name":"sys",
+    "function_name":"fadvise64_64"
+  },
+  "1071":{
+    "probe_name":"sys",
+    "function_name":"munmap"
+  },
+  "100016":{
+    "probe_name":"custom1",
+    "function_name":"readahead"
+  },
+  "1083":{
+    "probe_name":"sys",
+    "function_name":"remap_file_pages"
+  },
+  "1015":{
+    "probe_name":"sys",
+    "function_name":"fanotify_init"
+  },
+  "1072":{
+    "probe_name":"sys",
+    "function_name":"newfstat"
+  },
+  "100017":{
+    "probe_name":"custom1",
+    "function_name":"readv"
+  },
+  "1084":{
+    "probe_name":"sys",
+    "function_name":"removexattr"
+  },
+  "1073":{
+    "probe_name":"sys",
+    "function_name":"newlstat"
+  },
+  "100018":{
+    "probe_name":"custom1",
+    "function_name":"writev"
+  },
+  "1085":{
+    "probe_name":"sys",
+    "function_name":"rename"
+  },
+  "1017":{
+    "probe_name":"sys",
+    "function_name":"fchdir"
+  },
+  "1074":{
+    "probe_name":"sys",
+    "function_name":"newstat"
+  },
+  "100019":{
+    "probe_name":"custom1",
+    "function_name":"open"
+  },
+  "1086":{
+    "probe_name":"sys",
+    "function_name":"renameat"
+  },
+  "1018":{
+    "probe_name":"sys",
+    "function_name":"fchmod"
+  },
+  "1075":{
+    "probe_name":"sys",
+    "function_name":"pidfd_open"
+  },
+  "100020":{
+    "probe_name":"custom1",
+    "function_name":"openat2"
+  },
+  "1087":{
+    "probe_name":"sys",
+    "function_name":"rmdir"
   },
   "1037":{
     "probe_name":"sys",
-    "function_name":"getdents"
+    "function_name":"io_cancel"
   },
   "1038":{
     "probe_name":"sys",
-    "function_name":"getxattr"
+    "function_name":"io_destroy"
   },
   "1039":{
     "probe_name":"sys",
-    "function_name":"inotify_add_watch"
+    "function_name":"io_setup"
   },
   "1040":{
     "probe_name":"sys",
-    "function_name":"inotify_init"
+    "function_name":"io_submit"
   },
   "1041":{
     "probe_name":"sys",
-    "function_name":"inotify_init1"
+    "function_name":"io_uring_enter"
   },
   "1042":{
     "probe_name":"sys",
-    "function_name":"inotify_rm_watch"
+    "function_name":"io_uring_register"
   },
   "1043":{
     "probe_name":"sys",
-    "function_name":"io_cancel"
+    "function_name":"io_uring_setup"
   },
   "1044":{
     "probe_name":"sys",
-    "function_name":"io_destroy"
+    "function_name":"lgetxattr"
   },
   "1045":{
     "probe_name":"sys",
-    "function_name":"io_setup"
+    "function_name":"link"
   },
   "1046":{
     "probe_name":"sys",
-    "function_name":"io_submit"
+    "function_name":"linkat"
   },
   "1047":{
     "probe_name":"sys",
-    "function_name":"io_uring_enter"
+    "function_name":"listxattr"
   },
   "1048":{
     "probe_name":"sys",
-    "function_name":"io_uring_register"
+    "function_name":"llistxattr"
   },
   "1049":{
     "probe_name":"sys",
-    "function_name":"io_uring_setup"
+    "function_name":"llseek"
   },
   "1050":{
     "probe_name":"sys",
-    "function_name":"lgetxattr"
+    "function_name":"lookup_dcookie"
   },
   "1051":{
     "probe_name":"sys",
-    "function_name":"link"
+    "function_name":"lremovexattr"
   },
   "1052":{
     "probe_name":"sys",
-    "function_name":"linkat"
+    "function_name":"lsetxattr"
   },
   "1053":{
     "probe_name":"sys",
-    "function_name":"listxattr"
+    "function_name":"lstat"
   },
   "1054":{
     "probe_name":"sys",
-    "function_name":"llistxattr"
+    "function_name":"madvise"
+  },
+  "100000":{
+    "probe_name":"custom1",
+    "function_name":"openat"
   },
   "1055":{
     "probe_name":"sys",
-    "function_name":"llseek"
+    "function_name":"mbind"
+  },
+  "100001":{
+    "probe_name":"custom1",
+    "function_name":"read"
   },
   "1056":{
     "probe_name":"sys",
-    "function_name":"lookup_dcookie"
+    "function_name":"migrate_pages"
+  },
+  "100002":{
+    "probe_name":"custom1",
+    "function_name":"write"
   },
   "1057":{
     "probe_name":"sys",
-    "function_name":"lremovexattr"
+    "function_name":"mincore"
+  },
+  "100003":{
+    "probe_name":"custom1",
+    "function_name":"close"
+  },
+  "1058":{
+    "probe_name":"sys",
+    "function_name":"mkdir"
+  },
+  "100004":{
+    "probe_name":"custom1",
+    "function_name":"fallocate"
+  },
+  "1059":{
+    "probe_name":"sys",
+    "function_name":"mkdirat"
+  },
+  "100005":{
+    "probe_name":"custom1",
+    "function_name":"fdatasync"
+  },
+  "1060":{
+    "probe_name":"sys",
+    "function_name":"mknod"
+  },
+  "100006":{
+    "probe_name":"custom1",
+    "function_name":"flock"
+  },
+  "1061":{
+    "probe_name":"sys",
+    "function_name":"mknodat"
+  },
+  "100007":{
+    "probe_name":"custom1",
+    "function_name":"fsync"
+  },
+  "1062":{
+    "probe_name":"sys",
+    "function_name":"mlock"
+  },
+  "100008":{
+    "probe_name":"custom1",
+    "function_name":"ftruncate"
+  },
+  "1063":{
+    "probe_name":"sys",
+    "function_name":"mlockall"
+  },
+  "100009":{
+    "probe_name":"custom1",
+    "function_name":"lseek"
+  },
+  "1064":{
+    "probe_name":"sys",
+    "function_name":"mmap_pgoff"
+  },
+  "100010":{
+    "probe_name":"custom1",
+    "function_name":"pread64"
+  },
+  "1065":{
+    "probe_name":"sys",
+    "function_name":"move_pages"
+  },
+  "100011":{
+    "probe_name":"custom1",
+    "function_name":"preadv"
+  },
+  "1066":{
+    "probe_name":"sys",
+    "function_name":"mprotect"
+  },
+  "1088":{
+    "probe_name":"sys",
+    "function_name":"sendfile64"
+  },
+  "1089":{
+    "probe_name":"sys",
+    "function_name":"setxattr"
+  },
+  "1090":{
+    "probe_name":"sys",
+    "function_name":"stat"
+  },
+  "1091":{
+    "probe_name":"sys",
+    "function_name":"statfs"
+  },
+  "1092":{
+    "probe_name":"sys",
+    "function_name":"statfs64"
+  },
+  "1093":{
+    "probe_name":"sys",
+    "function_name":"statx"
+  },
+  "1094":{
+    "probe_name":"sys",
+    "function_name":"symlink"
+  },
+  "1095":{
+    "probe_name":"sys",
+    "function_name":"symlinkat"
+  },
+  "1096":{
+    "probe_name":"sys",
+    "function_name":"sync"
+  },
+  "1097":{
+    "probe_name":"sys",
+    "function_name":"sync_file_range"
+  },
+  "1098":{
+    "probe_name":"sys",
+    "function_name":"sync_file_range2"
+  },
+  "1099":{
+    "probe_name":"sys",
+    "function_name":"syncfs"
+  },
+  "1100":{
+    "probe_name":"sys",
+    "function_name":"sysfs"
+  },
+  "1101":{
+    "probe_name":"sys",
+    "function_name":"truncate"
+  },
+  "1102":{
+    "probe_name":"sys",
+    "function_name":"unlink"
+  },
+  "1103":{
+    "probe_name":"sys",
+    "function_name":"unlinkat"
+  },
+  "1104":{
+    "probe_name":"sys",
+    "function_name":"ustat"
   }
 }
