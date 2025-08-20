@@ -157,8 +157,20 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   profile_key.event_id = key.event_id;
   profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
   struct profile_value_t* profile_value = bpf_map_lookup_elem(&profile, &profile_key);
-  profile_value->frequency++;
-  profile_value->duration += (te - start_ts);
+  if (profile_value == NULL) {
+      // Key not found, initialize a new value
+      struct profile_value_t new_value;
+      new_value.frequency = 0;
+      new_value.duration = 0;
+      bpf_map_update_elem(&profile, &profile_key, &new_value, BPF_NOEXIST);
+      profile_value = bpf_map_lookup_elem(&profile, &profile_key); // Lookup again to get the new value's address
+  }
+  if (profile_value != NULL) {
+    profile_value->frequency++;
+    profile_value->duration += (te - fn->ts);
+    DBG_PRINTK("Captured event: %d, %d, %d, %d\n", profile_key.type, profile_key.id,
+               profile_key.event_id, profile_key.time_interval);
+  }
   bpf_map_update_elem(&latest_interval, &DATACRUMBS_TS_KEY, &profile_key.time_interval, BPF_ANY);
   return 0;
 }
@@ -261,8 +273,18 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   profile_key.method_hash = method_hash;
   profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
   struct profile_value_t* profile_value = bpf_map_lookup_elem(&usdt_profile, &profile_key);
-  profile_value->frequency++;
-  profile_value->duration += (te - start_ts);
+  if (profile_value == NULL) {
+      // Key not found, initialize a new value
+      struct profile_value_t new_value;
+      bpf_map_update_elem(&usdt_profile, &profile_key, &new_value, BPF_NOEXIST);
+      profile_value = bpf_map_lookup_elem(&usdt_profile, &profile_key); // Lookup again to get the new value's address
+  }
+  if (profile_value != NULL) {
+    profile_value->frequency++;
+    profile_value->duration += (te - fn->ts);
+    DBG_PRINTK("Captured usdt event: %d, %d, %d, %d\n", profile_key.type, profile_key.id,
+               profile_key.event_id, profile_key.time_interval); 
+  }
   bpf_map_update_elem(&latest_interval, &DATACRUMBS_TS_KEY, &profile_key.time_interval, BPF_ANY);
   return 0;
 }

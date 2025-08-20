@@ -70,6 +70,16 @@ void ChromeWriter::write_event(EventWithId* event_with_id) {
       unsigned int method = 0, clazz = 0;
 
       if (args != nullptr) {
+        if (event_with_id->event_type == COUNTER_EVENT) {
+          // Handle COUNTER_EVENT specific logic
+          unsigned long long duration = std::any_cast<unsigned int>((*args)["duration"]);
+          if (duration > std::numeric_limits<unsigned long long>::max() / 1000) {
+            duration = std::numeric_limits<unsigned long long>::max();
+          } else {
+            duration = static_cast<unsigned long long>(std::floor(duration / 1000.0));
+          }
+          (*args)["duration"] = duration;
+        }
         method = std::any_cast<unsigned int>((*args)["method"]);
         clazz = std::any_cast<unsigned int>((*args)["clazz"]);
         function_name = std::to_string(clazz) + "." + std::to_string(method);

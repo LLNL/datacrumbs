@@ -287,7 +287,7 @@ inline static int lookup_general(int map_fd, unsigned long long latest_timestamp
   unsigned int j = 0;
   // Process the retrieved keys and values
   for (int i = 0; i < batch_size; ++i) {
-    if (keys[i].time_interval <= latest_timestamp) {
+    if (latest_timestamp == 0 || keys[i].time_interval <= latest_timestamp) {
       struct counter_event_t event;
       event.key = &keys[i];
       event.value = &values[i];
@@ -318,7 +318,7 @@ inline static int lookup_usdt(int map_fd, unsigned long long latest_timestamp, d
   unsigned int j = 0;
   // Process the retrieved keys and values
   for (int i = 0; i < batch_size; ++i) {
-    if (keys[i].time_interval <= latest_timestamp) {
+    if (latest_timestamp == 0 || keys[i].time_interval <= latest_timestamp) {
       struct usdt_counter_event_t event;
       event.key = &keys[i];
       event.value = &values[i];
@@ -499,17 +499,25 @@ int main(int argc, char** argv) {
   struct profile_key_t* general_in_batch = NULL;
   struct usdt_profile_key_t* usdt_in_batch = NULL;
 #endif
-  unsigned long long last_processed_timestamp = -1;
+  unsigned long long last_processed_timestamp = 0;
   while (!stop) {
     lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch);
 
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
     err = ring_buffer__poll(rb, 10);
+    if (err < 0) {
+      DC_LOG_ERROR("Error polling ring buffer: %d", err);
+      break;
+    }
 #else
-    unsigned long long latest_ts = -1;
-    err = bpf_map_lookup_elem(file_hash_fd, &DATACRUMBS_TS_KEY, &latest_ts);
+    unsigned long long latest_ts = 0;
+    err = bpf_map_lookup_elem(latest_interval_fd, &DATACRUMBS_TS_KEY, &latest_ts);
     if (err == 0) {
+      if (last_processed_timestamp == 0) {
+        last_processed_timestamp = latest_ts;
+      }
       if (latest_ts - last_processed_timestamp > DATACRUMBS_TIME_MS) {
+        DC_LOG_INFO("Recieved latest latest_ts:%llu, last_processed_timestamp:%llu, interval:%d", latest_ts, last_processed_timestamp, DATACRUMBS_TIME_MS);
         last_processed_timestamp = latest_ts;
         lookup_general(profile_map_fd, latest_ts, &event_processor,
                           general_keys, counter_values, batch_size, general_in_batch);
@@ -524,11 +532,15 @@ int main(int argc, char** argv) {
       err = 0;
       break;
     }
-    if (err < 0) {
-      DC_LOG_ERROR("Error polling ring buffer: %d", err);
-      break;
-    }
+    
   }
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
+  DC_LOG_INFO("\nCollecting rest of the events");
+  lookup_general(profile_map_fd, 0, &event_processor,
+                          general_keys, counter_values, batch_size, general_in_batch);
+  lookup_usdt(usdt_profile_map_fd, 0, &event_processor,
+                    usdt_keys, counter_values, batch_size, usdt_in_batch);
+#endif
   DC_LOG_PRINT("Collecting string metadata from file_map...");
   while (lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch) !=
          -1) {

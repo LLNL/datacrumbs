@@ -465,15 +465,6 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
 void ConfigurationManager::derive_configurations() {
   DC_LOG_TRACE("[ConfigurationManager] Deriving configurations...");
 
-  char hostname[256];
-  if (gethostname(hostname, sizeof(hostname)) != 0) {
-    DC_LOG_WARN("[ConfigurationManager] Failed to get hostname, using 'unknownhost'.");
-    std::strncpy(hostname, "unknownhost", sizeof(hostname));
-    hostname[sizeof(hostname) - 1] = '\0';
-  } else {
-    DC_LOG_DEBUG("[ConfigurationManager] Hostname: %s", hostname);
-  }
-
   pid_t pid = getpid();
   DC_LOG_DEBUG("[ConfigurationManager] Process ID: %d", pid);
 
@@ -484,7 +475,7 @@ void ConfigurationManager::derive_configurations() {
 
   // Simple encoding: base64 of hostname + pid + timestamp
   std::stringstream ss;
-  ss << hostname << "_" << pid << "_" << timestamp;
+  ss << this->name << "_" << pid << "_" << timestamp;
   std::string raw = ss.str();
   auto encoded =
       datacrumbs::utils::base64_encode(std::vector<unsigned char>(raw.begin(), raw.end()));
@@ -493,7 +484,7 @@ void ConfigurationManager::derive_configurations() {
   DC_LOG_DEBUG("[ConfigurationManager] Trace file path: %s",
                this->trace_file_path.string().c_str());
 
-  std::string hostname_str(hostname);
+  std::string hostname_str(this->name);
   // Remove digits from hostname for file naming
   hostname_str.erase(std::remove_if(hostname_str.begin(), hostname_str.end(), ::isdigit),
                      hostname_str.end());
