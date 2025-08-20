@@ -340,6 +340,8 @@ int main(int argc, char** argv) {
     cur_key = &next_key;
   }
 
+
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   // Prepare context for event handler
   // Create ring buffer for event processing
   rb = ring_buffer__new(bpf_map__fd(skel->maps.output), handle_event, &event_processor, NULL);
@@ -349,8 +351,26 @@ int main(int argc, char** argv) {
     datacrumbs_bpf__destroy(skel);
     return 1;
   }
+#else
+  int profile_map_fd = bpf_map__fd(skel->maps.profile);
+  if (profile_map_fd < 0) {
+    DC_LOG_ERROR("Failed to get profile map fd: %d", profile_map_fd);
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
+  int usdt_profile_map_fd = bpf_map__fd(skel->maps.usdt_profile);
+  if (usdt_profile_map_fd < 0) {
+    DC_LOG_ERROR("Failed to get USDT profile map fd: %d", usdt_profile_map_fd);
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
+#endif
   int file_hash_fd = bpf_map__fd(skel->maps.file_map);
-
+  if (file_hash_fd < 0) {
+    DC_LOG_ERROR("Failed to get file hash fd: %d", file_hash_fd);
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
   double elapsed = timer.pauseTime();
   DC_LOG_PRINT("Initialization of DataCrumbs elapsed time: %f seconds", elapsed);
   DC_LOG_PRINT("Ready to run the code.");
@@ -369,7 +389,12 @@ int main(int argc, char** argv) {
 
   while (!stop) {
     lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch);
+
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
     err = ring_buffer__poll(rb, 10);
+#else
+    
+#endif
     // Ctrl-C gives -EINTR
     if (err == -EINTR) {
       DC_LOG_INFO("\nReceived EINTR, exiting poll loop");

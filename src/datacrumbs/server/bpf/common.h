@@ -18,13 +18,16 @@
 
 DATACRUMBS_MAP(pid_map, u32, u64, 1024);
 DATACRUMBS_MAP(fn_pid_map, struct fn_key_t, struct fn_value_t);
+
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 DATACRUMBS_RINGBUF(output, 1024 * 1024 * 16U);  // 16MB ring buffer
+#else
+DATACRUMBS_MAP(profile, struct profile_key_t, struct profile_value_t, 10240);
+DATACRUMBS_MAP(usdt_profile, struct usdt_profile_key_t, struct profile_value_t, 10240);
+DATACRUMBS_MAP(latest_interval, u64, u32, 10240);
+#endif
 DATACRUMBS_MAP(file_map, char[MAX_STR_READ_LEN], u32, 1024);
 DATACRUMBS_TRIE(inclusion_path_trie, struct string_t, u32);
-
-#ifndef DATACRUMBS_TRACE_ALL
-#define DATACRUMBS_TRACE_ALL 0
-#endif
 
 static inline __attribute__((always_inline)) u32 hash_str(const char* str, size_t len) {
   u32 hash = 5381;
@@ -81,6 +84,7 @@ static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* k
 #endif
 
 #if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -94,12 +98,28 @@ static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* c
   DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
   return 0;
 }
+#else 
+static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;  // not tracing this pid
+  }
+  struct fn_value_t fn = {};
+  fn.ts = bpf_ktime_get_ns();
+  bpf_map_update_elem(&fn_pid_map, &key, &fn, BPF_ANY);
+  DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
+  return 0;
+}
+#endif
 #else
 static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
   return 0;
 }
 #endif
 #if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
   u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
@@ -120,6 +140,30 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
+#else 
+static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
+  u64 te = bpf_ktime_get_ns();
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;  // not tracing this pid
+  }
+  struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
+  if (fn == 0) return 0;  // missed entry
+  struct profile_key_t profile_key = {};
+  profile_key.type = 1;
+  profile_key.id = key.id;
+  profile_key.event_id = key.event_id;
+  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
+  struct profile_value_t* profile_value = bpf_map_lookup_elem(&profile, &profile_key);
+  profile_value->frequency++;
+  profile_value->duration += (te - start_ts);
+  int value = 1;
+  bpf_map_update_elem(&latest_interval, &profile_key.time_interval, &value, BPF_ANY);
+  return 0;
+}
+#endif
 #else
 static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
   return 0;
@@ -148,7 +192,7 @@ static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx,
 #endif
 
 #if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
-
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
                                                            long clazz, long method) {
   u64 te = bpf_ktime_get_ns();
@@ -186,7 +230,45 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
-
+#else
+static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
+                                                           long clazz, long method) {
+  u64 te = bpf_ktime_get_ns();
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;  // not tracing this pid
+  }
+  struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
+  if (fn == 0) return 0;  // missed entry
+  DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
+  struct string_t local_str = {};                                                      // 100
+  long len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)clazz);  // 90
+  local_str.len = len;
+  int found = prefix_search(&inclusion_path_trie, &local_str);
+  if (!found) {
+    DBG_PRINTK("Skipping usdt for %s as it is not in inclusion path trie\n", local_str.str);
+    return 0;  // Skip if not in inclusion path
+  }
+  struct usdt_profile_key_t profile_key = {};
+  profile_key.type = 1;
+  profile_key.id = key.id;
+  profile_key.event_id = key.event_id;
+  u32 class_hash = hash_and_store(&local_str, len);                               // 100
+  len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)method);  // 90
+  u32 method_hash = hash_and_store(&local_str, len);
+  profile_key.class_hash = class_hash;
+  profile_key.method_hash = method_hash;
+  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
+  struct profile_value_t* profile_value = bpf_map_lookup_elem(&usdt_profile, &profile_key);
+  profile_value->frequency++;
+  profile_value->duration += (te - start_ts);
+  int value = 1;
+  bpf_map_update_elem(&latest_interval, &profile_key.time_interval, &value, BPF_ANY);
+  return 0;
+}
+#endif
 #else
 static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
                                                            long clazz, long method) {

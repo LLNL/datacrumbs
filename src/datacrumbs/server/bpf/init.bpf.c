@@ -15,6 +15,9 @@ static inline __attribute__((always_inline)) int generic_trace_datacrumbs_start(
   u32 pid = id & 0xFFFFFFFF;
   u64* start_ts = bpf_map_lookup_elem(&pid_map, &pid);
   if (start_ts != 0) tsp = *start_ts;
+  u64 interval = tsp / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
+  u32 value = 1;
+  bpf_map_update_elem(&latest_interval, &interval, &value, BPF_ANY);
   bpf_map_update_elem(&pid_map, &pid, &tsp, BPF_ANY);
   (void)pid;
   DBG_PRINTK("Tracing PID %d", pid);
