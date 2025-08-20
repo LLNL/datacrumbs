@@ -96,7 +96,11 @@ void ChromeWriter::write_event(EventWithId* event_with_id) {
       dur_us = static_cast<unsigned long long>(std::ceil(event_with_id->dur / 1000.0));
     }
     int len = 0;
-    if (event_with_id->event_type == METADATA_EVENT) {
+    if (event_with_id->event_type == COUNTER_EVENT) {
+      len = std::snprintf(buffer, sizeof(buffer), R"({"id":%lu,"name":"%s","cat":"%s","ph":"%c","ts":%llu)",
+                          index_, function_name.c_str(), probe_name.c_str(),
+                          event_with_id->event_type, ts_us);
+    } else if (event_with_id->event_type == METADATA_EVENT) {
       len = std::snprintf(buffer, sizeof(buffer), R"({"id":%lu,"name":"%s","cat":"%s","ph":"%c")",
                           index_, function_name.c_str(), probe_name.c_str(),
                           event_with_id->event_type);

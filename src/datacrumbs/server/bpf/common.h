@@ -24,7 +24,7 @@ DATACRUMBS_RINGBUF(output, 1024 * 1024 * 16U);  // 16MB ring buffer
 #else
 DATACRUMBS_MAP(profile, struct profile_key_t, struct profile_value_t, 10240);
 DATACRUMBS_MAP(usdt_profile, struct usdt_profile_key_t, struct profile_value_t, 10240);
-DATACRUMBS_MAP(latest_interval, u64, u32, 10240);
+DATACRUMBS_MAP(latest_interval, int, unsigned long long, 128);
 #endif
 DATACRUMBS_MAP(file_map, char[MAX_STR_READ_LEN], u32, 1024);
 DATACRUMBS_TRIE(inclusion_path_trie, struct string_t, u32);
@@ -159,8 +159,7 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   struct profile_value_t* profile_value = bpf_map_lookup_elem(&profile, &profile_key);
   profile_value->frequency++;
   profile_value->duration += (te - start_ts);
-  int value = 1;
-  bpf_map_update_elem(&latest_interval, &profile_key.time_interval, &value, BPF_ANY);
+  bpf_map_update_elem(&latest_interval, &DATACRUMBS_TS_KEY, &profile_key.time_interval, BPF_ANY);
   return 0;
 }
 #endif
@@ -264,8 +263,7 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   struct profile_value_t* profile_value = bpf_map_lookup_elem(&usdt_profile, &profile_key);
   profile_value->frequency++;
   profile_value->duration += (te - start_ts);
-  int value = 1;
-  bpf_map_update_elem(&latest_interval, &profile_key.time_interval, &value, BPF_ANY);
+  bpf_map_update_elem(&latest_interval, &DATACRUMBS_TS_KEY, &profile_key.time_interval, BPF_ANY);
   return 0;
 }
 #endif

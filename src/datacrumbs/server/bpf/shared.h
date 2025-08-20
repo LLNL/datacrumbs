@@ -17,6 +17,8 @@
 #define DATACRUMBS_TRACE_ALL 0
 #endif
 
+static int DATACRUMBS_TS_KEY = 1;
+
 struct general_event_t {
   unsigned int type;
   unsigned long long id;
@@ -74,6 +76,16 @@ struct usdt_profile_key_t {
   unsigned long long time_interval;
   unsigned int class_hash;
   unsigned int method_hash;
+};
+
+struct counter_event_t {
+  struct profile_key_t* key;
+  struct profile_value_t* value;
+};
+
+struct usdt_counter_event_t {
+  struct usdt_profile_key_t* key;
+  struct profile_value_t* value;
 };
 
 #endif  // DATACRUMBS_SERVER_BPF_SHARED_H

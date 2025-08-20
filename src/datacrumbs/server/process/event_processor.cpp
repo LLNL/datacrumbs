@@ -30,21 +30,43 @@
 #include <utility>
 
 static datacrumbs::EventWithId* get_data_1(void* data, uint64_t index) {
+
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   struct general_event_t* base = (general_event_t*)data;
 
   auto event = new datacrumbs::EventWithId(NORMAL_EVENT, index, base->type, base->id,
                                            base->event_id, base->ts, base->dur, nullptr);
+#else
+  struct counter_event_t* base = (counter_event_t*)data;
+  auto args = new DataCrumbsArgs();
+  args->emplace("duration", base->value->duration);
+  args->emplace("frequency", base->value->frequency);
+  auto event = new datacrumbs::EventWithId(COUNTER_EVENT, index, base->key->type, base->key->id,
+                                           base->key->event_id, base->key->time_interval, 0, args);
+#endif
   return event;
 }
 
 #define GET_DATA_3_EXISTS
 static datacrumbs::EventWithId* get_data_3(void* data, uint64_t index) {
+
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   struct usdt_event_t* base = (usdt_event_t*)data;
   auto args = new DataCrumbsArgs();
   args->emplace("clazz", base->class_hash);
   args->emplace("method", base->method_hash);
   auto event = new datacrumbs::EventWithId(NORMAL_EVENT, index, base->type, base->id,
                                            base->event_id, base->ts, base->dur, args);
+#else
+  struct usdt_counter_event_t* base = (usdt_counter_event_t*)data;
+  auto args = new DataCrumbsArgs();
+  args->emplace("duration", base->value->duration);
+  args->emplace("frequency", base->value->frequency);
+  args->emplace("clazz", base->key->class_hash);
+  args->emplace("method", base->key->method_hash);
+  auto event = new datacrumbs::EventWithId(COUNTER_EVENT, index, base->key->type, base->key->id,
+                                           base->key->event_id, base->key->time_interval, 0, args);
+#endif
   return event;
 }
 
@@ -69,8 +91,11 @@ class EventProcessor {
   int handle_event(void* data, size_t data_sz) {
     DC_LOG_TRACE("handle_event: start");
 
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
     struct general_event_t* event = (general_event_t*)data;
-
+#else
+    struct profile_key_t* event = (profile_key_t*)((usdt_counter_event_t*)data)->key;
+#endif
     unsigned int pid = event->id;
 
     if (pid == 0) {
@@ -171,6 +196,17 @@ class EventProcessor {
     }
     return 0;
   }
+
+  int capture_general_counter(struct profile_key_t* key, struct profile_value_t* value) {
+    
+    return 0;
+  }
+
+  int capture_usdt_counter(struct usdt_profile_key_t* key, struct profile_value_t* value) {
+
+    return 0;
+  }
+
   int finalize() {
     if (writer_) {
       writer_->finalize();
@@ -238,6 +274,69 @@ inline static int lookup(int map_fd, datacrumbs::EventProcessor* event_processor
   }
   return 0;
 }
+
+inline static int lookup_general(int map_fd, unsigned long long latest_timestamp, datacrumbs::EventProcessor* event_processor,
+                         struct profile_key_t* keys, struct profile_value_t* values, unsigned int batch_size,
+                         struct profile_key_t* in_batch) {
+  int ret = bpf_map_lookup_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
+  if (ret < 0 && errno != ENOENT) {
+    perror("bpf_map_lookup_batch");
+    return -1;
+  }
+  struct profile_key_t delete_keys[batch_size];
+  unsigned int j = 0;
+  // Process the retrieved keys and values
+  for (int i = 0; i < batch_size; ++i) {
+    if (keys[i].time_interval <= latest_timestamp) {
+      struct counter_event_t event;
+      event.key = &keys[i];
+      event.value = &values[i];
+      event_processor->handle_event(&event, 1024);
+      delete_keys[j++] = keys[i];
+    }
+  }
+  ret = bpf_map_delete_batch(map_fd, delete_keys, &j, NULL);
+  if (ret < 0) {
+    perror("bpf_map_delete_batch");
+  }
+  // Check if the end of the map has been reached
+  if (ret < 0 && errno == ENOENT) {
+    return -1;
+  }
+  return 0;
+}
+
+inline static int lookup_usdt(int map_fd, unsigned long long latest_timestamp, datacrumbs::EventProcessor* event_processor,
+                         struct usdt_profile_key_t* keys, struct profile_value_t* values, unsigned int batch_size,
+                         struct usdt_profile_key_t* in_batch) {
+  int ret = bpf_map_lookup_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
+  if (ret < 0 && errno != ENOENT) {
+    perror("bpf_map_lookup_batch");
+    return -1;
+  }
+  struct usdt_profile_key_t delete_keys[batch_size];
+  unsigned int j = 0;
+  // Process the retrieved keys and values
+  for (int i = 0; i < batch_size; ++i) {
+    if (keys[i].time_interval <= latest_timestamp) {
+      struct usdt_counter_event_t event;
+      event.key = &keys[i];
+      event.value = &values[i];
+      event_processor->handle_event(&event, 1024);
+      delete_keys[j++] = keys[i];
+    }
+  }
+  ret = bpf_map_delete_batch(map_fd, delete_keys, &j, NULL);
+  if (ret < 0) {
+    perror("bpf_map_delete_batch");
+  }
+  // Check if the end of the map has been reached
+  if (ret < 0 && errno == ENOENT) {
+    return -1;
+  }
+  return 0;
+}
+
 
 int main(int argc, char** argv) {
   DC_LOG_TRACE("main: start");
@@ -340,7 +439,6 @@ int main(int argc, char** argv) {
     cur_key = &next_key;
   }
 
-
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   // Prepare context for event handler
   // Create ring buffer for event processing
@@ -364,6 +462,12 @@ int main(int argc, char** argv) {
     datacrumbs_bpf__destroy(skel);
     return 1;
   }
+  int latest_interval_fd = bpf_map__fd(skel->maps.latest_interval);
+  if (latest_interval_fd < 0) {
+    DC_LOG_ERROR("Failed to get latest interval map fd: %d", latest_interval_fd);
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
 #endif
   int file_hash_fd = bpf_map__fd(skel->maps.file_map);
   if (file_hash_fd < 0) {
@@ -382,18 +486,37 @@ int main(int argc, char** argv) {
   signal(SIGINT, sig_handler);
 
   unsigned int batch_size = 16;
+
   struct string_t* keys = (struct string_t*)malloc(batch_size * sizeof(struct string_t));
   unsigned int* values = (unsigned int*)malloc(batch_size * sizeof(unsigned int));
   // Initialize in_batch to NULL for the first iteration
   struct string_t* in_batch = NULL;
-
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
+  struct profile_key_t* general_keys = (struct profile_key_t*)malloc(batch_size * sizeof(struct profile_key_t));
+  struct usdt_profile_key_t* usdt_keys = (struct usdt_profile_key_t*)malloc(batch_size * sizeof(struct usdt_profile_key_t));
+  struct profile_value_t* counter_values = (struct profile_value_t*)malloc(batch_size * sizeof(struct profile_value_t));
+  // Initialize in_batch to NULL for the first iteration
+  struct profile_key_t* general_in_batch = NULL;
+  struct usdt_profile_key_t* usdt_in_batch = NULL;
+#endif
+  unsigned long long last_processed_timestamp = -1;
   while (!stop) {
     lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch);
 
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
     err = ring_buffer__poll(rb, 10);
 #else
-    
+    unsigned long long latest_ts = -1;
+    err = bpf_map_lookup_elem(file_hash_fd, &DATACRUMBS_TS_KEY, &latest_ts);
+    if (err == 0) {
+      if (latest_ts - last_processed_timestamp > DATACRUMBS_TIME_MS) {
+        last_processed_timestamp = latest_ts;
+        lookup_general(profile_map_fd, latest_ts, &event_processor,
+                          general_keys, counter_values, batch_size, general_in_batch);
+        lookup_usdt(usdt_profile_map_fd, latest_ts, &event_processor,
+                          usdt_keys, counter_values, batch_size, usdt_in_batch);
+      }
+    }
 #endif
     // Ctrl-C gives -EINTR
     if (err == -EINTR) {
