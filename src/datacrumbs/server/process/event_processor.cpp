@@ -168,7 +168,7 @@ int EventProcessor::handle_event(void* data, size_t data_sz) {
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   struct general_event_t* event = (general_event_t*)data;
 #else
-  struct profile_key_t* event = (profile_key_t*)((usdt_counter_event_t*)data)->key;
+  struct profile_key_t* event = (profile_key_t*)((counter_event_t*)data)->key;
 #endif
   unsigned int pid = event->id;
 
@@ -180,8 +180,8 @@ int EventProcessor::handle_event(void* data, size_t data_sz) {
   if (it != configManager_->category_map.end()) {
     const auto& [probe_name, function_name] = it->second;
     // Print event info to stdout for debugging
-    DC_LOG_DEBUG("%-6u  %-6llu %-6llu %-6llu  %s.%s", pid, event->event_id, event->ts, event->dur,
-                 probe_name.c_str(), function_name.c_str());
+    DC_LOG_DEBUG("%-6u  %-6llu  %s.%s", pid, event->event_id, probe_name.c_str(),
+                 function_name.c_str());
     // Write event to Chrome trace file
     auto writer = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
     if (!writer) {
@@ -507,8 +507,8 @@ int main(int argc, char** argv) {
         last_processed_timestamp = latest_ts;
       }
       if (latest_ts - last_processed_timestamp > DATACRUMBS_TIME_MS) {
-        DC_LOG_INFO("Recieved latest latest_ts:%llu, last_processed_timestamp:%llu, interval:%d",
-                    latest_ts, last_processed_timestamp, DATACRUMBS_TIME_MS);
+        DC_LOG_DEBUG("Recieved latest latest_ts:%llu, last_processed_timestamp:%llu, interval:%d",
+                     latest_ts, last_processed_timestamp, DATACRUMBS_TIME_MS);
         last_processed_timestamp = latest_ts;
 
         lookup_1(profile_1_fd, latest_ts, &event_processor, batch_size);
@@ -549,30 +549,40 @@ int main(int argc, char** argv) {
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
   DC_LOG_INFO("\nCollecting rest of the events");
   unsigned long long latest_ts = 0;
-  lookup_1(profile_1_fd, latest_ts, &event_processor, batch_size);
+  while (lookup_1(profile_1_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
 #ifdef GET_DATA_2_EXISTS
-  lookup_2(profile_2_fd, latest_ts, &event_processor, batch_size);
+  DC_LOG_DEBUG("Getting rest of sysio events:");
+  while (lookup_2(profile_2_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
 #endif
 #ifdef GET_DATA_3_EXISTS
-  lookup_3(profile_3_fd, latest_ts, &event_processor, batch_size);
+  while (lookup_3(profile_3_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
 #endif
 #ifdef GET_DATA_4_EXISTS
-  lookup_4(profile_4_fd, latest_ts, &event_processor, batch_size);
+  while (lookup_4(profile_4_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
 #endif
 #ifdef GET_DATA_5_EXISTS
-  lookup_5(profile_5_fd, latest_ts, &event_processor, batch_size);
+  while (lookup_5(profile_5_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
 #endif
 #ifdef GET_DATA_6_EXISTS
-  lookup_6(profile_6_fd, latest_ts, &event_processor, batch_size);
+  while (lookup_6(profile_6_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
 #endif
 #ifdef GET_DATA_7_EXISTS
-  lookup_7(profile_7_fd, latest_ts, &event_processor, batch_size);
+  while (lookup_7(profile_7_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
 #endif
 #ifdef GET_DATA_8_EXISTS
-  lookup_8(profile_8_fd, latest_ts, &event_processor, batch_size);
+  while (lookup_8(profile_8_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
 #endif
 #ifdef GET_DATA_9_EXISTS
-  lookup_9(profile_9_fd, latest_ts, &event_processor, batch_size);
+  while (lookup_9(profile_9_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
 #endif
 #endif
   DC_LOG_PRINT("Collecting string metadata from file_map...");

@@ -1,6 +1,9 @@
 #ifndef DATACRUMBS_CUSTOM_PROBES_SYS_IO_SYSIO_BPF_H
 #define DATACRUMBS_CUSTOM_PROBES_SYS_IO_SYSIO_BPF_H
 
+#include <datacrumbs/server/bpf/shared.h>
+
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 struct sysio_event_t {
   unsigned int type;
   unsigned long long id;
@@ -10,9 +13,7 @@ struct sysio_event_t {
   unsigned int fhash;
   unsigned long long size;
 };
-
-
-#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
+#else
 struct sysio_counter_key_t {
   unsigned int type;
   unsigned long long id;

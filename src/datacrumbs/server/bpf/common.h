@@ -22,8 +22,8 @@ DATACRUMBS_MAP(fn_pid_map, struct fn_key_t, struct fn_value_t);
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 DATACRUMBS_RINGBUF(output, 1024 * 1024 * 16U);  // 16MB ring buffer
 #else
-DATACRUMBS_MAP(profile, struct profile_key_t, struct profile_value_t, 10240);
-DATACRUMBS_MAP(usdt_profile, struct usdt_profile_key_t, struct profile_value_t, 10240);
+DATACRUMBS_MAP(profile, struct profile_key_t, struct profile_value_t, 1024);
+DATACRUMBS_MAP(usdt_profile, struct usdt_profile_key_t, struct profile_value_t, 1024);
 DATACRUMBS_MAP(latest_interval, int, unsigned long long, 128);
 #endif
 DATACRUMBS_MAP(file_map, char[MAX_STR_READ_LEN], u32, 1024);
@@ -98,7 +98,7 @@ static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* c
   DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
   return 0;
 }
-#else 
+#else
 static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -140,7 +140,7 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
-#else 
+#else
 static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
   u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
@@ -158,12 +158,13 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
   struct profile_value_t* profile_value = bpf_map_lookup_elem(&profile, &profile_key);
   if (profile_value == NULL) {
-      // Key not found, initialize a new value
-      struct profile_value_t new_value;
-      new_value.frequency = 0;
-      new_value.duration = 0;
-      bpf_map_update_elem(&profile, &profile_key, &new_value, BPF_NOEXIST);
-      profile_value = bpf_map_lookup_elem(&profile, &profile_key); // Lookup again to get the new value's address
+    // Key not found, initialize a new value
+    struct profile_value_t new_value;
+    new_value.frequency = 0;
+    new_value.duration = 0;
+    bpf_map_update_elem(&profile, &profile_key, &new_value, BPF_NOEXIST);
+    profile_value =
+        bpf_map_lookup_elem(&profile, &profile_key);  // Lookup again to get the new value's address
   }
   if (profile_value != NULL) {
     profile_value->frequency++;
@@ -263,10 +264,10 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
     return 0;  // Skip if not in inclusion path
   }
   struct usdt_profile_key_t profile_key = {};
-  profile_key.type = 1;
+  profile_key.type = 3;
   profile_key.id = key.id;
   profile_key.event_id = key.event_id;
-  u32 class_hash = hash_and_store(&local_str, len);                               // 100
+  u32 class_hash = hash_and_store(&local_str, len);                                // 100
   len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)method);  // 90
   u32 method_hash = hash_and_store(&local_str, len);
   profile_key.class_hash = class_hash;
@@ -274,16 +275,17 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
   struct profile_value_t* profile_value = bpf_map_lookup_elem(&usdt_profile, &profile_key);
   if (profile_value == NULL) {
-      // Key not found, initialize a new value
-      struct profile_value_t new_value;
-      bpf_map_update_elem(&usdt_profile, &profile_key, &new_value, BPF_NOEXIST);
-      profile_value = bpf_map_lookup_elem(&usdt_profile, &profile_key); // Lookup again to get the new value's address
+    // Key not found, initialize a new value
+    struct profile_value_t new_value;
+    bpf_map_update_elem(&usdt_profile, &profile_key, &new_value, BPF_NOEXIST);
+    profile_value = bpf_map_lookup_elem(
+        &usdt_profile, &profile_key);  // Lookup again to get the new value's address
   }
   if (profile_value != NULL) {
     profile_value->frequency++;
     profile_value->duration += (te - fn->ts);
     DBG_PRINTK("Captured usdt event: %d, %d, %d, %d\n", profile_key.type, profile_key.id,
-               profile_key.event_id, profile_key.time_interval); 
+               profile_key.event_id, profile_key.time_interval);
   }
   bpf_map_update_elem(&latest_interval, &DATACRUMBS_TS_KEY, &profile_key.time_interval, BPF_ANY);
   return 0;

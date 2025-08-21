@@ -10,9 +10,4 @@ capture_probes:
     probes: /home/cc/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/probes.json
     process_header: /home/cc/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/sysio_process.h
     event_type: 2
-  - name: sys
-    probe: syscalls
-    type: header
-    file: /usr/src/linux-hwe-6.5-headers-6.5.0-44/include/linux/syscalls.h
-    regex: sys_.*
 profiling_interval: 0.0001
