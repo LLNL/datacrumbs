@@ -1,6 +1,8 @@
 #ifndef DATACRUMBS_SERVER_BPF_MACROS_BPF_H
 #define DATACRUMBS_SERVER_BPF_MACROS_BPF_H
 
+#include <datacrumbs/server/bpf/shared.h>
+
 /**
  * Macros for defining BPF ring buffers
  */

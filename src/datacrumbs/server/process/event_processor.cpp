@@ -1,50 +1,148 @@
-#include <bpf/bpf.h>
-#include <bpf/libbpf.h>
-#include <datacrumbs/bpf/datacrumbs.skel.h>
-#include <datacrumbs/common/configuration_manager.h>
-#include <datacrumbs/common/data_structures.h>
-#include <datacrumbs/common/logging.h>  // Logging header
-#include <datacrumbs/common/singleton.h>
-#include <datacrumbs/common/typedefs.h>
-#include <datacrumbs/common/utils.h>
-#include <datacrumbs/server/bpf/shared.h>
-#include <datacrumbs/server/process/generated_process.h>
-#include <datacrumbs/server/process/writer/chrome_writer.h>
-// #include <datacrumbs/server/process/
-#include <errno.h>
-#include <grp.h>
-#include <json-c/json.h>
-#include <pwd.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <datacrumbs/server/process/event_processor.h>
 
-#include <atomic>
-#include <csignal>
-#include <fstream>
-#include <functional>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
+int initialize_map_1(struct datacrumbs_bpf* skel) {
+  int profile_map_fd = bpf_map__fd(skel->maps.profile);
+  if (profile_map_fd < 0) {
+    DC_LOG_ERROR("Failed to get profile map fd: %d", profile_map_fd);
+    datacrumbs_bpf__destroy(skel);
+    return -1;
+  }
+  return profile_map_fd;
+}
+inline static int lookup_1(int map_fd, unsigned long long latest_timestamp,
+                           datacrumbs::EventProcessor* event_processor, unsigned int batch_size) {
+  static struct profile_key_t* keys = nullptr;
+  static struct profile_value_t* values = nullptr;
+  static struct profile_key_t* in_batch = nullptr;
+  static bool initialized = false;
 
+  if (!initialized) {
+    keys = (struct profile_key_t*)malloc(batch_size * sizeof(struct profile_key_t));
+    values = (struct profile_value_t*)malloc(batch_size * sizeof(struct profile_value_t));
+    in_batch = nullptr;
+    initialized = true;
+  }
+
+  int ret = bpf_map_lookup_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
+  if (ret < 0 && errno != ENOENT) {
+    perror("bpf_map_lookup_batch");
+    return -1;
+  }
+  struct profile_key_t delete_keys[batch_size];
+  unsigned int j = 0;
+  // Process the retrieved keys and values
+  for (int i = 0; i < batch_size; ++i) {
+    if (latest_timestamp == 0 || keys[i].time_interval <= latest_timestamp) {
+      struct counter_event_t event;
+      event.key = &keys[i];
+      event.value = &values[i];
+      event_processor->handle_event(&event, 1024);
+      delete_keys[j++] = keys[i];
+    }
+  }
+  ret = bpf_map_delete_batch(map_fd, delete_keys, &j, NULL);
+  if (ret < 0) {
+    perror("bpf_map_delete_batch");
+  }
+  // Check if the end of the map has been reached
+  if (ret < 0 && errno == ENOENT) {
+    return -1;
+  }
+  return 0;
+}
+
+#endif
 static datacrumbs::EventWithId* get_data_1(void* data, uint64_t index) {
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   struct general_event_t* base = (general_event_t*)data;
 
   auto event = new datacrumbs::EventWithId(NORMAL_EVENT, index, base->type, base->id,
                                            base->event_id, base->ts, base->dur, nullptr);
+#else
+  struct counter_event_t* base = (counter_event_t*)data;
+  auto args = new DataCrumbsArgs();
+  args->emplace("duration", base->value->duration);
+  args->emplace("frequency", base->value->frequency);
+  auto event = new datacrumbs::EventWithId(COUNTER_EVENT, index, base->key->type, base->key->id,
+                                           base->key->event_id, base->key->time_interval, 0, args);
+#endif
   return event;
 }
 
 #define GET_DATA_3_EXISTS
+
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
+int initialize_map_3(struct datacrumbs_bpf* skel) {
+  int profile_map_fd = bpf_map__fd(skel->maps.usdt_profile);
+  if (profile_map_fd < 0) {
+    DC_LOG_ERROR("Failed to get profile map fd: %d", profile_map_fd);
+    datacrumbs_bpf__destroy(skel);
+    return -1;
+  }
+  return profile_map_fd;
+}
+inline static int lookup_3(int map_fd, unsigned long long latest_timestamp,
+                           datacrumbs::EventProcessor* event_processor, unsigned int batch_size) {
+  static struct usdt_profile_key_t* keys = nullptr;
+  static struct profile_value_t* values = nullptr;
+  static struct usdt_profile_key_t* in_batch = nullptr;
+  static bool initialized = false;
+
+  if (!initialized) {
+    keys = (struct usdt_profile_key_t*)malloc(batch_size * sizeof(struct usdt_profile_key_t));
+    values = (struct profile_value_t*)malloc(batch_size * sizeof(struct profile_value_t));
+    in_batch = nullptr;
+    initialized = true;
+  }
+
+  int ret = bpf_map_lookup_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
+  if (ret < 0 && errno != ENOENT) {
+    perror("bpf_map_lookup_batch");
+    return -1;
+  }
+  struct usdt_profile_key_t delete_keys[batch_size];
+  unsigned int j = 0;
+  // Process the retrieved keys and values
+  for (int i = 0; i < batch_size; ++i) {
+    if (latest_timestamp == 0 || keys[i].time_interval <= latest_timestamp) {
+      struct usdt_counter_event_t event;
+      event.key = &keys[i];
+      event.value = &values[i];
+      event_processor->handle_event(&event, 1024);
+      delete_keys[j++] = keys[i];
+    }
+  }
+  ret = bpf_map_delete_batch(map_fd, delete_keys, &j, NULL);
+  if (ret < 0) {
+    perror("bpf_map_delete_batch");
+  }
+  // Check if the end of the map has been reached
+  if (ret < 0 && errno == ENOENT) {
+    return -1;
+  }
+  return 0;
+}
+#endif
+
 static datacrumbs::EventWithId* get_data_3(void* data, uint64_t index) {
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   struct usdt_event_t* base = (usdt_event_t*)data;
   auto args = new DataCrumbsArgs();
   args->emplace("clazz", base->class_hash);
   args->emplace("method", base->method_hash);
   auto event = new datacrumbs::EventWithId(NORMAL_EVENT, index, base->type, base->id,
                                            base->event_id, base->ts, base->dur, args);
+#else
+  struct usdt_counter_event_t* base = (usdt_counter_event_t*)data;
+  auto args = new DataCrumbsArgs();
+  args->emplace("duration", base->value->duration);
+  args->emplace("frequency", base->value->frequency);
+  args->emplace("clazz", base->key->class_hash);
+  args->emplace("method", base->key->method_hash);
+  auto event = new datacrumbs::EventWithId(COUNTER_EVENT, index, base->key->type, base->key->id,
+                                           base->key->event_id, base->key->time_interval, 0, args);
+#endif
   return event;
 }
 
@@ -55,139 +153,125 @@ static datacrumbs::EventWithId* get_data_3(void* data, uint64_t index) {
   }
 
 namespace datacrumbs {
-class EventProcessor {
- public:
-  EventProcessor(int argc, char** argv) {
-    configManager_ =
-        datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance(argc, argv);
-    // Initialize the ChromeWriter singleton instance
-    writer_ = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
-    if (!writer_) {
-      DC_LOG_ERROR("Failed to create ChromeWriter instance");
-    }
+EventProcessor::EventProcessor(int argc, char** argv) {
+  configManager_ =
+      datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance(argc, argv);
+  // Initialize the ChromeWriter singleton instance
+  writer_ = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
+  if (!writer_) {
+    DC_LOG_ERROR("Failed to create ChromeWriter instance");
   }
-  int handle_event(void* data, size_t data_sz) {
-    DC_LOG_TRACE("handle_event: start");
+}
+int EventProcessor::handle_event(void* data, size_t data_sz) {
+  DC_LOG_TRACE("handle_event: start");
 
-    struct general_event_t* event = (general_event_t*)data;
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
+  struct general_event_t* event = (general_event_t*)data;
+#else
+  struct profile_key_t* event = (profile_key_t*)((counter_event_t*)data)->key;
+#endif
+  unsigned int pid = event->id;
 
-    unsigned int pid = event->id;
-
-    if (pid == 0) {
-      DC_LOG_DEBUG("handle_event: pid is 0, skipping event");
-      return 0;
+  if (pid == 0) {
+    DC_LOG_DEBUG("handle_event: pid is 0, skipping event");
+    return 0;
+  }
+  auto it = configManager_->category_map.find(event->event_id);
+  if (it != configManager_->category_map.end()) {
+    const auto& [probe_name, function_name] = it->second;
+    // Print event info to stdout for debugging
+    DC_LOG_DEBUG("%-6u  %-6llu  %s.%s", pid, event->event_id, probe_name.c_str(),
+                 function_name.c_str());
+    // Write event to Chrome trace file
+    auto writer = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
+    if (!writer) {
+      DC_LOG_ERROR("Failed to create ChromeWriter instance");
+      return 1;
     }
-    auto it = configManager_->category_map.find(event->event_id);
-    if (it != configManager_->category_map.end()) {
-      const auto& [probe_name, function_name] = it->second;
-      // Print event info to stdout for debugging
-      DC_LOG_DEBUG("%-6u  %-6llu %-6llu %-6llu  %s.%s", pid, event->event_id, event->ts, event->dur,
-                   probe_name.c_str(), function_name.c_str());
-      // Write event to Chrome trace file
-      auto writer = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
-      if (!writer) {
-        DC_LOG_ERROR("Failed to create ChromeWriter instance");
-        return 1;
+    if (event->type > 0) {
+      if (event->type == 1) {
+        GET_DATA_FUNCTION(1);
       }
-      if (event->type > 0) {
-        if (event->type == 1) {
-          GET_DATA_FUNCTION(1);
-        }
 #ifdef GET_DATA_2_EXISTS
-        else if (event->type == 2) {
-          GET_DATA_FUNCTION(2);
-        }
+      else if (event->type == 2) {
+        GET_DATA_FUNCTION(2);
+      }
 #endif
 #ifdef GET_DATA_3_EXISTS
-        else if (event->type == 3) {
-          GET_DATA_FUNCTION(3);
-        }
+      else if (event->type == 3) {
+        GET_DATA_FUNCTION(3);
+      }
 #endif
 #ifdef GET_DATA_4_EXISTS
-        else if (event->type == 4) {
-          GET_DATA_FUNCTION(4);
-        }
+      else if (event->type == 4) {
+        GET_DATA_FUNCTION(4);
+      }
 #endif
 #ifdef GET_DATA_5_EXISTS
-        else if (event->type == 5) {
-          GET_DATA_FUNCTION(5);
-        }
+      else if (event->type == 5) {
+        GET_DATA_FUNCTION(5);
+      }
 #endif
 #ifdef GET_DATA_6_EXISTS
-        else if (event->type == 6) {
-          GET_DATA_FUNCTION(6);
-        }
+      else if (event->type == 6) {
+        GET_DATA_FUNCTION(6);
+      }
 #endif
 #ifdef GET_DATA_7_EXISTS
-        else if (event->type == 7) {
-          GET_DATA_FUNCTION(7);
-        }
+      else if (event->type == 7) {
+        GET_DATA_FUNCTION(7);
+      }
 #endif
 #ifdef GET_DATA_8_EXISTS
-        else if (event->type == 8) {
-          GET_DATA_FUNCTION(8);
-        }
+      else if (event->type == 8) {
+        GET_DATA_FUNCTION(8);
+      }
 #endif
 #ifdef GET_DATA_9_EXISTS
-        else if (event->type == 9) {
-          GET_DATA_FUNCTION(9);
-        }
+      else if (event->type == 9) {
+        GET_DATA_FUNCTION(9);
+      }
 #endif
 #ifdef GET_DATA_10_EXISTS
-        else if (event->type == 10) {
-          GET_DATA_FUNCTION(10);
-        }
+      else if (event->type == 10) {
+        GET_DATA_FUNCTION(10);
+      }
 #endif
-        else {
-          DC_LOG_WARN("Unknown event type: %u, skipping event", event->type);
-          return 0;
-        }
-      } else {
-        DC_LOG_WARN("Event type is not positive, skipping event");
+      else {
+        DC_LOG_WARN("Unknown event type: %u, skipping event", event->type);
         return 0;
       }
-
     } else {
-      // If no category found, print warning
-      DC_LOG_WARN("No category found for event_id %llu", event->event_id);
+      DC_LOG_WARN("Event type is not positive, skipping event");
+      return 0;
     }
-    DC_LOG_TRACE("handle_event: end");
-    DC_LOG_PROGRESS_SINGLE("Processed event", event_index);
-    return 0;
-  }
-  int update_filename(const char* filename, unsigned int hash) {
-    if (processed_hashes_.find(hash) != processed_hashes_.end()) {
-      DC_LOG_DEBUG("Filename %s with hash %u already processed, skipping", filename, hash);
-      return 0;  // Skip if already processed
-    }
-    processed_hashes_.insert(hash);  // Mark this hash as processed
-    auto args = new DataCrumbsArgs();
-    args->emplace("value", std::string(filename));
-    args->emplace("hash", hash);
-    auto event =
-        new datacrumbs::EventWithId(METADATA_EVENT, event_index.fetch_add(1), 0, 0, 0, 0, 0, args);
-    if (writer_) {
-      writer_->write_event(event);
-    }
-    return 0;
-  }
-  int finalize() {
-    if (writer_) {
-      writer_->finalize();
-    }
-    return 0;
-  }
 
- public:
-  std::shared_ptr<ConfigurationManager> configManager_;
-  std::shared_ptr<datacrumbs::ChromeWriter> writer_;
+  } else {
+    // If no category found, print warning
+    DC_LOG_WARN("No category found for event_id %llu", event->event_id);
+  }
+  DC_LOG_TRACE("handle_event: end");
+  DC_LOG_PROGRESS_SINGLE("Processed event", event_index);
+  return 0;
+}
+int EventProcessor::update_filename(const char* filename, unsigned int hash) {
+  if (processed_hashes_.find(hash) != processed_hashes_.end()) {
+    DC_LOG_DEBUG("Filename %s with hash %u already processed, skipping", filename, hash);
+    return 0;  // Skip if already processed
+  }
+  processed_hashes_.insert(hash);  // Mark this hash as processed
+  auto args = new DataCrumbsArgs();
+  args->emplace("value", std::string(filename));
+  args->emplace("hash", hash);
+  auto event =
+      new datacrumbs::EventWithId(METADATA_EVENT, event_index.fetch_add(1), 0, 0, 0, 0, 0, args);
+  if (writer_) {
+    writer_->write_event(event);
+  }
+  return 0;
+}
 
- private:
-  std::atomic<uint64_t> event_index{0};                // Atomic index for event processing
-  std::unordered_set<unsigned int> processed_hashes_;  // Set to track processed PIDs
-};
-
-}  // namespace datacrumbs
+};  // namespace datacrumbs
 
 // Custom libbpf print function for debugging
 static int libbpf_print_fn(enum libbpf_print_level level, const char* format, va_list args) {
@@ -340,6 +424,7 @@ int main(int argc, char** argv) {
     cur_key = &next_key;
   }
 
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   // Prepare context for event handler
   // Create ring buffer for event processing
   rb = ring_buffer__new(bpf_map__fd(skel->maps.output), handle_event, &event_processor, NULL);
@@ -349,8 +434,45 @@ int main(int argc, char** argv) {
     datacrumbs_bpf__destroy(skel);
     return 1;
   }
+#else
+  int profile_1_fd = initialize_map_1(skel);
+#ifdef GET_DATA_2_EXISTS
+  int profile_2_fd = initialize_map_2(skel);
+#endif
+#ifdef GET_DATA_3_EXISTS
+  int profile_3_fd = initialize_map_3(skel);
+#endif
+#ifdef GET_DATA_4_EXISTS
+  int profile_4_fd = initialize_map_4(skel);
+#endif
+#ifdef GET_DATA_5_EXISTS
+  int profile_5_fd = initialize_map_5(skel);
+#endif
+#ifdef GET_DATA_6_EXISTS
+  int profile_6_fd = initialize_map_6(skel);
+#endif
+#ifdef GET_DATA_7_EXISTS
+  int profile_7_fd = initialize_map_7(skel);
+#endif
+#ifdef GET_DATA_8_EXISTS
+  int profile_8_fd = initialize_map_8(skel);
+#endif
+#ifdef GET_DATA_9_EXISTS
+  int profile_9_fd = initialize_map_9(skel);
+#endif
+  int latest_interval_fd = bpf_map__fd(skel->maps.latest_interval);
+  if (latest_interval_fd < 0) {
+    DC_LOG_ERROR("Failed to get latest interval map fd: %d", latest_interval_fd);
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
+#endif
   int file_hash_fd = bpf_map__fd(skel->maps.file_map);
-
+  if (file_hash_fd < 0) {
+    DC_LOG_ERROR("Failed to get file hash fd: %d", file_hash_fd);
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
   double elapsed = timer.pauseTime();
   DC_LOG_PRINT("Initialization of DataCrumbs elapsed time: %f seconds", elapsed);
   DC_LOG_PRINT("Ready to run the code.");
@@ -362,25 +484,107 @@ int main(int argc, char** argv) {
   signal(SIGINT, sig_handler);
 
   unsigned int batch_size = 16;
+
   struct string_t* keys = (struct string_t*)malloc(batch_size * sizeof(struct string_t));
   unsigned int* values = (unsigned int*)malloc(batch_size * sizeof(unsigned int));
   // Initialize in_batch to NULL for the first iteration
   struct string_t* in_batch = NULL;
-
+  unsigned long long last_processed_timestamp = 0;
   while (!stop) {
     lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch);
+
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
     err = ring_buffer__poll(rb, 10);
+    if (err < 0) {
+      DC_LOG_ERROR("Error polling ring buffer: %d", err);
+      break;
+    }
+#else
+    unsigned long long latest_ts = 0;
+    err = bpf_map_lookup_elem(latest_interval_fd, &DATACRUMBS_TS_KEY, &latest_ts);
+    if (err == 0) {
+      if (last_processed_timestamp == 0) {
+        last_processed_timestamp = latest_ts;
+      }
+      if (latest_ts - last_processed_timestamp > DATACRUMBS_TIME_MS) {
+        DC_LOG_DEBUG("Recieved latest latest_ts:%llu, last_processed_timestamp:%llu, interval:%d",
+                     latest_ts, last_processed_timestamp, DATACRUMBS_TIME_MS);
+        last_processed_timestamp = latest_ts;
+
+        lookup_1(profile_1_fd, latest_ts, &event_processor, batch_size);
+#ifdef GET_DATA_2_EXISTS
+        lookup_2(profile_2_fd, latest_ts, &event_processor, batch_size);
+#endif
+#ifdef GET_DATA_3_EXISTS
+        lookup_3(profile_3_fd, latest_ts, &event_processor, batch_size);
+#endif
+#ifdef GET_DATA_4_EXISTS
+        lookup_4(profile_4_fd, latest_ts, &event_processor, batch_size);
+#endif
+#ifdef GET_DATA_5_EXISTS
+        lookup_5(profile_5_fd, latest_ts, &event_processor, batch_size);
+#endif
+#ifdef GET_DATA_6_EXISTS
+        lookup_6(profile_6_fd, latest_ts, &event_processor, batch_size);
+#endif
+#ifdef GET_DATA_7_EXISTS
+        lookup_7(profile_7_fd, latest_ts, &event_processor, batch_size);
+#endif
+#ifdef GET_DATA_8_EXISTS
+        lookup_8(profile_8_fd, latest_ts, &event_processor, batch_size);
+#endif
+#ifdef GET_DATA_9_EXISTS
+        lookup_9(profile_9_fd, latest_ts, &event_processor, batch_size);
+#endif
+      }
+    }
+#endif
     // Ctrl-C gives -EINTR
     if (err == -EINTR) {
       DC_LOG_INFO("\nReceived EINTR, exiting poll loop");
       err = 0;
       break;
     }
-    if (err < 0) {
-      DC_LOG_ERROR("Error polling ring buffer: %d", err);
-      break;
-    }
   }
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
+  DC_LOG_INFO("\nCollecting rest of the events");
+  unsigned long long latest_ts = 0;
+  while (lookup_1(profile_1_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
+#ifdef GET_DATA_2_EXISTS
+  DC_LOG_DEBUG("Getting rest of sysio events:");
+  while (lookup_2(profile_2_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
+#endif
+#ifdef GET_DATA_3_EXISTS
+  while (lookup_3(profile_3_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
+#endif
+#ifdef GET_DATA_4_EXISTS
+  while (lookup_4(profile_4_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
+#endif
+#ifdef GET_DATA_5_EXISTS
+  while (lookup_5(profile_5_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
+#endif
+#ifdef GET_DATA_6_EXISTS
+  while (lookup_6(profile_6_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
+#endif
+#ifdef GET_DATA_7_EXISTS
+  while (lookup_7(profile_7_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
+#endif
+#ifdef GET_DATA_8_EXISTS
+  while (lookup_8(profile_8_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
+#endif
+#ifdef GET_DATA_9_EXISTS
+  while (lookup_9(profile_9_fd, latest_ts, &event_processor, batch_size) != -1)
+    ;
+#endif
+#endif
   DC_LOG_PRINT("Collecting string metadata from file_map...");
   while (lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch) !=
          -1) {

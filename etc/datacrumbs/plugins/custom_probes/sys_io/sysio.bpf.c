@@ -10,8 +10,13 @@ struct file_t {
 DATACRUMBS_MAP(latest_fname, struct fn_key_t, u32);
 DATACRUMBS_MAP(fd_fname, struct file_t, u32);
 DATACRUMBS_MAP(latest_fd, struct fn_key_t, int);
+
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
+DATACRUMBS_MAP(sysio_profile, struct sysio_counter_key_t, struct sysio_counter_value_t, 1024);
+#endif
 #define USER_EVENT_ID_START 100000
 
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
 static inline __attribute__((always_inline)) int sysio_fd_init(u64 event_id, int fd) {
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -26,7 +31,14 @@ static inline __attribute__((always_inline)) int sysio_fd_init(u64 event_id, int
   DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, key.event_id);
   return 0;
 }
+#else
+static inline __attribute__((always_inline)) int sysio_fd_init(u64 event_id, int fd) {
+  return 0;
+}
+#endif
 
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs* ctx,
                                                                  u64 event_id) {
   u64 te = bpf_ktime_get_ns();
@@ -67,7 +79,76 @@ static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs*
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
+#else
+static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs* ctx,
+                                                                 u64 event_id) {
+  u64 te = bpf_ktime_get_ns();
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;  // not tracing this pid
+  }
+  struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
+  if (fn == 0) return 0;  // missed entry
+  struct sysio_counter_key_t profile_key = {};
+  profile_key.type = 2;
+  profile_key.id = key.id;
+  profile_key.event_id = key.event_id;
+  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
+  profile_key.fhash = 0;  // Initialize fhash to empty
+  int* fd_ptr = bpf_map_lookup_elem(&latest_fd, &key);
+  if (fd_ptr != 0) {
+    DBG_PRINTK("Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
+    struct file_t file_key = {};
+    file_key.id = key.id;
+    file_key.fd = *fd_ptr;
+    u32* fhash = bpf_map_lookup_elem(&fd_fname, &file_key);
+    if (fhash != 0) {
+      profile_key.fhash = *fhash;
+      DBG_PRINTK("Found fd:%d, file:%u, event_id:%llu\n", *fd_ptr, *fhash, key.event_id);
+      struct sysio_counter_value_t* profile_value =
+          bpf_map_lookup_elem(&sysio_profile, &profile_key);
+      if (profile_value == NULL) {
+        // Key not found, initialize a new value
+        struct sysio_counter_value_t new_value;
+        new_value.frequency = 0;
+        new_value.duration = 0;
+        new_value.size = 0;
+        bpf_map_update_elem(&sysio_profile, &profile_key, &new_value, BPF_NOEXIST);
+        profile_value = bpf_map_lookup_elem(&sysio_profile, &profile_key);
+        DBG_PRINTK("Created a new event: %d, %d, %d, %d, fhash:%u\n", profile_key.type,
+                   profile_key.id, profile_key.event_id, profile_key.time_interval,
+                   profile_key.fhash);
+      }
+      if (profile_value != NULL) {
+        profile_value->frequency++;
+        profile_value->duration += (te - fn->ts);
+        profile_value->size += PT_REGS_RC(ctx);
+        DBG_PRINTK("Captured event: %d, %d, %d, %d\n", profile_key.type, profile_key.id,
+                   profile_key.event_id, profile_key.time_interval);
+      }
+      bpf_map_update_elem(&latest_interval, &DATACRUMBS_TS_KEY, &profile_key.time_interval,
+                          BPF_ANY);
+    } else {
+      DBG_PRINTK("Not Found fd:%d, file:%u, event_id:%llu\n", *fd_ptr, *fhash, key.event_id);
+    }
+  } else {
+    DBG_PRINTK("Not Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
+  }
 
+  return 0;
+}
+#endif
+#else
+static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs* ctx,
+                                                                 u64 event_id) {
+  return 0;
+}
+#endif
+
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_regs* ctx,
                                                                      u64 event_id) {
   u64 te = bpf_ktime_get_ns();
@@ -107,7 +188,74 @@ static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_r
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
+#else
+static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_regs* ctx,
+                                                                     u64 event_id) {
+  u64 te = bpf_ktime_get_ns();
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;  // not tracing this pid
+  }
+  struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
+  if (fn == 0) return 0;  // missed entry
+  struct sysio_counter_key_t profile_key = {};
+  profile_key.type = 2;
+  profile_key.id = key.id;
+  profile_key.event_id = key.event_id;
+  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
+  profile_key.fhash = 0;  // Initialize fhash to empty
+  int* fd_ptr = bpf_map_lookup_elem(&latest_fd, &key);
+  if (fd_ptr != 0) {
+    DBG_PRINTK("Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
+    struct file_t file_key = {};
+    file_key.id = key.id;
+    file_key.fd = *fd_ptr;
+    u32* fhash = bpf_map_lookup_elem(&fd_fname, &file_key);
+    if (fhash != 0) {
+      profile_key.fhash = *fhash;
+      DBG_PRINTK("Found fd:%d, file:%u, event_id:%llu\n", *fd_ptr, *fhash, key.event_id);
+      struct sysio_counter_value_t* profile_value =
+          bpf_map_lookup_elem(&sysio_profile, &profile_key);
+      if (profile_value == NULL) {
+        // Key not found, initialize a new value
+        struct sysio_counter_value_t new_value;
+        new_value.frequency = 0;
+        new_value.duration = 0;
+        new_value.size = 0;
+        bpf_map_update_elem(&sysio_profile, &profile_key, &new_value, BPF_NOEXIST);
+        profile_value = bpf_map_lookup_elem(
+            &sysio_profile, &profile_key);  // Lookup again to get the new value's address
+        DBG_PRINTK("Created a new event: %d, %d, %d, %d, fhash:%u\n", profile_key.type,
+                   profile_key.id, profile_key.event_id, profile_key.time_interval,
+                   profile_key.fhash);
+      }
+      if (profile_value != NULL) {
+        profile_value->frequency++;
+        profile_value->duration += (te - fn->ts);
+        DBG_PRINTK("Captured event: %d, %d, %d, %d\n", profile_key.type, profile_key.id,
+                   profile_key.event_id, profile_key.time_interval);
+      }
+      bpf_map_update_elem(&latest_interval, &DATACRUMBS_TS_KEY, &profile_key.time_interval,
+                          BPF_ANY);
+    } else {
+      DBG_PRINTK("Not Found fd:%d, file:%u, event_id:%llu\n", *fd_ptr, *fhash, key.event_id);
+    }
+  } else {
+    DBG_PRINTK("Not Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
+  }
+  return 0;
+}
+#endif
+#else
+static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_regs* ctx,
+                                                                     u64 event_id) {
+  return 0;
+}
+#endif
 
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
 static inline __attribute__((always_inline)) int sysio_open_entry(struct pt_regs* ctx, u64 event_id,
                                                                   const char* filename) {
   struct fn_key_t key = {};
@@ -134,7 +282,15 @@ static inline __attribute__((always_inline)) int sysio_open_entry(struct pt_regs
              (u32)key.id, key.event_id);
   return 0;
 }
+#else
+static inline __attribute__((always_inline)) int sysio_open_entry(struct pt_regs* ctx, u64 event_id,
+                                                                  const char* filename) {
+  return 0;
+}
+#endif
 
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int sysio_open_exit(struct pt_regs* ctx,
                                                                  u64 event_id) {
   u64 te = bpf_ktime_get_ns();
@@ -161,14 +317,79 @@ static inline __attribute__((always_inline)) int sysio_open_exit(struct pt_regs*
     event->fhash = *fhash;
     struct file_t file_key = {};
     int fd = PT_REGS_RC(ctx);
-    file_key.id = key.id;
-    file_key.fd = fd;
-    DBG_PRINTK("Adding Found fd:%d, file:%u event_id:%llu\n", fd, *fhash, key.event_id);
-    bpf_map_update_elem(&fd_fname, &file_key, fhash, BPF_ANY);
+    if (fd > 0) {
+      file_key.id = key.id;
+      file_key.fd = fd;
+      DBG_PRINTK("Adding Found fd:%d, file:%u event_id:%llu\n", fd, *fhash, key.event_id);
+      bpf_map_update_elem(&fd_fname, &file_key, fhash, BPF_ANY);
+    }
   }
   DATACRUMBS_EVENT_SUBMIT(event);
   return 0;
 }
+#else
+static inline __attribute__((always_inline)) int sysio_open_exit(struct pt_regs* ctx,
+                                                                 u64 event_id) {
+  u64 te = bpf_ktime_get_ns();
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;  // not tracing this pid
+  }
+  struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
+  if (fn == 0) return 0;  // missed entry
+  struct sysio_counter_key_t profile_key = {};
+  profile_key.type = 2;
+  profile_key.id = key.id;
+  profile_key.event_id = key.event_id;
+  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
+  profile_key.fhash = 0;  // Initialize fhash to empty
+  u32* fhash = bpf_map_lookup_elem(&latest_fname, &key);
+  if (fhash != 0) {
+    profile_key.fhash = *fhash;
+    struct file_t file_key = {};
+    int fd = PT_REGS_RC(ctx);
+    if (fd > 0) {
+      file_key.id = key.id;
+      file_key.fd = fd;
+      DBG_PRINTK("Adding Found fd:%d, file:%u event_id:%llu\n", fd, *fhash, key.event_id);
+      bpf_map_update_elem(&fd_fname, &file_key, fhash, BPF_ANY);
+      struct sysio_counter_value_t* profile_value =
+          bpf_map_lookup_elem(&sysio_profile, &profile_key);
+      if (profile_value == NULL) {
+        // Key not found, initialize a new value
+        struct sysio_counter_value_t new_value;
+        new_value.frequency = 0;
+        new_value.duration = 0;
+        new_value.size = 0;
+        bpf_map_update_elem(&sysio_profile, &profile_key, &new_value, BPF_NOEXIST);
+        // Lookup again to get the new value's address
+        profile_value = bpf_map_lookup_elem(&sysio_profile, &profile_key);
+        DBG_PRINTK("Created a new event: %d, %d, %d, %d, fhash:%u\n", profile_key.type,
+                   profile_key.id, profile_key.event_id, profile_key.time_interval,
+                   profile_key.fhash);
+      }
+      if (profile_value != NULL) {
+        profile_value->frequency++;
+        profile_value->duration += (te - fn->ts);
+        DBG_PRINTK("Captured event: %d, %d, %d, %d\n", profile_key.type, profile_key.id,
+                   profile_key.event_id, profile_key.time_interval);
+      }
+      bpf_map_update_elem(&latest_interval, &DATACRUMBS_TS_KEY, &profile_key.time_interval,
+                          BPF_ANY);
+    }
+  }
+
+  return 0;
+}
+#endif
+#else
+static inline __attribute__((always_inline)) int sysio_open_exit(struct pt_regs* ctx,
+                                                                 u64 event_id) {
+  return 0;
+}
+#endif
 
 SEC("ksyscall/openat")
 int BPF_KSYSCALL(openat_entry, int dfd, const char* filename, int flags) {

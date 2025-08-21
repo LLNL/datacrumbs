@@ -3,6 +3,7 @@
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/typedefs.h>
+#include <datacrumbs/server/bpf/shared.h>
 #include <json-c/json.h>
 
 #include <string>
@@ -51,6 +52,7 @@ struct EventWithId {
         dur(other.dur),
         args(other.args) {}
 };
+
 // Base class representing a generic probe
 class Probe {
  public:
