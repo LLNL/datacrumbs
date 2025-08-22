@@ -66,28 +66,10 @@ ElfSymbolExtractor::extract_symbols() {
       for (size_t j = 0; j < num_syms; ++j) {
         if (syms[j].st_shndx == SHN_UNDEF) continue;
         if (ELF64_ST_TYPE(syms[j].st_info) != STT_FUNC) continue;
+        
         std::string name = std::string(strtab + syms[j].st_name);
-        if (!name.empty()) {
-          symbol_counts[name]++;
-        }
-      }
-    }
-  }
-  DC_LOG_DEBUG("First pass: counted symbol occurrences");
-
-  // Second pass: collect only unique symbols
-  for (int i = 0; i < ehdr->e_shnum; ++i) {
-    if (shdrs[i].sh_type == SHT_SYMTAB || shdrs[i].sh_type == SHT_DYNSYM) {
-      const Elf64_Sym* syms = reinterpret_cast<const Elf64_Sym*>(data_ + shdrs[i].sh_offset);
-      size_t num_syms = shdrs[i].sh_size / shdrs[i].sh_entsize;
-      const char* strtab = reinterpret_cast<const char*>(data_ + shdrs[shdrs[i].sh_link].sh_offset);
-
-      for (size_t j = 0; j < num_syms; ++j) {
-        if (syms[j].st_shndx == SHN_UNDEF) continue;
-        if (ELF64_ST_TYPE(syms[j].st_info) != STT_FUNC) continue;
-        std::string name = std::string(strtab + syms[j].st_name);
-        if (!name.empty() && symbol_counts[name] == 1 &&
-            symbols_map.find(name) == symbols_map.end()) {
+        DC_LOG_DEBUG("found name: %s %d %d",name.c_str(), syms[j].st_shndx, ELF64_ST_TYPE(syms[j].st_info));
+        if (!name.empty() && symbols_map.find(name) == symbols_map.end()) {
           char buffer[32];
           sprintf(buffer, "0x%lx", static_cast<unsigned long>(syms[j].st_value));
           symbols_map[name] = buffer;
@@ -95,7 +77,6 @@ ElfSymbolExtractor::extract_symbols() {
       }
     }
   }
-  DC_LOG_DEBUG("Second pass: collected unique symbols");
 
   // First, collect base names (before '@') for versioned symbols
   std::unordered_set<std::string> versioned_bases;
@@ -144,5 +125,4 @@ bool ElfSymbolExtractor::is_elf() const {
   DC_LOG_TRACE("is_elf: end");
   return result;
 }
-
-}  // namespace datacrumbs
+}

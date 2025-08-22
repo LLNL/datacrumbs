@@ -53,7 +53,7 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #ifndef ENABLE_BPF_PRINTK
-#define ENABLE_BPF_PRINTK 1
+#define ENABLE_BPF_PRINTK 0
 #endif
 
 #if ENABLE_BPF_PRINTK

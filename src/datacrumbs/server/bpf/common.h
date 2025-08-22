@@ -71,7 +71,7 @@ static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* k
 static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
   key.event_id = event_id;
-  u64 start_ts;
+  u64 start_ts = 0;
   if (!need_tracing(&key, &start_ts)) {
     return 0;  // not tracing this pid
   }
@@ -91,7 +91,7 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
   key.event_id = event_id;
-  u64 start_ts;
+  u64 start_ts = 0;
   if (!need_tracing(&key, &start_ts)) {
     return 0;  // not tracing this pid
   }
