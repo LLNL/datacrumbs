@@ -70,7 +70,7 @@ message(STATUS "[${UPPER_PROJECT_NAME}] DATACRUMBS_LOG_LEVEL is ${DATACRUMBS_LOG
 
 # Optionally allow user to specify host name via CMake option
 option(DATACRUMBS_HOST "Host name for datacrumbs (numbers will be stripped if not set)" "")
-
+option(DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS "Threshold in microseconds for skipping events" 1000)
 if(NOT DATACRUMBS_SKIP_PROBE_EXPLORING)
     set(ENABLE_PROBE_EXPLORER ON)
 else()
@@ -136,7 +136,6 @@ install(
 set(DATACRUMBS_COMMON_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/data_structures.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/enumerations.h
 )
