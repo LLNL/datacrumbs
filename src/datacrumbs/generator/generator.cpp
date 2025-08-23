@@ -50,9 +50,9 @@ int ProbeGenerator::run() {
     // Iterate over each function in the probe
     for (size_t func_index = 0; func_index < probe.functions.size(); ++func_index) {
       const auto& func = probe.functions[func_index];
-
+      auto combined_name = probe.name + "_" + func;
       // Check and insert into global set to avoid duplicates
-      if (!global_function_names.insert(func).second) {
+      if (!global_function_names.insert(combined_name).second) {
         DC_LOG_WARN(
             "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from %s.",
             func.c_str(), probe.name.c_str());
