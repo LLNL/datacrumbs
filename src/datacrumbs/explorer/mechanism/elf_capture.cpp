@@ -1,11 +1,4 @@
-#include <datacrumbs/common/logging.h>  // Add logging header
 #include <datacrumbs/explorer/mechanism/elf_capture.h>
-
-#include <iomanip>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
 
 namespace datacrumbs {
 

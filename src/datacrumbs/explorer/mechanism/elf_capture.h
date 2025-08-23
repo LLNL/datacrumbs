@@ -1,13 +1,19 @@
 #pragma once
-
-#include <datacrumbs/common/logging.h>  // For logging macros
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
+#include <datacrumbs/common/logging.h>
+// std headers
 #include <elf.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include <iomanip>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace datacrumbs {

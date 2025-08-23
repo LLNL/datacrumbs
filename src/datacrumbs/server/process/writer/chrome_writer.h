@@ -1,5 +1,7 @@
 #pragma once
-
+// Generated Headers
+#include <datacrumbs/datacrumbs_config.h>
+// Other headers
 #include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/logging.h>
@@ -7,6 +9,7 @@
 #include <datacrumbs/common/typedefs.h>
 #include <datacrumbs/server/bpf/shared.h>
 #include <datacrumbs/server/process/compress/zlib_compressor.h>
+// std headers
 #include <pwd.h>
 #include <sys/stat.h>
 #include <sys/types.h>

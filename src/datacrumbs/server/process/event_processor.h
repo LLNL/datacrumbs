@@ -1,9 +1,12 @@
 #ifndef DATACRUMBS_SERVER_PROCESS_DEF
 #define DATACRUMBS_SERVER_PROCESS_DEF
-
+// BPF Headers
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
+// Generated Headers
 #include <datacrumbs/bpf/datacrumbs.skel.h>
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/logging.h>  // Logging header
@@ -12,7 +15,7 @@
 #include <datacrumbs/common/utils.h>
 #include <datacrumbs/server/bpf/shared.h>
 #include <datacrumbs/server/process/writer/chrome_writer.h>
-// #include <datacrumbs/server/process/
+// std headers
 #include <errno.h>
 #include <grp.h>
 #include <json-c/json.h>

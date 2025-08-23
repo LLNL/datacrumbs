@@ -1,6 +1,7 @@
 #ifndef DATACRUMBS_SERVER_BPF_SHARED_H
 #define DATACRUMBS_SERVER_BPF_SHARED_H
 
+#include <datacrumbs/datacrumbs_config.h>
 
 #ifndef DATACRUMBS_MODE
 // 0 - no tracing, 1 - tracing, 2 - profiling

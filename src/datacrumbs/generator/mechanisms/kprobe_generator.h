@@ -1,7 +1,9 @@
 #pragma once
-
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/logging.h>  // Logging macros
-
+// std headers
 #include <algorithm>
 #include <regex>
 #include <sstream>
@@ -42,7 +44,6 @@ class KProbeGenerator {
     std::replace(sanitized_func_name.begin(), sanitized_func_name.end(), '.', '_');
     std::replace(sanitized_func_name.begin(), sanitized_func_name.end(), '@', '_');
     DC_LOG_DEBUG("Sanitized function name: %s", sanitized_func_name.c_str());
-
 
     std::stringstream ss;
     // Generate kprobe entry code

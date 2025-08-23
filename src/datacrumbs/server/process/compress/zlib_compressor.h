@@ -1,12 +1,16 @@
 #pragma once
-
+// Generated Headers
+#include <datacrumbs/datacrumbs_config.h>
+// Other headers
 #include <datacrumbs/common/logging.h>
+// std headers
 #include <zlib.h>
 
 #include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
 namespace datacrumbs {
 class ZlibCompression {
  public:
