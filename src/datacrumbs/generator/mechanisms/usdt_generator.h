@@ -1,6 +1,9 @@
 #pragma once
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/logging.h>  // Logging macros
-
+// std headers
 #include <algorithm>
 #include <sstream>
 #include <string>

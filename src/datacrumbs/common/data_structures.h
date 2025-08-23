@@ -1,11 +1,14 @@
 #pragma once
-
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/typedefs.h>
 #include <datacrumbs/server/bpf/shared.h>
+// dependency headers
 #include <json-c/json.h>
-
+// std headers
 #include <string>
 #include <vector>
 

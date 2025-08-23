@@ -1,7 +1,0 @@
-psutil==5.8
-tqdm
-pyelftools
-clang-format
-clang==14.0.0
-libclang
-pyyaml

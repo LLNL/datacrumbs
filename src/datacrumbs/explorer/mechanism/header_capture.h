@@ -1,7 +1,11 @@
 #pragma once
-#include <clang-c/Index.h>
-#include <datacrumbs/common/logging.h>  // Use custom logging macros
-
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
+#include <datacrumbs/common/logging.h>
+// dependency headers
+#include <clang-c/Index.h>  // Use custom logging macros
+// std headers
 #include <string>
 #include <vector>
 

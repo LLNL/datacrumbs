@@ -1,15 +1,5 @@
-#include <datacrumbs/common/configuration_manager.h>
-#include <datacrumbs/common/logging.h>  // Added for logging macros
-#include <datacrumbs/common/utils.h>
-#include <datacrumbs/explorer/mechanism/elf_capture.h>
-#include <datacrumbs/explorer/mechanism/header_capture.h>
-#include <datacrumbs/explorer/mechanism/ksym_capture.h>
-#include <datacrumbs/explorer/mechanism/usdt_functions.h>
-#include <datacrumbs/explorer/probe_explorer.h>
 
-#include <regex>
-#include <unordered_map>
-#include <unordered_set>
+#include <datacrumbs/explorer/probe_explorer.h>
 
 namespace datacrumbs {
 
