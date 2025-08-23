@@ -7,11 +7,14 @@
  * This file defines the ConfigurationManager class, which is responsible for
  * managing, validating, and deriving configuration settings for the DataCrumbs library.
  */
-
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>
 
+// std headers
 #include <filesystem>
 #include <memory>
 #include <string>

@@ -20,6 +20,7 @@
  */
 #include <datacrumbs/client/library.h>
 #include <datacrumbs/common/logging.h>
+#include <datacrumbs/datacrumbs_config.h>
 
 /**
  * @brief Called when the library is loaded.

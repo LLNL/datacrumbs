@@ -1,22 +1,28 @@
 #pragma once
 
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 // Include necessary headers for configuration, data structures, enumerations, and probe generators
 #include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/enumerations.h>
+#include <datacrumbs/common/logging.h>  // Added for logging macros
 #include <datacrumbs/common/singleton.h>
+#include <datacrumbs/common/utils.h>
 #include <datacrumbs/generator/mechanisms/kprobe_generator.h>
 #include <datacrumbs/generator/mechanisms/syscall_generator.h>
 #include <datacrumbs/generator/mechanisms/uprobe_generator.h>
 #include <datacrumbs/generator/mechanisms/usdt_generator.h>
-#include <json-c/json.h>
 
+// dependency headers
+#include <json-c/json.h>
+// std headers
 #include <fstream>
 #include <string>
 #include <unordered_map>
-
-// Use custom logging macros instead of std::cout and std::cerr
-#include <datacrumbs/common/logging.h>
+#include <unordered_set>
+#include <vector>
 
 namespace datacrumbs {
 
