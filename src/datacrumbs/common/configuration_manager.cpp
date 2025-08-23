@@ -54,21 +54,6 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
 #define DC_YAML_INCLUSION_PATH "inclusion_path"
 
 /**
- * Default configuration paths (can be overridden by build system)
- */
-#ifndef DATACRUMBS_CONFIG_PATH
-#define DATACRUMBS_CONFIG_PATH "/home/haridev/datacrumbs/etc/datacrumbs/configs"
-#endif
-
-#ifndef DATACRUMBS_LOG_DIR
-#define DATACRUMBS_LOG_DIR "/home/haridev/datacrumbs/etc/datacrumbs/logs"
-#endif
-
-#ifndef DATACRUMBS_DATA_DIR
-#define DATACRUMBS_DATA_DIR "/home/haridev/datacrumbs/etc/datacrumbs/data"
-#endif
-
-/**
  * @class ArgumentParser
  * @brief Parses command-line arguments for DataCrumbs configuration.
  *

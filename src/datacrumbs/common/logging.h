@@ -16,13 +16,6 @@
 #define LOG_LEVEL_DEBUG 4
 #define LOG_LEVEL_TRACE 5
 
-// Set default log level if not defined by CMake
-#ifndef DATACRUMBS_LOG_LEVEL
-#define DATACRUMBS_LOG_LEVEL LOG_LEVEL_INFO
-#else
-
-#endif
-
 #include <cstdarg>
 #include <vector>
 

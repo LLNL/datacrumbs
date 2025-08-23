@@ -88,8 +88,10 @@ set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPE
 set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEBUG TRACE)
 option(DATACRUMBS_HOST "Host name for datacrumbs (numbers will be stripped if not set)" OFF)
 set(DATACRUMBS_USER "$ENV{USER}" CACHE STRING "User name for datacrumbs (default: current environment user)")
-option(DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS "Threshold in microseconds for skipping events" 1000)
-
+set(DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS "1000" CACHE STRING "Threshold in microseconds for skipping events")
+option(DATACRUMBS_ENABLE_TRACING "Enable tracing" ON)
+set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval in nanosecond")
+option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
 #------------------------------------------------------------------------------
 # Derive CMake variables based on options
 #------------------------------------------------------------------------------
@@ -111,6 +113,13 @@ if(DATACRUMBS_TRACE AND DATACRUMBS_TRACE STREQUAL "ON")
 else()
     set(DATACRUMBS_MODE 2)
 endif()
+
+if(DATACRUMBS_TRACE_ALL_PROCESSES_OPT AND DATACRUMBS_TRACE_ALL_PROCESSES_OPT STREQUAL "ON")
+    set(DATACRUMBS_TRACE_ALL_PROCESSES 1)
+else()
+    set(DATACRUMBS_TRACE_ALL_PROCESSES 0)
+endif()
+
 option(BPFTOOL_EXECUTABLE "Path to bpftool executable" "")
 
 if(BPFTOOL_EXECUTABLE STREQUAL "OFF")
@@ -132,6 +141,16 @@ endif()
 set(DATACRUMBS_SRC_GEN_PATH ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs --data_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data --trace_log_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
 set(DATACRUMBS_BUILD_CLIENT_SO ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so)
+
+set(DATACRUMBS_CONFIG_PATH ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs)
+set(DATACRUMBS_LOG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
+set(DATACRUMBS_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data)
+
+if(DATACRUMBS_ENABLE_TRACING AND DATACRUMBS_ENABLE_TRACING STREQUAL "ON")
+    set(DATACRUMBS_TRACING_ENABLE 1)
+else()
+    set(DATACRUMBS_TRACING_ENABLE 0)
+endif()
 #------------------------------------------------------------------------------
 
 
@@ -145,6 +164,7 @@ find_library(LIBC_SO NAMES libc.so.6 libc.so PATHS /lib /usr/lib /lib64 /usr/lib
 
 if(LIBC_SO)
 message(STATUS "             - Found libc: ${LIBC_SO}")
+set(DATACRUMBS_LIBC_SO ${LIBC_SO})
 else()
 message(FATAL_ERROR "             - libc.so not found!")
 endif()
@@ -207,6 +227,22 @@ message(STATUS "             - Detected architecture: ${DATACRUMBS_ARCH}")
 #------------------------------------------------------------------------------
 # Generate Header file for all sources with compile definitions
 #------------------------------------------------------------------------------
+message(STATUS "[${UPPER_PROJECT_NAME}] Set Variables for CMake")
+message(STATUS "             - DATACRUMBS_LOG_LEVEL: ${DATACRUMBS_LOG_LEVEL}")
+message(STATUS "             - DATACRUMBS_MODE: ${DATACRUMBS_MODE}")
+message(STATUS "             - DATACRUMBS_TRACING_ENABLE: ${DATACRUMBS_TRACING_ENABLE}")
+message(STATUS "             - DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS: ${DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS}")
+message(STATUS "             - DATACRUMBS_TRACE_ALL_PROCESSES: ${DATACRUMBS_TRACE_ALL_PROCESSES}")
+
+
+message(STATUS "             - DATACRUMBS_SRC_GEN_PATH: ${DATACRUMBS_SRC_GEN_PATH}")
+message(STATUS "             - DATACRUMBS_LIBC_SO: ${DATACRUMBS_LIBC_SO}")
+message(STATUS "             - DATACRUMBS_BUILD_CLIENT_SO: ${DATACRUMBS_BUILD_CLIENT_SO}")
+
+
+message(STATUS "             - DATACRUMBS_CONFIG_PATH: ${DATACRUMBS_CONFIG_PATH}")
+message(STATUS "             - DATACRUMBS_LOG_DIR: ${DATACRUMBS_LOG_DIR}")
+message(STATUS "             - DATACRUMBS_DATA_DIR: ${DATACRUMBS_DATA_DIR}")
 configure_file("${CMAKE_SOURCE_DIR}/cmake/configure_files/datacrumbs_config.h.in"
                "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/datacrumbs_config.h" @ONLY)
 

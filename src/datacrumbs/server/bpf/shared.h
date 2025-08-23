@@ -3,20 +3,7 @@
 
 #include <datacrumbs/datacrumbs_config.h>
 
-#ifndef DATACRUMBS_MODE
-// 0 - no tracing, 1 - tracing, 2 - profiling
-#define DATACRUMBS_MODE 2 
-#endif
-
 #define DATACRUMBS_TIME_MS 1000000
-
-#ifndef DATACRUMBS_TIME_INTERVAL_MS
-#define DATACRUMBS_TIME_INTERVAL_MS 1000
-#endif
-
-#ifndef DATACRUMBS_TRACE_ALL
-#define DATACRUMBS_TRACE_ALL 0
-#endif
 
 static int DATACRUMBS_TS_KEY = 1;
 
