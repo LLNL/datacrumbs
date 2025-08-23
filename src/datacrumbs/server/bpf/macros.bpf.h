@@ -97,9 +97,7 @@
     DBG_PRINTK("Failed to reserve space for event:%llu in ring buffer", event_id); \
     return 0;                                                                      \
   }
-#ifndef DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS
-#define DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS 1000
-#endif
+
 #define DATACRUMBS_SKIP_SMALL_EVENTS(fn, te)                                                     \
   if (te - fn->ts <                                                                              \
       DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS) { /* Skip events with duration less than 1ms */ \

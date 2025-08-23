@@ -95,7 +95,7 @@ static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs*
   profile_key.type = 2;
   profile_key.id = key.id;
   profile_key.event_id = key.event_id;
-  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
+  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_NS * DATACRUMBS_TIME_MS);
   profile_key.fhash = 0;  // Initialize fhash to empty
   int* fd_ptr = bpf_map_lookup_elem(&latest_fd, &key);
   if (fd_ptr != 0) {
@@ -204,7 +204,7 @@ static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_r
   profile_key.type = 2;
   profile_key.id = key.id;
   profile_key.event_id = key.event_id;
-  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
+  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_NS * DATACRUMBS_TIME_MS);
   profile_key.fhash = 0;  // Initialize fhash to empty
   int* fd_ptr = bpf_map_lookup_elem(&latest_fd, &key);
   if (fd_ptr != 0) {
@@ -343,7 +343,7 @@ static inline __attribute__((always_inline)) int sysio_open_exit(struct pt_regs*
   profile_key.type = 2;
   profile_key.id = key.id;
   profile_key.event_id = key.event_id;
-  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_MS * DATACRUMBS_TIME_MS);
+  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_NS * DATACRUMBS_TIME_MS);
   profile_key.fhash = 0;  // Initialize fhash to empty
   u32* fhash = bpf_map_lookup_elem(&latest_fname, &key);
   if (fhash != 0) {
