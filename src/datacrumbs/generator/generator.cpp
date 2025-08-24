@@ -86,8 +86,17 @@ int ProbeGenerator::run() {
           DC_LOG_DEBUG("[ProbeGenerator] Using UProbeGenerator for function: %s (event_id: %d)",
                        func.c_str(), current_event_id);
           auto uprobe = UProbe::fromJson(jprobe);
-          const auto& offset = uprobe.function_offsets[func_index];
-          UProbeGenerator uprobe_gen(current_event_id, func, offset, uprobe.binary_path);
+          std::string function_name, offset;
+          auto pos = func.find(':');
+          if (pos != std::string::npos) {
+            function_name = func.substr(0, pos);
+            offset = func.substr(pos + 1);
+          } else {
+            function_name = func;
+            offset = "";
+          }
+          if (!uprobe.include_offsets) offset = "";
+          UProbeGenerator uprobe_gen(current_event_id, function_name, offset, uprobe.binary_path);
           ss << uprobe_gen.generate().str() << std::endl;
           break;
         }

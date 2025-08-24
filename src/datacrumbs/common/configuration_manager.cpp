@@ -234,6 +234,16 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
                 DC_LOG_ERROR("[ConfigurationManager] Binary path missing for BINARY capture type.");
                 throw std::invalid_argument("Binary path is required for BINARY capture type.");
               }
+              if (probe_node["include_offsets"]) {
+                binary_probe->include_offsets = probe_node["include_offsets"].as<bool>();
+                DC_LOG_DEBUG("[ConfigurationManager] BINARY include_offsets set to: %s",
+                             binary_probe->include_offsets ? "true" : "false");
+              } else {
+                DC_LOG_DEBUG(
+                    "[ConfigurationManager] No include_offsets provided for BINARY, using default: "
+                    "false");
+                binary_probe->include_offsets = false;  // Default value
+              }
               probe = binary_probe;
               break;
             }

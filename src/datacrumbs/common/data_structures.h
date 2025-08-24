@@ -130,20 +130,17 @@ struct KProbe : public Probe {
 // Probe for user-space functions (uprobes)
 struct UProbe : public Probe {
  public:
-  UProbe() : Probe(ProbeType::UPROBE), binary_path() { DC_LOG_TRACE("UProbe constructor called"); }
-  std::string binary_path;                    // Path to the binary being probed
-  std::vector<std::string> function_offsets;  // Offsets of functions in the binary
-
+  UProbe() : Probe(ProbeType::UPROBE), binary_path(), include_offsets(false) {
+    DC_LOG_TRACE("UProbe constructor called");
+  }
+  std::string binary_path;  // Path to the binary being probed
+  bool include_offsets;
   // Validates the uprobe's configuration
   bool validate() const override {
     DC_LOG_TRACE("UProbe::validate called");
     if (!Probe::validate()) return false;
     if (binary_path.empty()) {
       DC_LOG_DEBUG("UProbe binary_path is empty");
-      return false;
-    }
-    if (function_offsets.empty()) {
-      DC_LOG_DEBUG("UProbe function_offsets are empty");
       return false;
     }
     return true;
@@ -154,13 +151,7 @@ struct UProbe : public Probe {
     DC_LOG_TRACE("UProbe::toJson called");
     json_object* j = Probe::toJson();
     json_object_object_add(j, "binary_path", json_object_new_string(binary_path.c_str()));
-
-    json_object* offsets = json_object_new_array();
-    for (const auto& offset : function_offsets) {
-      json_object_array_add(offsets, json_object_new_string(offset.c_str()));
-    }
-    json_object_object_add(j, "function_offsets", offsets);
-
+    json_object_object_add(j, "include_offsets", json_object_new_boolean(include_offsets));
     return j;
   }
 
@@ -172,18 +163,11 @@ struct UProbe : public Probe {
     p.type = base.type;
     p.name = base.name;
     p.functions = base.functions;
-    json_object* offsets_obj = json_object_object_get(j, "function_offsets");
-    if (offsets_obj && json_object_get_type(offsets_obj) == json_type_array) {
-      int len = json_object_array_length(offsets_obj);
-      for (int i = 0; i < len; ++i) {
-        json_object* offset = json_object_array_get_idx(offsets_obj, i);
-        if (offset && json_object_get_type(offset) == json_type_string) {
-          p.function_offsets.push_back(json_object_get_string(offset));
-        }
-      }
-    }
     json_object* bin_obj = json_object_object_get(j, "binary_path");
     if (bin_obj) p.binary_path = json_object_get_string(bin_obj);
+
+    json_object* include_offsets_obj = json_object_object_get(j, "include_offsets");
+    if (include_offsets_obj) p.include_offsets = json_object_get_boolean(include_offsets_obj);
 
     return p;
   }
@@ -344,10 +328,11 @@ class HeaderCaptureProbe : public CaptureProbe {
 // Capture probe for binaries
 class BinaryCaptureProbe : public CaptureProbe {
  public:
-  BinaryCaptureProbe() : CaptureProbe(CaptureType::BINARY), file() {
+  BinaryCaptureProbe() : CaptureProbe(CaptureType::BINARY), file(), include_offsets(false) {
     DC_LOG_TRACE("BinaryCaptureProbe constructor called");
   }
   std::string file;  // Path to the binary
+  bool include_offsets;
 };
 
 // Capture probe for USDT probes

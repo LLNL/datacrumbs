@@ -3,8 +3,6 @@
 
 #include <datacrumbs/datacrumbs_config.h>
 
-#define DATACRUMBS_TIME_MS 1000000
-
 static int DATACRUMBS_TS_KEY = 1;
 
 struct general_event_t {

@@ -119,14 +119,13 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         DC_LOG_INFO("Extracting binary probes...");
         if (auto binaryProbe = std::static_pointer_cast<BinaryCaptureProbe>(capture_probe)) {
           DC_LOG_DEBUG("Binary Path: %s", binaryProbe->file.c_str());
-          auto pair = ElfSymbolExtractor(binaryProbe->file).extract_symbols();
-          functionNames = std::move(pair.first);
-          auto functionOffsets = std::move(pair.second);
+          functionNames =
+              ElfSymbolExtractor(binaryProbe->file, binaryProbe->include_offsets).extract_symbols();
           if (capture_probe->probe_type == ProbeType::UPROBE) {
             DC_LOG_DEBUG("UPROBE: Extracting symbols from binary...");
             if (auto uprobe = std::dynamic_pointer_cast<UProbe>(probe)) {
               uprobe->binary_path = binaryProbe->file;
-              uprobe->function_offsets = std::move(functionOffsets);
+              uprobe->include_offsets = binaryProbe->include_offsets;
             }
           }
         }
@@ -232,7 +231,10 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         const auto& excludedFuncs = it->second;
         std::vector<std::string> filteredNames;
         for (const auto& name : functionNames) {
-          if (excludedFuncs.find(name) == excludedFuncs.end()) {
+          auto pos = name.find(':');
+          std::string base_name = (pos != std::string::npos) ? name.substr(0, pos) : name;
+          if (excludedFuncs.find(name) == excludedFuncs.end() &&
+              excludedFuncs.find(base_name) == excludedFuncs.end()) {
             filteredNames.push_back(name);
           }
         }
