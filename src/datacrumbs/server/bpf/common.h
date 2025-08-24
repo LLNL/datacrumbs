@@ -45,6 +45,7 @@ static inline __attribute__((always_inline)) u32 hash_and_store(struct string_t*
   return hash;
 }
 
+#if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
 // Returns 1 if any prefix in trie matches 'str' of length 'len', else 0
 static inline __attribute__((always_inline)) int prefix_search(void* trie, struct string_t* key) {
   // key->len = MAX_STR_READ_LEN;
@@ -57,6 +58,11 @@ static inline __attribute__((always_inline)) int prefix_search(void* trie, struc
 
   return 0;
 }
+#else
+static inline __attribute__((always_inline)) int prefix_search(void* trie, struct string_t* key) {
+  return 1;
+}
+#endif
 
 #if defined(DATACRUMBS_TRACE_ALL_PROCESSES) && (DATACRUMBS_TRACE_ALL_PROCESSES == 1)
 static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* key, u64* start_ts) {
@@ -146,7 +152,7 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   profile_key.type = 1;
   profile_key.id = key.id;
   profile_key.event_id = key.event_id;
-  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_NS * DATACRUMBS_TIME_MS);
+  profile_key.time_interval = fn->ts / DATACRUMBS_TIME_INTERVAL_NS;
   struct profile_value_t* profile_value = bpf_map_lookup_elem(&profile, &profile_key);
   if (profile_value == NULL) {
     // Key not found, initialize a new value
@@ -263,7 +269,7 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   u32 method_hash = hash_and_store(&local_str, len);
   profile_key.class_hash = class_hash;
   profile_key.method_hash = method_hash;
-  profile_key.time_interval = fn->ts / (DATACRUMBS_TIME_INTERVAL_NS * DATACRUMBS_TIME_MS);
+  profile_key.time_interval = fn->ts / DATACRUMBS_TIME_INTERVAL_NS;
   struct profile_value_t* profile_value = bpf_map_lookup_elem(&usdt_profile, &profile_key);
   if (profile_value == NULL) {
     // Key not found, initialize a new value

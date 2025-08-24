@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.4)
 project(datacrumbs LANGUAGES C CXX)
-#------------------------------------------------------------------------------
-# Version information
-#------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# Version information
+# ------------------------------------------------------------------------------
 set(DATACRUMBS_VERSION_MAJOR "1")
 set(DATACRUMBS_VERSION_MINOR "0")
 set(DATACRUMBS_VERSION_PATCH "0")
@@ -23,12 +23,14 @@ string(TOLOWER "${PROJECT_NAME}" LOWER_PROJECT_NAME)
 
 # Get installation directories -- these get used in various places;
 # best to just make them available
-option (DATACRUMBS_LIBDIR_AS_LIB OFF)
-if (NOT DATACRUMBS_LIBDIR_AS_LIB)
-    include(GNUInstallDirs)
-endif ()
+option(DATACRUMBS_LIBDIR_AS_LIB OFF)
 
-if(CMAKE_INSTALL_LIBDIR)
+if(NOT DATACRUMBS_LIBDIR_AS_LIB)
+    include(GNUInstallDirs)
+endif()
+
+if(CMAKE_INSTALL_LIBDIR AND NOT DATACRUMBS_LIBDIR_AS_LIB)
+    set(DATACRUMBS_LIBDIR ${CMAKE_INSTALL_LIBDIR})
     set(DATACRUMBS_INSTALL_LIB_DIR ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
     set(DATACRUMBS_INSTALL_INCLUDE_DIR
         ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR})
@@ -49,37 +51,38 @@ else()
     set(DATACRUMBS_INSTALL_BINARYDIR "${CMAKE_INSTALL_PREFIX}/bin")
     set(DATACRUMBS_INSTALL_LIBEXEC ${CMAKE_INSTALL_PREFIX}/libexec)
 endif()
+
 message(STATUS "[${UPPER_PROJECT_NAME}] DATACRUMBS_LIBDIR set to ${DATACRUMBS_LIBDIR}")
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Internal Paths for cmake libraries and Setup install and output Directories
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # This sets where to look for dependent libraries
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_BINARY_DIR} ${CMAKE_INSTALL_PREFIX})
+
 # This sets where to look for dependent library's cmake files
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR}/cmake)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/share/cmake)
 include(datacrumbs-utils)
-#------------------------------------------------------------------------------
 
-if(NOT DATACRUMBS_EXTERNALLY_CONFIGURED)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE PATH "Single Directory for all Executables.")
-    set(CMAKE_INCLUDE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/include CACHE PATH "Store the headers.")
-    set(EXECUTABLE_OUTPUT_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all Libraries")
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
-    set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec)
-endif()
+# ------------------------------------------------------------------------------
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE PATH "Single Directory for all Executables.")
+set(CMAKE_INCLUDE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/include CACHE PATH "Store the headers.")
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all Libraries")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
+set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec)
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_BINARY_DIR}/include)
 include_directories(${DATACRUMBS_INSTALL_LIBEXEC})
 include_directories(${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Options for CMake
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
 option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" ON)
 option(DATACRUMBS_TRACE "Enable tracing" ON)
@@ -92,10 +95,11 @@ set(DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS "1000" CACHE STRING "Threshold in 
 option(DATACRUMBS_ENABLE_TRACING "Enable tracing" ON)
 set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval in nanosecond")
 option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
-#------------------------------------------------------------------------------
-# Derive CMake variables based on options
-#------------------------------------------------------------------------------
+set(DATACRUMBS_INCLUSION_PATH "NONE" CACHE STRING "Inclusion path for profiling")
 
+# ------------------------------------------------------------------------------
+# Derive CMake variables based on options
+# ------------------------------------------------------------------------------
 if(DATACRUMBS_LOG_LEVEL_STR STREQUAL "ERROR")
     set(DATACRUMBS_LOG_LEVEL 1)
 elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "WARN")
@@ -138,9 +142,15 @@ else()
     set(ENABLE_PROBE_GENERATOR OFF)
 endif()
 
+if(DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
+    set(DATACRUMBS_ENABLE_INCLUSION_PATH 0)
+else()
+    set(DATACRUMBS_ENABLE_INCLUSION_PATH 1)
+endif()
+
 set(DATACRUMBS_SRC_GEN_PATH ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs --data_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data --trace_log_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
-set(DATACRUMBS_BUILD_CLIENT_SO ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so)
+set(DATACRUMBS_BUILD_CLIENT_SO ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so)
 
 set(DATACRUMBS_CONFIG_PATH ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs)
 set(DATACRUMBS_LOG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
@@ -151,22 +161,21 @@ if(DATACRUMBS_ENABLE_TRACING AND DATACRUMBS_ENABLE_TRACING STREQUAL "ON")
 else()
     set(DATACRUMBS_TRACING_ENABLE 0)
 endif()
-#------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Find system details
-#------------------------------------------------------------------------------
-
+# ------------------------------------------------------------------------------
 message(STATUS "[${UPPER_PROJECT_NAME}] Detecting system details")
 
 find_library(LIBC_SO NAMES libc.so.6 libc.so PATHS /lib /usr/lib /lib64 /usr/lib64 /usr/local/lib /usr/local/lib64 /usr/lib/x86_64-linux-gnu NO_DEFAULT_PATH)
 
 if(LIBC_SO)
-message(STATUS "             - Found libc: ${LIBC_SO}")
-set(DATACRUMBS_LIBC_SO ${LIBC_SO})
+    message(STATUS "             - Found libc: ${LIBC_SO}")
+    set(DATACRUMBS_LIBC_SO ${LIBC_SO})
 else()
-message(FATAL_ERROR "             - libc.so not found!")
+    message(FATAL_ERROR "             - libc.so not found!")
 endif()
 
 if(DATACRUMBS_HOST STREQUAL "OFF")
@@ -176,6 +185,7 @@ if(DATACRUMBS_HOST STREQUAL "OFF")
         OUTPUT_VARIABLE RAW_HOSTNAME
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
+
     # Remove all numbers from the hostname
     string(REGEX REPLACE "[0-9]" "" DATACRUMBS_HOST "${RAW_HOSTNAME}")
     message(STATUS "             - Derived hostname: ${DATACRUMBS_HOST}")
@@ -189,19 +199,21 @@ if(BPFTOOL_EXECUTABLE AND NOT BPFTOOL_EXECUTABLE STREQUAL "OFF")
 else()
     find_program(BPFTOOL_EXECUTABLE_SEARCH bpftool PATHS /usr/sbin/ /usr/bin/ /usr/local/bin/ /usr/local/sbin/)
     set(BPFTOOL_EXECUTABLE ${BPFTOOL_EXECUTABLE_SEARCH})
+
     if(NOT BPFTOOL_EXECUTABLE)
         message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] bpftool executable not found! Please install bpftool or specify its path via BPFTOOL_EXECUTABLE.")
     endif()
+
     message(STATUS "             - Found bpftool executable: ${BPFTOOL_EXECUTABLE}")
 endif()
 
 find_file(VMLINUX_BTF_PATH vmlinux PATHS /sys/kernel/btf NO_DEFAULT_PATH)
+
 if(NOT VMLINUX_BTF_PATH)
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] vmlinux BTF file not found in /sys/kernel/btf. Please ensure your kernel provides BTF information at /sys/kernel/btf/vmlinux.")
 else()
     message(STATUS "             - Found vmlinux BTF file at: ${VMLINUX_BTF_PATH}")
 endif()
-
 
 if(CMAKE_SYSTEM_PROCESSOR)
     set(DATACRUMBS_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
@@ -221,43 +233,44 @@ if(DATACRUMBS_ARCH STREQUAL "x86_64")
 elseif(DATACRUMBS_ARCH STREQUAL "aarch64")
     set(DATACRUMBS_ARCH "arm64")
 endif()
-message(STATUS "             - Detected architecture: ${DATACRUMBS_ARCH}")
-#------------------------------------------------------------------------------
 
-#------------------------------------------------------------------------------
+message(STATUS "             - Detected architecture: ${DATACRUMBS_ARCH}")
+
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
 # Generate Header file for all sources with compile definitions
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 message(STATUS "[${UPPER_PROJECT_NAME}] Set Variables for CMake")
 message(STATUS "             - DATACRUMBS_LOG_LEVEL: ${DATACRUMBS_LOG_LEVEL}")
 message(STATUS "             - DATACRUMBS_MODE: ${DATACRUMBS_MODE}")
 message(STATUS "             - DATACRUMBS_TRACING_ENABLE: ${DATACRUMBS_TRACING_ENABLE}")
 message(STATUS "             - DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS: ${DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS}")
 message(STATUS "             - DATACRUMBS_TRACE_ALL_PROCESSES: ${DATACRUMBS_TRACE_ALL_PROCESSES}")
-
+message(STATUS "             - DATACRUMBS_TIME_INTERVAL_NS: ${DATACRUMBS_TIME_INTERVAL_NS}")
 
 message(STATUS "             - DATACRUMBS_SRC_GEN_PATH: ${DATACRUMBS_SRC_GEN_PATH}")
 message(STATUS "             - DATACRUMBS_LIBC_SO: ${DATACRUMBS_LIBC_SO}")
 message(STATUS "             - DATACRUMBS_BUILD_CLIENT_SO: ${DATACRUMBS_BUILD_CLIENT_SO}")
 
-
 message(STATUS "             - DATACRUMBS_CONFIG_PATH: ${DATACRUMBS_CONFIG_PATH}")
 message(STATUS "             - DATACRUMBS_LOG_DIR: ${DATACRUMBS_LOG_DIR}")
 message(STATUS "             - DATACRUMBS_DATA_DIR: ${DATACRUMBS_DATA_DIR}")
+message(STATUS "             - DATACRUMBS_ENABLE_INCLUSION_PATH: ${DATACRUMBS_ENABLE_INCLUSION_PATH}")
 configure_file("${CMAKE_SOURCE_DIR}/cmake/configure_files/datacrumbs_config.h.in"
-               "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/datacrumbs_config.h" @ONLY)
+    "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/datacrumbs_config.h" @ONLY)
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Make output directories
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/process/)
 file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/)
-#------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Find all dependencies
-#------------------------------------------------------------------------------
-
+# ------------------------------------------------------------------------------
 set(DEPENDENCY_LIBRARY_DIRS "")
 set(DEPENDENCY_LIB ${CMAKE_EXE_LINKER_FLAGS} $ENV{LDFLAGS} -lpthread)
 
@@ -275,23 +288,26 @@ find_package(ZLIB REQUIRED)
 if(LIBBPF_VERSION VERSION_LESS "1.0.0")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf version 1.0.0 or newer is required, but found ${LIBBPF_VERSION}")
 endif()
+
 # include all links
 if(LIBBPF_FOUND)
     include_directories(${LIBBPF_INCLUDEDIR})
     link_directories(${LIBBPF_LIBRARY_DIRS})
     list(APPEND DEPENDENCY_LIBRARY_DIRS ${LIBBPF_LIBRARY_DIRS})
-    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${LIBBPF_LIBRARY_DIRS} -lbpf -lelf )
+    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${LIBBPF_LIBRARY_DIRS} -lbpf -lelf)
 else()
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf not found!")
 endif()
 
 if(${yaml-cpp_FOUND})
-        get_filename_component(YAML_CPP_INCLUDE_DIR "${YAML_CPP_INCLUDE_DIR}" ABSOLUTE)
+    get_filename_component(YAML_CPP_INCLUDE_DIR "${YAML_CPP_INCLUDE_DIR}" ABSOLUTE)
     include_directories(${YAML_CPP_INCLUDE_DIR})
-    if (NOT DEFINED YAML_CPP_LIBRARY_DIR)
+
+    if(NOT DEFINED YAML_CPP_LIBRARY_DIR)
         get_filename_component(YAML_CPP_LIBRARY_DIR "${YAML_CPP_CMAKE_DIR}/../../" ABSOLUTE)
         get_filename_component(YAML_CPP_LIBRARY_DIR "${YAML_CPP_LIBRARY_DIR}" ABSOLUTE)
     endif()
+
     list(APPEND DEPENDENCY_LIBRARY_DIRS ${YAML_CPP_LIBRARY_DIR})
     set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${YAML_CPP_LIBRARY_DIR} ${YAML_CPP_LIBRARIES})
 else()
@@ -303,6 +319,7 @@ if(LLVM_FOUND)
     link_directories(${LLVM_LIBRARY_DIRS})
     set(DEPENDENCY_LIB ${DEPENDENCY_LIB} ${LLVM_LIBRARIES} -lclang)
     set(CLANG_EXECUTABLE ${LLVM_TOOLS_BINARY_DIR}/clang)
+
     if(NOT EXISTS ${CLANG_EXECUTABLE})
         message(FATAL_ERROR "clang executable not found at ${CLANG_EXECUTABLE}. Please check your LLVM installation.")
     else()
@@ -313,6 +330,7 @@ if(LLVM_FOUND)
             ERROR_QUIET
             COMMAND_ECHO NONE
         )
+
         # message(STATUS "[${UPPER_PROJECT_NAME}] Found clang executable: ${CLANG_EXECUTABLE}")
         # message(STATUS "[${UPPER_PROJECT_NAME}] clang version: ${CLANG_VERSION_OUTPUT}")
     endif()
@@ -338,7 +356,9 @@ if(ZLIB_FOUND)
 else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] zlib is needed for ${PROJECT_NAME} build")
 endif()
+
 list(REMOVE_DUPLICATES DEPENDENCY_LIBRARY_DIRS)
+
 # print found packages
 message(STATUS "             - Found libbpf:${LIBBPF_VERSION} at include:${LIBBPF_INCLUDEDIR} lib:${LIBBPF_LIBRARY_DIRS}")
 message(STATUS "             - Found yaml-cpp:${yaml-cpp_VERSION} at include:${YAML_CPP_INCLUDE_DIR} lib:${YAML_CPP_LIBRARY_DIR}")
@@ -352,11 +372,11 @@ set(CMAKE_INSTALL_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
 set(CMAKE_BUILD_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
 
 # print_all_variables()
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Sources for Datacrumbs Components
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 set(DATACRUMBS_COMMON_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.h
@@ -364,9 +384,14 @@ set(DATACRUMBS_COMMON_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/data_structures.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/enumerations.h
 )
+
 # Datacrumbs client
 set(DATACRUMBS_CLIENT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/client/library.h)
 add_library(${PROJECT_NAME}_client SHARED ${DATACRUMBS_CLIENT_SRC})
+message(STATUS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+set_target_properties(${PROJECT_NAME}_client PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+)
 
 # Datacrumbs explorer
 set(DATACRUMBS_EXPLORER_SRC
@@ -383,7 +408,6 @@ set(DATACRUMBS_EXPLORER_SRC
 add_executable(${PROJECT_NAME}_explorer ${DATACRUMBS_EXPLORER_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(${PROJECT_NAME}_explorer ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME}_explorer ${PROJECT_NAME}_client clean_all)
-
 
 add_custom_target(run_explorer
     COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}_explorer ${DATACRUMBS_HOST} ${DATACRUMBS_VARS}
@@ -439,6 +463,7 @@ set(DATACRUMBS_BPF_INCLUDE_PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 set(DATACRUMBS_BPF_INCLUDE_FLAGS "")
+
 foreach(path IN LISTS DATACRUMBS_BPF_INCLUDE_PATHS)
     list(APPEND DATACRUMBS_BPF_INCLUDE_FLAGS -I${path})
 endforeach()
@@ -447,7 +472,7 @@ add_custom_command(
     OUTPUT ${BPF_OUTPUT}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bpf
     COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Compiling BPF program: ${BPF_SOURCE} (timing start)"
-    COMMAND ${CMAKE_COMMAND} -E time ${CLANG_EXECUTABLE} -target bpf -D__TARGET_ARCH_${DATACRUMBS_ARCH} ${DATACRUMBS_BPF_INCLUDE_FLAGS} -Wall -g -O2 -c ${BPF_SOURCE} -o ${BPF_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E time ${CLANG_EXECUTABLE} -target bpf -D__TARGET_ARCH_${DATACRUMBS_ARCH} ${DATACRUMBS_BPF_INCLUDE_FLAGS} -Wall -g -O2 -c ${BPF_SOURCE} -o ${BPF_OUTPUT} -fopenmp
     DEPENDS ${BPF_SOURCE}
     COMMENT "Compiling BPF program: ${BPF_SOURCE} (timed)"
     VERBATIM
@@ -479,10 +504,9 @@ add_executable(${PROJECT_NAME} ${DATACRUMBS_PROCESS_EVENTS_SRC} ${DATACRUMBS_COM
 target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel)
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Custom executables for Datacrumbs
-#------------------------------------------------------------------------------
-
+# ------------------------------------------------------------------------------
 add_custom_target(clean_all
     COMMAND ${CMAKE_COMMAND} -E rm -rf
     ${BPF_OUTPUT}
@@ -491,13 +515,13 @@ add_custom_target(clean_all
     COMMENT "Cleaning BPF build artifacts (ignoring if cannot remove)"
 )
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Run configurations for DataCrumbs executables.
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 enable_testing()
 add_test(NAME datacrumbs_pretest COMMAND bash -c "ulimit -n 4096")
 
-add_test(NAME datacrumbs COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs ${DATACRUMBS_HOST} ${configuration_variables})
+add_test(NAME datacrumbs COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs PROPERTIES DEPENDS ${PROJECT_NAME})
 

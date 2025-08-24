@@ -21,10 +21,16 @@ capture_probes:
     type: binary
     file: /usr/lib64/libc.so.6
     regex: .*fork.*
-  # - name: bio
-  #   probe: kprobe
-  #   type: ksym
-  #   regex: bio.*
+  - name: hdf5
+    probe: uprobe
+    type: binary
+    file: /home/haridev/spack/opt/spack/linux-haswell/hdf5-1.14.5-ul6ejhuh527dwwbgwi3ij6soj2pikw2u/lib/libhdf5.so
+    regex: .*
+    include_offsets: false
+  - name: bio
+    probe: kprobe
+    type: ksym
+    regex: bio.*
   - name: python
     probe: usdt
     type: usdt
@@ -34,32 +40,37 @@ capture_probes:
     probe: kprobe
     type: header
     file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/pagemap.h
-  # - name: swap
-  #   probe: kprobe
-  #   type: header
-  #   file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
-  # - name: shm
-  #   probe: kprobe
-  #   type: header
-  #   file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
-  # - name: fscache
-  #   probe: kprobe
-  #   type: header
-  #   file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fscache.h
+  - name: swap
+    probe: kprobe
+    type: header
+    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
+  - name: shm
+    probe: kprobe
+    type: header
+    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
+  - name: fscache
+    probe: kprobe
+    type: header
+    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fscache.h
   - name: xfs
     probe: kprobe
     type: ksym
     regex: ^xfs(?!.*cold).*
-  # - name: ext4
-  #   probe: kprobe
-  #   type: ksym
-  #   regex: ^ext4(?!.*cold).*
-  # - name: iomap
-  #   probe: kprobe
-  #   type: ksym
-  #   regex: ^iomap(?!.*cold).*
-  # - name: test_posix
-  #   probe: uprobe
-  #   type: binary
-  #   file: /home/haridev/datacrumbs/build/bin/df_tracer_test
+  - name: ext4
+    probe: kprobe
+    type: ksym
+    regex: ^ext4(?!.*cold).*
+  - name: iomap
+    probe: kprobe
+    type: ksym
+    regex: ^iomap(?!.*cold).*
+  - name: mpi
+    probe: uprobe
+    type: binary
+    file: /home/haridev/spack/opt/spack/linux-haswell/openmpi-5.0.7-y6xplmqxukxsuvvwnv2jqvztli5rhevm/lib/libmpi.so.40
+    regex: .*
+  - name: ior
+    probe: uprobe
+    type: binary
+    file: /home/haridev/spack/opt/spack/linux-haswell/ior-3.3.0-ip47j26fw7xxfftdzjvy2h36phgcuypv/bin/ior
 profiling_interval: 0.0001

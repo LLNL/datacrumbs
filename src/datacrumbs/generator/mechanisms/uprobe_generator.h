@@ -43,10 +43,13 @@ class UProbeGenerator {
     std::string sanitized_func_name = func_name_;
     std::replace(sanitized_func_name.begin(), sanitized_func_name.end(), '.', '_');
     std::replace(sanitized_func_name.begin(), sanitized_func_name.end(), '@', '_');
-
+    auto load_func = func_name_;
+    if (offset_ != "") {
+      load_func = offset_;
+    }
     std::stringstream ss;
     // Generate uprobe section and function
-    ss << "SEC(\"uprobe/" << provider_ << ":" << func_name_ << "\")\n";
+    ss << "SEC(\"uprobe/" << provider_ << ":" << load_func << "\")\n";
     ss << "int BPF_UPROBE(" << sanitized_func_name << event_id_ << "_entry) {\n";
     ss << "  generic_entry(ctx, " << event_id_ << ");\n";
     ss << "  return 0;\n";
