@@ -83,7 +83,7 @@
 #define ENABLE_BPF_PRINTK 0
 #endif
 
-#if ENABLE_BPF_PRINTK
+#if defined(DATACRUMBS_BPF_PRINT_ENABLE_FLAG) && (DATACRUMBS_BPF_PRINT_ENABLE_FLAG == 1)
 #define DBG_PRINTK(fmt, ...) bpf_printk(fmt, ##__VA_ARGS__)
 #else
 #define DBG_PRINTK(fmt, ...) \

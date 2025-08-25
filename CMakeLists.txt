@@ -86,16 +86,17 @@ include_directories(${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
 option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" ON)
 option(DATACRUMBS_TRACE "Enable tracing" ON)
-option(BPFTOOL_EXECUTABLE "Path to bpftool executable" OFF)
+set(BPFTOOL_EXECUTABLE "NONE" CACHE STRING "Path to bpftool executable")
 set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPER_PROJECT_NAME}")
 set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEBUG TRACE)
-option(DATACRUMBS_HOST "Host name for datacrumbs (numbers will be stripped if not set)" OFF)
+set(DATACRUMBS_HOST "NONE" CACHE STRING "Host name for datacrumbs (numbers will be stripped if not set)")
 set(DATACRUMBS_USER "$ENV{USER}" CACHE STRING "User name for datacrumbs (default: current environment user)")
 set(DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS "1000" CACHE STRING "Threshold in microseconds for skipping events")
 option(DATACRUMBS_ENABLE_TRACING "Enable tracing" ON)
 set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval in nanosecond")
 option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
 set(DATACRUMBS_INCLUSION_PATH "NONE" CACHE STRING "Inclusion path for profiling")
+option(DATACRUMBS_BPF_PRINT_ENABLE "Enable BPF print" OFF)
 
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
@@ -126,7 +127,7 @@ endif()
 
 option(BPFTOOL_EXECUTABLE "Path to bpftool executable" "")
 
-if(BPFTOOL_EXECUTABLE STREQUAL "OFF")
+if(BPFTOOL_EXECUTABLE STREQUAL "NONE")
     set(BPFTOOL_EXECUTABLE "")
 endif()
 
@@ -148,8 +149,19 @@ else()
     set(DATACRUMBS_ENABLE_INCLUSION_PATH 1)
 endif()
 
+if(DATACRUMBS_BPF_PRINT_ENABLE)
+    set(DATACRUMBS_BPF_PRINT_ENABLE_FLAG 1)
+else()
+    set(DATACRUMBS_BPF_PRINT_ENABLE_FLAG 0)
+endif()
+
 set(DATACRUMBS_SRC_GEN_PATH ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs --data_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data --trace_log_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
+
+if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
+    set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
+endif()
+
 set(DATACRUMBS_BUILD_CLIENT_SO ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so)
 
 set(DATACRUMBS_CONFIG_PATH ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs)
@@ -178,7 +190,7 @@ else()
     message(FATAL_ERROR "             - libc.so not found!")
 endif()
 
-if(DATACRUMBS_HOST STREQUAL "OFF")
+if(DATACRUMBS_HOST STREQUAL "NONE")
     # Get the system hostname
     execute_process(
         COMMAND hostname
@@ -194,7 +206,7 @@ else()
 endif()
 
 # Generate vmlinux.h using bpftool before building datacrumbs_bpf
-if(BPFTOOL_EXECUTABLE AND NOT BPFTOOL_EXECUTABLE STREQUAL "OFF")
+if(BPFTOOL_EXECUTABLE AND NOT BPFTOOL_EXECUTABLE STREQUAL "NONE")
     message(STATUS "             - Using provided bpftool executable: ${BPFTOOL_EXECUTABLE}")
 else()
     find_program(BPFTOOL_EXECUTABLE_SEARCH bpftool PATHS /usr/sbin/ /usr/bin/ /usr/local/bin/ /usr/local/sbin/)
@@ -248,6 +260,7 @@ message(STATUS "             - DATACRUMBS_TRACING_ENABLE: ${DATACRUMBS_TRACING_E
 message(STATUS "             - DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS: ${DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS}")
 message(STATUS "             - DATACRUMBS_TRACE_ALL_PROCESSES: ${DATACRUMBS_TRACE_ALL_PROCESSES}")
 message(STATUS "             - DATACRUMBS_TIME_INTERVAL_NS: ${DATACRUMBS_TIME_INTERVAL_NS}")
+message(STATUS "             - DATACRUMBS_BPF_PRINT_ENABLE_FLAG: ${DATACRUMBS_BPF_PRINT_ENABLE_FLAG}")
 
 message(STATUS "             - DATACRUMBS_SRC_GEN_PATH: ${DATACRUMBS_SRC_GEN_PATH}")
 message(STATUS "             - DATACRUMBS_LIBC_SO: ${DATACRUMBS_LIBC_SO}")
