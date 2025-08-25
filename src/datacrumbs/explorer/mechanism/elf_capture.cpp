@@ -81,7 +81,7 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
 
       for (size_t j = 0; j < num_syms; ++j) {
         if (syms[j].st_shndx == SHN_UNDEF) continue;
-        if (ELF64_ST_BIND(syms[j].st_info) != STB_GLOBAL) continue;
+        // if (ELF64_ST_BIND(syms[j].st_info) == STB_LOCAL) continue;
         if (ELF64_ST_TYPE(syms[j].st_info) != STT_FUNC) continue;
 
         std::string name = std::string(strtab + syms[j].st_name);

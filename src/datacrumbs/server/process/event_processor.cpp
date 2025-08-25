@@ -539,7 +539,8 @@ int main(int argc, char** argv) {
       DC_LOG_INFO("\nReceived EINTR, exiting poll loop");
       err = 0;
       break;
-    } else if (err < 0) {
+    }
+    if (err < 0) {
       DC_LOG_ERROR("Error polling ring buffer: %d", err);
       break;
     }
