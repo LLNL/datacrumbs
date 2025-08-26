@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.4)
+cmake_policy(SET CMP0075 NEW)
 project(datacrumbs LANGUAGES C CXX)
 
 # ------------------------------------------------------------------------------
@@ -481,15 +482,88 @@ foreach(path IN LISTS DATACRUMBS_BPF_INCLUDE_PATHS)
     list(APPEND DATACRUMBS_BPF_INCLUDE_FLAGS -I${path})
 endforeach()
 
+# Read the YAML config file and extract the list of probe names under capture_probes
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs/${DATACRUMBS_HOST}.yaml" DATACRUMBS_CONFIG_YAML)
+
+# Extract the capture_probes block and get all names under it
+set(DATACRUMBS_CAPTURE_PROBES_LIST "")
+
+# Find the capture_probes block
+string(REGEX MATCH "capture_probes:[^\n]*\n([^\n]*\n)*" _CAPTURE_PROBES_BLOCK "${DATACRUMBS_CONFIG_YAML}")
+
+# message(STATUS "Capture probes: ${_CAPTURE_PROBES_BLOCK}")
+# Split the _CAPTURE_PROBES_BLOCK into lines
+string(REPLACE "\n" ";" _CAPTURE_PROBES_LINES "${_CAPTURE_PROBES_BLOCK}")
+
+# If any line in _CAPTURE_PROBES_LINES contains 'name:', add it to _CAPTURE_PROBES_NAME_LINES
+set(_CAPTURE_PROBES_NAME_LINES "")
+
+foreach(_line ${_CAPTURE_PROBES_LINES})
+    if(_line MATCHES "^[ ]*-[ ]*name:[ ]*")
+        list(APPEND _CAPTURE_PROBES_NAME_LINES "${_line}")
+    endif()
+endforeach()
+
+foreach(_line ${_CAPTURE_PROBES_NAME_LINES})
+    string(REGEX REPLACE "^[ ]*-[ ]*name:[ ]*" "" _probe_name "${_line}")
+
+    # message(STATUS "[${UPPER_PROJECT_NAME}]  Capture probe name: ${_probe_name}")
+    list(APPEND DATACRUMBS_CAPTURE_PROBES_LIST "${_probe_name}")
+endforeach()
+
+message(STATUS "[${UPPER_PROJECT_NAME}]  Capture probes: ${DATACRUMBS_CAPTURE_PROBES_LIST}")
+
+list(APPEND DATACRUMBS_BPF_EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/common.c)
+list(APPEND DATACRUMBS_BPF_EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/init.bpf.c)
+
+# For each probe in DATACRUMBS_CAPTURE_PROBES_LIST, add probename.bpf.c to DATACRUMBS_BPF_EXTRA_SOURCES
+foreach(_probe_name ${DATACRUMBS_CAPTURE_PROBES_LIST})
+    set(_probe_bpf_c "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/${_probe_name}.bpf.c")
+    list(APPEND DATACRUMBS_BPF_EXTRA_SOURCES "${_probe_bpf_c}")
+endforeach()
+
+# Find all .c source files in ${CMAKE_BINARY_DIR}/libexec/datacrumbs/server/bpf
+# file(GLOB DATACRUMBS_BPF_EXTRA_SOURCES "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/*.c")
+# message(STATUS "BPF Extra Sources: ${DATACRUMBS_BPF_EXTRA_SOURCES}")
+set(DATACRUMBS_BPF_OBJECTS "")
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bpf)
+
+foreach(BPF_SRC_FILE ${DATACRUMBS_BPF_EXTRA_SOURCES})
+    get_filename_component(BPF_SRC_NAME ${BPF_SRC_FILE} NAME_WE)
+    set(BPF_OBJ_FILE "${CMAKE_BINARY_DIR}/bpf/${BPF_SRC_NAME}.o")
+
+    add_custom_command(
+        OUTPUT ${BPF_OBJ_FILE}
+        COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Compiling BPF object: ${BPF_OBJ_FILE} (timed)"
+        COMMAND /usr/bin/time -f "Elapsed time for ${BPF_OBJ_FILE}: %E" ${CLANG_EXECUTABLE}
+        -target bpf
+        -D__TARGET_ARCH_${DATACRUMBS_ARCH}
+        -Wall -g -O2
+        ${DATACRUMBS_BPF_INCLUDE_FLAGS}
+        -c ${BPF_SRC_FILE}
+        -o ${BPF_OBJ_FILE}
+        DEPENDS ${BPF_SRC_FILE} vmlinux_header run_generator
+        COMMENT "Compiling BPF object: ${BPF_OBJ_FILE} (timed)"
+        VERBATIM
+    )
+    list(APPEND DATACRUMBS_BPF_OBJECTS ${BPF_OBJ_FILE})
+endforeach()
+
+string(REPLACE ";" " " DATACRUMBS_BPF_OBJECTS_STR "${DATACRUMBS_BPF_OBJECTS}")
+
+# message(STATUS "BPF Objects: ${DATACRUMBS_BPF_OBJECTS}")
+# message(STATUS "[${UPPER_PROJECT_NAME}] BPFTOOL LINK COMMAND: ${BPFTOOL_EXECUTABLE} gen object ${BPF_OUTPUT} ${DATACRUMBS_BPF_OBJECTS_STR}")
+
+# Link all object files into a single object file
 add_custom_command(
     OUTPUT ${BPF_OUTPUT}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bpf
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Compiling BPF program: ${BPF_SOURCE} (timing start)"
-    COMMAND ${CMAKE_COMMAND} -E time ${CLANG_EXECUTABLE} -target bpf -D__TARGET_ARCH_${DATACRUMBS_ARCH} ${DATACRUMBS_BPF_INCLUDE_FLAGS} -Wall -g -O2 -c ${BPF_SOURCE} -o ${BPF_OUTPUT} -fopenmp
-    DEPENDS ${BPF_SOURCE}
-    COMMENT "Compiling BPF program: ${BPF_SOURCE} (timed)"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Linking all BPF objects into ${BPF_OUTPUT} (timed)"
+    COMMAND /usr/bin/time -f "Elapsed time for linking: %E" ${BPFTOOL_EXECUTABLE} gen object ${BPF_OUTPUT} ${DATACRUMBS_BPF_OBJECTS}
+    DEPENDS ${DATACRUMBS_BPF_OBJECTS}
+    COMMENT "Linking all BPF objects into ${BPF_OUTPUT} (timed)"
     VERBATIM
 )
+
 add_custom_target(datacrumbs_bpf ALL DEPENDS ${BPF_OUTPUT})
 add_dependencies(datacrumbs_bpf vmlinux_header run_generator)
 
