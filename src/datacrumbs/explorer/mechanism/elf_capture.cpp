@@ -61,7 +61,7 @@ ElfSymbolExtractor::~ElfSymbolExtractor() {
 
 std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
   DC_LOG_TRACE("extract_symbols: start");
-  auto symbols_map = std::unordered_map<std::string, std::string>();
+  auto symbols_map = std::unordered_map<std::string, std::unordered_set<std::string>>();
   auto symbol_counts = std::unordered_map<std::string, int>();
   if (!is_elf()) {
     DC_LOG_ERROR("File is not a valid ELF file");
@@ -85,7 +85,10 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
         if (ELF64_ST_TYPE(syms[j].st_info) != STT_FUNC) continue;
 
         std::string name = std::string(strtab + syms[j].st_name);
-        if (!name.empty() && symbols_map.find(name) == symbols_map.end()) {
+        if (symbols_map.find(name) == symbols_map.end()) {
+          symbols_map[name] = std::unordered_set<std::string>();
+        }
+        if (!name.empty()) {
           char buffer[32];
           unsigned long offset = static_cast<unsigned long>(
               syms[j].st_value);  // - static_cast<unsigned long>(base_address_);
@@ -93,7 +96,7 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
                        name.c_str(), static_cast<unsigned long>(syms[j].st_value), offset,
                        static_cast<unsigned long>(base_address_));
           sprintf(buffer, "0x%lx", offset);
-          symbols_map[name] = buffer;
+          symbols_map[name].insert(buffer);
         }
       }
     }
@@ -122,10 +125,19 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
 
   std::vector<std::string> symbols;
   for (const auto& pair : symbols_map) {
-    if (include_offsets_) {
-      symbols.push_back(pair.first + ":" + pair.second);
+    if (pair.second.size() > 1) {
+      DC_LOG_WARN("Symbol %s has multiple offsets, using all occurrences", pair.first.c_str());
+      if (include_offsets_) {
+        for (const auto& offset : pair.second) {
+          symbols.push_back(pair.first + ":" + offset);
+        }
+      }
     } else {
-      symbols.push_back(pair.first);
+      if (include_offsets_) {
+        symbols.push_back(pair.first + ":" + *pair.second.begin());
+      } else {
+        symbols.push_back(pair.first);
+      }
     }
   }
   DC_LOG_INFO("Extracted %zu unique function symbols", symbols.size());

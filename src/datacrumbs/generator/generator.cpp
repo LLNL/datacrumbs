@@ -128,6 +128,7 @@ int ProbeGenerator::run() {
       auto custom = CustomProbe::fromJson(jprobe);
       probe_files.push_back(custom.bpf_path);
       process_headers.push_back(custom.process_header);
+      ss << "#include \"" << custom.bpf_path << "\"" << std::endl;
     }
     // Write generated code to file
     const char* gen_path = DATACRUMBS_SRC_GEN_PATH;
@@ -155,18 +156,6 @@ int ProbeGenerator::run() {
   // Append all generated probe files as includes to generated.bpf.c
   const char* gen_path = DATACRUMBS_SRC_GEN_PATH;
   if (gen_path) {
-    std::string generated_filename =
-        (std::filesystem::path(gen_path) / "datacrumbs/server/bpf" / "generated.bpf.c").string();
-    std::ofstream generated_out(generated_filename);
-    if (!generated_out) {
-      DC_LOG_ERROR("Failed to open file for writing: %s", generated_filename.c_str());
-    } else {
-      for (const auto& probe_file : probe_files) {
-        generated_out << "#include \"" << probe_file << "\"" << std::endl;
-      }
-      generated_out.close();
-      DC_LOG_INFO("[ProbeGenerator] All probe files included in: %s", generated_filename.c_str());
-    }
     std::filesystem::create_directories(std::filesystem::path(gen_path) /
                                         "datacrumbs/server/process");
     std::string generated_process_filename =

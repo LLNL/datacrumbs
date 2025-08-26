@@ -11,6 +11,7 @@
     __uint(type, BPF_MAP_TYPE_RINGBUF);      \
     __uint(max_entries, 1024 * 1024);        \
   } name SEC(".maps");
+
 #define DATACRUMBS_BPF_RING_BUF_2_ARGS(name, size) \
   struct {                                         \
     __uint(type, BPF_MAP_TYPE_RINGBUF);            \
@@ -73,6 +74,77 @@
   GET_5TH_ARG(__VA_ARGS__, DATACRUMBS_TRIE_4_ARGS, DATACRUMBS_TRIE_3_ARGS, )
 
 #define DATACRUMBS_TRIE(...) DATACRUMBS_TRIE_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+
+/**
+ * Macros for defining BPF ring buffers
+ */
+#define DATACRUMBS_BPF_RING_BUF_EXTERN_1_ARGS(name) \
+  extern struct {                                   \
+    __uint(type, BPF_MAP_TYPE_RINGBUF);             \
+    __uint(max_entries, 1024 * 1024);               \
+  } name SEC(".maps");
+#define DATACRUMBS_BPF_RING_BUF_EXTERN_2_ARGS(name, size) \
+  extern struct {                                         \
+    __uint(type, BPF_MAP_TYPE_RINGBUF);                   \
+    __uint(max_entries, size);                            \
+  } name SEC(".maps");
+
+#define DATACRUMBS_BPF_RING_BUF_EXTERN_MACRO_CHOOSER(...)         \
+  GET_3TH_ARG(__VA_ARGS__, DATACRUMBS_BPF_RING_BUF_EXTERN_2_ARGS, \
+              DATACRUMBS_BPF_RING_BUF_EXTERN_1_ARGS, )
+
+#define DATACRUMBS_RINGBUF_EXTERN(...) \
+  DATACRUMBS_BPF_RING_BUF_EXTERN_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+
+/**
+ * Macro for defining a BPF map
+ */
+
+#define DATACRUMBS_MAP_EXTERN_3_ARGS(name, map_key, map_value) \
+  extern struct {                                              \
+    __uint(type, BPF_MAP_TYPE_HASH);                           \
+    __uint(max_entries, 10240);                                \
+    __type(key, map_key);                                      \
+    __type(value, map_value);                                  \
+  } name SEC(".maps");
+
+#define DATACRUMBS_MAP_EXTERN_4_ARGS(name, map_key, map_value, size) \
+  extern struct {                                                    \
+    __uint(type, BPF_MAP_TYPE_HASH);                                 \
+    __uint(max_entries, size);                                       \
+    __type(key, map_key);                                            \
+    __type(value, map_value);                                        \
+  } name SEC(".maps");
+
+#define DATACRUMBS_MAP_EXTERN_MACRO_CHOOSER(...) \
+  GET_5TH_ARG(__VA_ARGS__, DATACRUMBS_MAP_EXTERN_4_ARGS, DATACRUMBS_MAP_EXTERN_3_ARGS, )
+
+#define DATACRUMBS_MAP_EXTERN(...) DATACRUMBS_MAP_EXTERN_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+
+#define DATACRUMBS_TRIE_EXTERN_3_ARGS(name, map_key, map_value) \
+  extern struct {                                               \
+    __uint(type, BPF_MAP_TYPE_LPM_TRIE);                        \
+    __uint(key_size, sizeof(map_key));                          \
+    __uint(value_size, sizeof(map_value));                      \
+    __uint(max_entries, 10000);                                 \
+    __uint(map_flags, BPF_F_NO_PREALLOC);                       \
+    __uint(pinning, LIBBPF_PIN_BY_NAME);                        \
+  } name SEC(".maps");
+
+#define DATACRUMBS_TRIE_EXTERN_4_ARGS(name, map_key, map_value, size) \
+  extern struct {                                                     \
+    __uint(type, BPF_MAP_TYPE_LPM_TRIE);                              \
+    __uint(max_entries, size);                                        \
+    __type(key, map_key);                                             \
+    __type(value, map_value);                                         \
+    __uint(map_flags, BPF_F_NO_PREALLOC);                             \
+    __uint(pinning, LIBBPF_PIN_BY_NAME);                              \
+  } name SEC(".maps");
+
+#define DATACRUMBS_TRIE_EXTERN_MACRO_CHOOSER(...) \
+  GET_5TH_ARG(__VA_ARGS__, DATACRUMBS_TRIE_EXTERN_4_ARGS, DATACRUMBS_TRIE_EXTERN_3_ARGS, )
+
+#define DATACRUMBS_TRIE_EXTERN(...) DATACRUMBS_TRIE_EXTERN_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 
 /**
  * Helper Macros

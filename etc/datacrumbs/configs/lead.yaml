@@ -40,10 +40,6 @@ capture_probes:
     probe: kprobe
     type: header
     file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/pagemap.h
-  - name: swap
-    probe: kprobe
-    type: header
-    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/swap.h
   - name: shm
     probe: kprobe
     type: header

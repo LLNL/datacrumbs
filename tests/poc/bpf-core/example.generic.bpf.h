@@ -1,5 +1,5 @@
-#ifndef EXAMPLE_GENERIC_H
-#define EXAMPLE_GENERIC_H
+#ifndef __EXAMPLE_GENERIC_H
+#define __EXAMPLE_GENERIC_H
 
 #include "vmlinux.h"
 //
@@ -14,32 +14,13 @@
 #include "example.h"
 
 #define DATACRUMBS_BPF_RING_BUF(name)   \
-  struct {                              \
+  extern struct {                       \
     __uint(type, BPF_MAP_TYPE_RINGBUF); \
     __uint(max_entries, 1024 * 1024);   \
   } name SEC(".maps");
 
-#define DATACRUMBS_BPF_RING_BUF_1_ARGS(name) \
-  struct {                                   \
-    __uint(type, BPF_MAP_TYPE_RINGBUF);      \
-    __uint(max_entries, 1024 * 1024);        \
-  } name SEC(".maps");
-#define DATACRUMBS_BPF_RING_BUF_2_ARGS(name, size) \
-  struct {                                         \
-    __uint(type, BPF_MAP_TYPE_RINGBUF);            \
-    __uint(max_entries, size);                     \
-  } name SEC(".maps");
-
-#define GET_3TH_ARG(arg1, arg2, arg3, ...) arg3
-#define DATACRUMBS_BPF_RING_BUF_MACRO_CHOOSER(...) \
-  GET_3TH_ARG(__VA_ARGS__, DATACRUMBS_BPF_RING_BUF_2_ARGS, DATACRUMBS_BPF_RING_BUF_1_ARGS, )
-
-#define DATACRUMBS_BPF_RING_BUF(...) DATACRUMBS_BPF_RING_BUF_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
-
-char message[12] = "Hello World";
 // anonymous struct assigned to rb variable
 DATACRUMBS_BPF_RING_BUF(output);
-DATACRUMBS_BPF_RING_BUF(event, 1024 * 1024);
 
 static inline __attribute__((always_inline)) int generic_call(int event_id) {
   struct event_t* evt;
@@ -58,4 +39,4 @@ static inline __attribute__((always_inline)) int generic_call(int event_id) {
 }
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
-#endif  // EXAMPLE_GENERIC_H
+#endif  // __EXAMPLE_GENERIC_H
