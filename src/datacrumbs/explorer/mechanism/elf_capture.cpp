@@ -127,10 +127,8 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
   for (const auto& pair : symbols_map) {
     if (pair.second.size() > 1) {
       DC_LOG_WARN("Symbol %s has multiple offsets, using all occurrences", pair.first.c_str());
-      if (include_offsets_) {
-        for (const auto& offset : pair.second) {
-          symbols.push_back(pair.first + ":" + offset);
-        }
+      for (const auto& offset : pair.second) {
+        symbols.push_back(pair.first + ":" + offset);
       }
     } else {
       if (include_offsets_) {

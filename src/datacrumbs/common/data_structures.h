@@ -65,7 +65,10 @@ class Probe {
   ProbeType type;                      // The type of probe (e.g., SYSCALLS, KPROBE, etc.)
   std::string name;                    // Name of the probe
   std::vector<std::string> functions;  // List of functions or arguments for the probe
-
+  // Copy constructor
+  Probe(const Probe& other) : type(other.type), name(other.name), functions(other.functions) {
+    DC_LOG_TRACE("Probe copy constructor called");
+  }
   // Validates the probe's configuration
   virtual bool validate() const {
     DC_LOG_TRACE("Probe::validate called");
@@ -118,18 +121,74 @@ class Probe {
 // Probe for system calls
 struct SysCallProbe : public Probe {
  public:
+  SysCallProbe(const SysCallProbe& other) : Probe(other) {
+    DC_LOG_TRACE("SysCallProbe copy constructor called");
+  }
   SysCallProbe() : Probe(ProbeType::SYSCALLS) { DC_LOG_TRACE("SysCallProbe constructor called"); }
+  // Validates the syscall probe's configuration
+  bool validate() const override {
+    DC_LOG_TRACE("SysCallProbe::validate called");
+    return Probe::validate();
+  }
+
+  // Serializes the syscall probe to a JSON object
+  json_object* toJson() const override {
+    DC_LOG_TRACE("SysCallProbe::toJson called");
+    // No extra fields, just use base
+    return Probe::toJson();
+  }
+
+  // Deserializes a syscall probe from a JSON object
+  static SysCallProbe fromJson(const json_object* j) {
+    DC_LOG_TRACE("SysCallProbe::fromJson called");
+    SysCallProbe p;
+    Probe base = Probe::fromJson(j);
+    p.type = base.type;
+    p.name = base.name;
+    p.functions = base.functions;
+    return p;
+  }
 };
 
 // Probe for kernel functions (kprobes)
 struct KProbe : public Probe {
  public:
+  KProbe(const KProbe& other) : Probe(other) { DC_LOG_TRACE("KProbe copy constructor called"); }
   KProbe() : Probe(ProbeType::KPROBE) { DC_LOG_TRACE("KProbe constructor called"); }
+  // No extra fields for KProbe, just use base class serialization/deserialization
+
+  // Validates the kprobe's configuration
+  bool validate() const override {
+    DC_LOG_TRACE("KProbe::validate called");
+    return Probe::validate();
+  }
+
+  // Serializes the kprobe to a JSON object
+  json_object* toJson() const override {
+    DC_LOG_TRACE("KProbe::toJson called");
+    // No extra fields, just use base
+    return Probe::toJson();
+  }
+
+  // Deserializes a kprobe from a JSON object
+  static KProbe fromJson(const json_object* j) {
+    DC_LOG_TRACE("KProbe::fromJson called");
+    KProbe p;
+    Probe base = Probe::fromJson(j);
+    p.type = base.type;
+    p.name = base.name;
+    p.functions = base.functions;
+    return p;
+  }
 };
 
 // Probe for user-space functions (uprobes)
 struct UProbe : public Probe {
  public:
+  UProbe(const UProbe& other)
+      : Probe(other), binary_path(other.binary_path), include_offsets(other.include_offsets) {
+    DC_LOG_TRACE("UProbe copy constructor called");
+  }
   UProbe() : Probe(ProbeType::UPROBE), binary_path(), include_offsets(false) {
     DC_LOG_TRACE("UProbe constructor called");
   }
@@ -176,6 +235,10 @@ struct UProbe : public Probe {
 // Probe for USDT (User-level Statically Defined Tracing) probes
 struct USDTProbe : public Probe {
  public:
+  USDTProbe(const USDTProbe& other)
+      : Probe(other), binary_path(other.binary_path), provider(other.provider) {
+    DC_LOG_TRACE("USDTProbe copy constructor called");
+  }
   USDTProbe() : Probe(ProbeType::USDT), binary_path(), provider() {
     DC_LOG_TRACE("USDTProbe constructor called");
   }
@@ -228,6 +291,14 @@ struct USDTProbe : public Probe {
 // Probe for USDT (User-level Statically Defined Tracing) probes
 struct CustomProbe : public Probe {
  public:
+  CustomProbe(const CustomProbe& other)
+      : Probe(other),
+        bpf_path(other.bpf_path),
+        start_event_id(other.start_event_id),
+        process_header(other.process_header),
+        event_type(other.event_type) {
+    DC_LOG_TRACE("CustomProbe copy constructor called");
+  }
   CustomProbe()
       : Probe(ProbeType::CUSTOM), bpf_path(), start_event_id(), process_header(), event_type(1) {
     DC_LOG_TRACE("CustomProbe constructor called");

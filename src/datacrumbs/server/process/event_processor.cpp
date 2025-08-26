@@ -370,6 +370,139 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  auto config_manager = event_processor.configManager_;
+  struct json_object* manual_probes_json =
+      json_object_from_file(config_manager->manual_probe_path.c_str());
+  if (manual_probes_json) {
+    int total_manual_probes = 0, total_successful_probes = 0, total_failed_probes = 0;
+    int arr_len = json_object_array_length(manual_probes_json);
+    for (int i = 0; i < arr_len; i++) {
+      struct json_object* jprobe = json_object_array_get_idx(manual_probes_json, i);
+      if (jprobe) {
+        auto probe = datacrumbs::Probe::fromJson(jprobe);
+        std::shared_ptr<datacrumbs::Probe> manual_probe;
+        switch (probe.type) {
+          case datacrumbs::ProbeType::UPROBE:
+            manual_probe =
+                std::make_shared<datacrumbs::UProbe>(datacrumbs::UProbe::fromJson(jprobe));
+            break;
+          case datacrumbs::ProbeType::SYSCALLS:
+            manual_probe = std::make_shared<datacrumbs::SysCallProbe>(
+                datacrumbs::SysCallProbe::fromJson(jprobe));
+            break;
+          case datacrumbs::ProbeType::USDT:
+            manual_probe =
+                std::make_shared<datacrumbs::USDTProbe>(datacrumbs::USDTProbe::fromJson(jprobe));
+            break;
+          case datacrumbs::ProbeType::KPROBE:
+            manual_probe =
+                std::make_shared<datacrumbs::KProbe>(datacrumbs::KProbe::fromJson(jprobe));
+            break;
+          case datacrumbs::ProbeType::CUSTOM:
+            manual_probe = std::make_shared<datacrumbs::CustomProbe>(
+                datacrumbs::CustomProbe::fromJson(jprobe));
+            break;
+          default:
+            DC_LOG_ERROR("Unknown probe type encountered in extractProbes()");
+            throw std::runtime_error("Unknown probe type encountered in extractProbes()");
+        }
+        for (const auto& func : manual_probe->functions) {
+          total_manual_probes += 2;
+          if (probe.type == datacrumbs::ProbeType::UPROBE) {
+            auto uprobe = std::dynamic_pointer_cast<datacrumbs::UProbe>(manual_probe);
+            uint64_t func_hash = std::stoull(func, nullptr, 0);
+            auto func_name_ = config_manager->category_map[func_hash].second;
+            DC_LOG_DEBUG("Extracted function name: %s", func_name_.c_str());
+            auto pos = func_name_.find(':');
+            std::string offset = "";
+            bool is_manual = false;
+            if (pos != std::string::npos) {
+              offset = func_name_.substr(pos + 1);
+              func_name_ = func_name_.substr(0, pos);
+              is_manual = true;
+            } else {
+              offset = "";
+            }
+            if (is_manual) {
+              std::string sanitized_func_name = func_name_;
+              if (sanitized_func_name.length() > 10) {
+                sanitized_func_name = sanitized_func_name.substr(0, 10);
+              }
+              std::replace(sanitized_func_name.begin(), sanitized_func_name.end(), '.', '_');
+              std::replace(sanitized_func_name.begin(), sanitized_func_name.end(), '@', '_');
+              sanitized_func_name += func;
+              auto entry_func = sanitized_func_name + "_entry";
+              auto exit_func = sanitized_func_name + "_exit";
+              struct bpf_link* link;
+              struct bpf_program* prog =
+                  bpf_object__find_program_by_name(skel->obj, entry_func.c_str());
+              struct bpf_uprobe_opts opts = {
+                  .sz = sizeof(struct bpf_uprobe_opts),
+              };
+
+              // Convert offset string to hex value if present
+              unsigned long offset_val = 0;
+              if (offset != "" && prog != NULL) {
+                offset_val =
+                    std::stoul(offset.c_str(), nullptr, 0);  // Accepts hex ("0x...") or decimal
+                DC_LOG_DEBUG("Attaching program %s to %s at offset:0x%lx manually",
+                             entry_func.c_str(), uprobe->binary_path.c_str(), offset_val);
+                link = bpf_program__attach_uprobe_opts(
+                    prog, -1 /* not a retprobe */, uprobe->binary_path.c_str(), offset_val, &opts);
+
+                if (link == NULL) {
+                  // This will provide a more specific error code than the skeleton attach.
+                  DC_LOG_DEBUG("Failed to attach uprobe %s on offset:0x%lx manually: %d",
+                               func_name_.c_str(), offset_val, errno);
+                  total_failed_probes += 2;
+                } else {
+                  total_successful_probes++;
+                  // Successfully attached uprobe
+                  DC_LOG_DEBUG("Successfully attached uprobe %s on offset:0x%lx manually",
+                               func_name_.c_str(), offset_val);
+                  opts.retprobe = true;
+                  struct bpf_program* prog2 =
+                      bpf_object__find_program_by_name(skel->obj, exit_func.c_str());
+                  link = bpf_program__attach_uprobe_opts(prog2, -1 /* not a retprobe */,
+                                                         uprobe->binary_path.c_str(), offset_val,
+                                                         &opts);
+
+                  if (link == NULL) {
+                    // This will provide a more specific error code than the skeleton attach.
+                    DC_LOG_DEBUG("Failed to attach uretprobe %s on offset:0x%lx manually: %d",
+                                 func_name_.c_str(), offset_val, errno);
+                    total_failed_probes++;
+                  } else {
+                    // Successfully attached uretprobe
+                    DC_LOG_DEBUG("Successfully attached probe %s on offset:0x%lx manually",
+                                 func_name_.c_str(), offset_val);
+                    total_successful_probes++;
+                  }
+                }
+              } else {
+                DC_LOG_DEBUG("Failed to attach uprobe %s on offset:0x%lx manually: %d",
+                             func_name_.c_str(), offset_val, errno);
+                total_failed_probes += 2;
+              }
+            } else {
+              DC_LOG_DEBUG("Failed to attach uprobe %s as no offset present", func_name_.c_str());
+              total_failed_probes += 2;
+            }
+          } else {
+            DC_LOG_DEBUG("Failed to attach as only support uprobe");
+            total_failed_probes += 2;
+          }
+        }
+      }
+    }
+    DC_LOG_INFO(
+        "Manual probes summary: total_manual_probes=%d, total_successful_probes=%d, "
+        "total_failed_probes=%d",
+        total_manual_probes, total_successful_probes, total_failed_probes);
+  } else {
+    DC_LOG_WARN("Failed to read probes file: %s", config_manager->manual_probe_path.c_str());
+  }
+
 #if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
   int inclusion_trie = bpf_obj_get("/sys/fs/bpf/inclusion_path_trie");
   if (inclusion_trie < 0) {

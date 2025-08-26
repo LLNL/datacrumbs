@@ -503,6 +503,12 @@ void ConfigurationManager::derive_configurations() {
   DC_LOG_DEBUG("[ConfigurationManager] Category map path: %s",
                this->category_map_path.string().c_str());
 
+  // Construct manual probe file name: manual-probes-user-host.json
+  std::string manual_probe_file_name = "manual-probes-" + user + "-" + hostname_str + ".json";
+  this->manual_probe_path = this->data_dir / manual_probe_file_name;
+  DC_LOG_DEBUG("[ConfigurationManager] Manual probe path: %s",
+               this->manual_probe_path.string().c_str());
+
   // Load category_map from JSON file using json-c
   std::string category_json_path = category_map_path.string();
   if (!category_json_path.empty() && std::filesystem::exists(category_json_path)) {
