@@ -306,9 +306,9 @@ inline static int lookup_and_delete(int map_fd, datacrumbs::EventProcessor* even
   }
   // Check if the end of the map has been reached
   if (ret < 0 && errno == ENOENT) {
-    return -1;
+    return 0;
   }
-  return 0;
+  return 1;
 }
 
 inline static int lookup(int map_fd, datacrumbs::EventProcessor* event_processor,
@@ -328,6 +328,14 @@ inline static int lookup(int map_fd, datacrumbs::EventProcessor* event_processor
     return -1;
   }
   return 0;
+}
+
+// Setup signal handler for Ctrl-C (SIGINT)
+static volatile bool stop = false;
+// Define a signal handler function with C linkage
+static void sig_handler(int) {
+  stop = true;
+  DC_LOG_INFO("\nReceived SIGINT, setting loop variable");
 }
 
 int main(int argc, char** argv) {
@@ -620,9 +628,6 @@ int main(int argc, char** argv) {
   DC_LOG_PRINT("Ready to run the code.");
 
   // Main event polling loop
-  // Setup signal handler for Ctrl-C (SIGINT)
-  static volatile bool stop = false;
-  auto sig_handler = [](int) { stop = true; };
   signal(SIGINT, sig_handler);
 
   unsigned int batch_size = 1024;
@@ -663,8 +668,14 @@ int main(int argc, char** argv) {
   unsigned long long last_processed_timestamp = 0;
   auto time_unit = 1000000000 / DATACRUMBS_TIME_INTERVAL_NS;
   while (!stop) {
-    lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch);
-
+    err = 0;
+    err = lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch);
+    if (err == -EINTR) {
+      DC_LOG_INFO("\nReceived EINTR, exiting poll loop");
+      err = 0;
+      break;
+    }
+    err = 0;
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
     err = ring_buffer__poll(rb, 10);
     // Ctrl-C gives -EINTR
@@ -724,6 +735,7 @@ int main(int argc, char** argv) {
       break;
     }
   }
+  batch_size = 1024 * 1024;
   DC_LOG_INFO("\n");
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
   DC_LOG_INFO("Collecting rest of the events");
@@ -758,8 +770,8 @@ int main(int argc, char** argv) {
 #endif
 #endif
   DC_LOG_PRINT("Collecting string metadata from file_map...");
-  while (lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch) !=
-         -1) {
+  while (lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch) ==
+         1) {
     // Continue until no more keys are found
   }
   if (keys) {
