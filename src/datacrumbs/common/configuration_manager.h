@@ -71,7 +71,10 @@ class ConfigurationManager {
   // Derived configuration: path to the category map file
   std::filesystem::path category_map_path;
 
-  // Dervived configuration: category map for event IDs
+  // Derived configuration: path to the manual probe file
+  std::filesystem::path manual_probe_path;
+
+  // Derived configuration: category map for event IDs
   std::unordered_map<uint64_t, std::pair<std::string, std::string>> category_map;
 
   /**

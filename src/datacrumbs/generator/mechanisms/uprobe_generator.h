@@ -26,11 +26,16 @@ class UProbeGenerator {
    * @param provider Name of the provider (e.g., binary or library).
    */
   UProbeGenerator(int event_id, const std::string& func_name, const std::string& offset,
-                  const std::string& provider)
-      : event_id_(event_id), func_name_(func_name), offset_(offset), provider_(provider) {
+                  const std::string& provider, bool is_manual = false)
+      : event_id_(event_id),
+        func_name_(func_name),
+        offset_(offset),
+        provider_(provider),
+        is_manual_(is_manual) {
     DC_LOG_TRACE(
-        "UProbeGenerator::UProbeGenerator - event_id=%d, func_name=%s, offset=%s, provider=%s",
-        event_id, func_name.c_str(), offset.c_str(), provider.c_str());
+        "UProbeGenerator::UProbeGenerator - event_id=%d, func_name=%s, offset=%s, provider=%s, "
+        "is_manual=%d",
+        event_id, func_name.c_str(), offset.c_str(), provider.c_str(), is_manual);
   }
 
   /**
@@ -50,7 +55,11 @@ class UProbeGenerator {
     }
     std::stringstream ss;
     // Generate uprobe section and function
-    ss << "SEC(\"uprobe/" << provider_ << ":" << load_func << "\")\n";
+    if (is_manual_) {
+      ss << "SEC(\"uprobe\")\n";
+    } else {
+      ss << "SEC(\"uprobe/" << provider_ << ":" << load_func << "\")\n";
+    }
     ss << "int BPF_UPROBE(" << sanitized_func_name << event_id_ << "_entry) {\n";
     ss << "  generic_entry(ctx, " << event_id_ << ");\n";
     ss << "  return 0;\n";
@@ -63,7 +72,11 @@ class UProbeGenerator {
       exit_func = "generic_exit";
     }
     // Generate uretprobe section and function
-    ss << "SEC(\"uretprobe/" << provider_ << ":" << func_name_ << "\")\n";
+    if (is_manual_) {
+      ss << "SEC(\"uretprobe\")\n";
+    } else {
+      ss << "SEC(\"uretprobe/" << provider_ << ":" << func_name_ << "\")\n";
+    }
     ss << "int BPF_URETPROBE(" << sanitized_func_name << event_id_ << "_exit) {\n";
     ss << "  " << exit_func << "(ctx, " << event_id_ << ");\n";
     ss << "  return 0;\n";
@@ -78,6 +91,7 @@ class UProbeGenerator {
   std::string func_name_;  ///< Name of the function to probe
   std::string provider_;   ///< Provider (binary/library)
   std::string offset_;     ///< Offset within the function (currently unused)
+  bool is_manual_;         ///< Whether the probe is manual
 };
 
 }  // namespace datacrumbs
