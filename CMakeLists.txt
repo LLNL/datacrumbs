@@ -527,7 +527,13 @@ set_tests_properties(datacrumbs PROPERTIES DEPENDS ${PROJECT_NAME})
 
 add_subdirectory(tools)
 add_subdirectory(tests)
-
+add_executable(callgraph_creator
+    tools/callgraph.cpp
+)
+install(
+    TARGETS callgraph_creator
+    RUNTIME DESTINATION ${DATACRUMBS_INSTALL_BINARYDIR}/tools
+)
 add_test(NAME test_simple_dd
     COMMAND bash -c "dd if=/dev/zero of=/tmp/img_temp.bat bs=1M count=16"
 )

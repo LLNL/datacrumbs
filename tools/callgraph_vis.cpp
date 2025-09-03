@@ -4,7 +4,10 @@
 #include <getopt.h>
 #include <math.h>
 #include <ctype.h>
-#include "cJSON.h"
+#include <json-c/json.h>
+#include <fstream>
+
+// --- Type Definitions and Global Structures ---
 
 typedef enum {
     FORMAT_TEXT,
@@ -20,20 +23,26 @@ typedef struct Node {
     struct Node** children;
     int children_count;
     int children_capacity;
-    //int line_num; // Diagnostic: original line number
+    int count = 1;
+    long long max;
+    long long min;
+    int depth = 0;
 } Node;
 
 // Global arguments parsed from command line
 typedef struct Args {
     int show_percentage;
     int is_exclusive_metric;
-    int force_sort; 
+    int force_sort;
     double min_percent_root;
     double min_percent_children;
     OutputFormat output_format;
     char* focus_function;
     char* filepath;
+    int aggregate;
+    int depth_cut = 20;
 } Args;
+
 
 void print_help(const char* prog_name) {
     printf("Usage: %s <filepath> [options]\n\n", prog_name);
@@ -41,14 +50,16 @@ void print_help(const char* prog_name) {
     printf("Options:\n");
     printf("  -h, --help                     Show this help message and exit.\n");
     printf("  -p, --show-percentage          Display the percentage of time each function took (text mode only).\n");
-    printf("  -t, --time-metric <type>       Metric for time display (text mode only). <type> can be 'inclusive' or 'exclusive'.\n");
+    printf("  -a, --aggregate                Aggregate repetitive functions under the same parent into one entry.\n");
+    printf("  -t, --time-metric <type>       Metric for time display. <type> can be 'inclusive' or 'exclusive'.\n");
     printf("  -f, --focus-function <name>    Focus the output on all instances of a specific function.\n");
-    printf("  -s, --force-sort               Force the program to sort the trace data if it might be out of order.\n");
+    printf("  -s, --force-sort               Force sorting of trace data (useful if out of order).\n");
     printf("  -o, --output-format <format>   Specify the output format. <format> can be:\n");
     printf("                                   'text' (default): Human-readable call tree.\n");
     printf("                                   'dot': DOT language file for Graphviz.\n");
-    printf("      --min-percent-root <num>   Hide root functions that are less than <num>%% of the total trace time.\n");
-    printf("      --min-percent-children <num> Hide child functions that are less than <num>%% of their parent's time.\n");
+    printf("  -d, --depth_cut <num>          Set the maximum depth for the call tree (default: 20).\n");
+    printf("      --min-percent-root <num>   Hide root functions consuming less than <num>%% of total time.\n");
+    printf("      --min-percent-children <num> Hide child functions consuming less than <num>%% of parent's time.\n");
 }
 
 void calculate_exclusive_times(Node** nodes, int count) {
@@ -77,7 +88,7 @@ void find_nodes_by_name(Node** nodes, int count, const char* name, Node*** found
         }
     }
 }
-
+// For events starting at the same time, process the larger (parent) one first
 int compare_nodes(const void* a, const void* b) {
     Node* nodeA = *(Node**)a;
     Node* nodeB = *(Node**)b;
@@ -119,22 +130,42 @@ void print_tree(Node** nodes, int count, Args* args, long long total_run_time, c
         
         if (args->output_format == FORMAT_TEXT) {
             const char* connector = (i == count - 1) ? "└── " : "├── ";
-            printf("%s%s%s (ts: %lld, dur: %lld [%s])", prefix, connector, node->name, node->ts, 
+            printf("%s%s%s (dur: %lld [%s], depth: %d)", prefix, connector, node->name, 
                    args->is_exclusive_metric ? node->exclusive_dur : node->dur,
-                   args->is_exclusive_metric ? "exclusive" : "inclusive");
-                   //node->line_num);
+                   args->is_exclusive_metric ? "exclusive" : "inclusive",
+                   node->depth);
+            
+            if (args->aggregate && node->count > 1) {
+                printf(" (count: %d, min: %lld, max: %lld, avg: %lld)", node->count, node->min, node->max, node->dur / node->count);
+            }
 
             if (args->show_percentage) {
                 const char* label = (parent_inclusive_dur == -1) ? (args->focus_function ? "of self" : "of total") : "of parent";
                 printf(" [%.2f%% %s]", percentage, label);
             }
+            
             printf("\n");
         } else if (args->output_format == FORMAT_DOT) {
+            char sanitized_name[1024];
+            sanitize_for_graphing(node->name, sanitized_name, sizeof(sanitized_name));
+
+            // Calculate the exclusive duration's percentage of the total run time.
+            double exclusive_percentage_of_total = 0.0;
+            if (total_run_time > 0) {
+                exclusive_percentage_of_total = ((double)node->exclusive_dur / total_run_time) * 100.0;
+            }
+
+            // Define the node with a label showing its name, exclusive duration, and percentage of total.
+            printf("  \"%s\" [label=\"%s\\nExclusive: %lld (%.2f%%)\"];\n",
+                   sanitized_name,
+                   node->name,
+                   node->exclusive_dur,
+                   exclusive_percentage_of_total);
+
+            // If it's a child node, draw an edge from its parent.
             if (parent_inclusive_dur != -1) {
                 char sanitized_parent[1024];
-                char sanitized_name[1024];
                 sanitize_for_graphing(stack_prefix, sanitized_parent, sizeof(sanitized_parent));
-                sanitize_for_graphing(node->name, sanitized_name, sizeof(sanitized_name));
                 printf("  \"%s\" -> \"%s\";\n", sanitized_parent, sanitized_name);
             }
         }
@@ -147,6 +178,7 @@ void print_tree(Node** nodes, int count, Args* args, long long total_run_time, c
                 snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, (i == count - 1) ? "    " : "│   ");
             }
             
+            // For DOT format, the new stack prefix is the current node's name, used to identify the parent in the recursive call.
             if (args->output_format == FORMAT_DOT) {
                 snprintf(new_stack_prefix, sizeof(new_stack_prefix), "%s", node->name);
             }
@@ -156,28 +188,29 @@ void print_tree(Node** nodes, int count, Args* args, long long total_run_time, c
     }
 }
 
-// --- Core Logic ---
-
 int main(int argc, char* argv[]) {
     // --- Argument Parsing ---
-    Args args = {0, 0, 0, 0.0, 0.0, FORMAT_TEXT, NULL, NULL};
+    Args args = {0, 0, 0, 0.0, 0.0, FORMAT_TEXT, NULL, NULL, 0, 20};
     int opt;
     struct option long_options[] = {
-        {"help",               no_argument,       0, 'h'},
-        {"show-percentage",    no_argument,       0, 'p'},
-        {"time-metric",        required_argument, 0, 't'},
-        {"focus-function",     required_argument, 0, 'f'},
-        {"force-sort",         no_argument,       0, 's'},
-        {"min-percent-root",   required_argument, 0, 256},
+        {"help",                 no_argument,       0, 'h'},
+        {"show-percentage",      no_argument,       0, 'p'},
+        {"aggregate",            no_argument,       0, 'a'},
+        {"time-metric",          required_argument, 0, 't'},
+        {"focus-function",       required_argument, 0, 'f'},
+        {"force-sort",           no_argument,       0, 's'},
+        {"output-format",        required_argument, 0, 'o'},
+        {"min-percent-root",     required_argument, 0, 256},
         {"min-percent-children", required_argument, 0, 257},
-        {"output-format",      required_argument, 0, 'o'},
+        {"depth_cut",            required_argument, 0, 'd'},
         {0, 0, 0, 0}
     };
 
-    while ((opt = getopt_long(argc, argv, "hpt:f:so:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hpat:f:so:d:", long_options, NULL)) != -1) {
         switch (opt) {
             case 'h': print_help(argv[0]); return 0;
             case 'p': args.show_percentage = 1; break;
+            case 'a': args.aggregate = 1; break;
             case 't': args.is_exclusive_metric = (strcmp(optarg, "exclusive") == 0); break;
             case 'f': args.focus_function = optarg; break;
             case 's': args.force_sort = 1; break;
@@ -186,6 +219,7 @@ int main(int argc, char* argv[]) {
                     args.output_format = FORMAT_DOT;
                 }
                 break;
+            case 'd': args.depth_cut = atoi(optarg); break;
             case 256: args.min_percent_root = atof(optarg); break;
             case 257: args.min_percent_children = atof(optarg); break;
             default: print_help(argv[0]); return EXIT_FAILURE;
@@ -198,7 +232,7 @@ int main(int argc, char* argv[]) {
     }
     args.filepath = argv[optind];
 
-    // --- Main Analysis Mode ---
+    // --- File Reading ---
     FILE* fp = fopen(args.filepath, "rb");
     if (!fp) {
         perror("Error opening file for analysis");
@@ -217,24 +251,17 @@ int main(int argc, char* argv[]) {
     buffer[file_size] = '\0';
     fclose(fp);
 
+    // --- JSON Parsing and Node Creation ---
     Node** all_nodes = NULL;
     int total_nodes = 0;
     int capacity = 0;
-    int line_counter = 0;
-
+    long long excluded_time = 0;
     char* current_pos = buffer;
     char* end = buffer + file_size;
 
     while (current_pos < end) {
-        line_counter++;
         char* next_newline = (char*)memchr(current_pos, '\n', end - current_pos);
-        
-        char* line_end;
-        if (next_newline != NULL) {
-            line_end = next_newline;
-        } else {
-            line_end = end;
-        }
+        char* line_end = (next_newline != NULL) ? next_newline : end;
 
         if (line_end > current_pos && *(line_end - 1) == '\r') {
             line_end--;
@@ -244,37 +271,41 @@ int main(int argc, char* argv[]) {
         *line_end = '\0';
         
         if (strlen(current_pos) > 1) {
-            cJSON* json = cJSON_Parse(current_pos);
+            json_object* json = json_tokener_parse(current_pos);
             if (json) {
-                cJSON* ph = cJSON_GetObjectItem(json, "ph");
-                if (ph && cJSON_IsString(ph) && strcmp(ph->valuestring, "X") == 0) {
-                    Node* node = (Node*)calloc(1, sizeof(Node));
-                    cJSON* name = cJSON_GetObjectItem(json, "name");
-                    cJSON* ts = cJSON_GetObjectItem(json, "ts");
-                    cJSON* dur = cJSON_GetObjectItem(json, "dur");
+                json_object *ph_obj;
+                if (json_object_object_get_ex(json, "ph", &ph_obj) &&
+                    json_object_is_type(ph_obj, json_type_string) &&
+                    strcmp(json_object_get_string(ph_obj), "X") == 0) {
                     
-                    if (name && cJSON_IsString(name) && ts && cJSON_IsNumber(ts) && dur && cJSON_IsNumber(dur)) {
-                        node->name = strdup(name->valuestring);
-                        node->ts = (long long)ts->valuedouble;
-                        node->dur = (long long)dur->valuedouble;
+                    json_object *name_obj, *ts_obj, *dur_obj;
+                    if (json_object_object_get_ex(json, "name", &name_obj) && json_object_is_type(name_obj, json_type_string) &&
+                        json_object_object_get_ex(json, "ts", &ts_obj) && json_object_get_type(ts_obj) != json_type_null &&
+                        json_object_object_get_ex(json, "dur", &dur_obj) && json_object_get_type(dur_obj) != json_type_null) {
+                        
+                        Node* node = (Node*)calloc(1, sizeof(Node));
+                        
+                        long long dur_val = json_object_get_int64(dur_obj);
+                        node->name = strdup(json_object_get_string(name_obj));
+                        node->ts = json_object_get_int64(ts_obj);
+                        node->dur = dur_val;
                         node->ts_end = node->ts + node->dur;
-                        //node->line_num = line_counter;
+                        node->count = 1;
+                        node->min = dur_val;
+                        node->max = dur_val;
 
                         if (total_nodes >= capacity) {
                             capacity = (capacity == 0) ? 1024 : capacity * 2;
                             all_nodes = (Node**)realloc(all_nodes, capacity * sizeof(Node*));
                         }
                         all_nodes[total_nodes++] = node;
-                    } else {
-                        free(node);
                     }
                 }
-                cJSON_Delete(json);
+                json_object_put(json); 
             }
         }
 
         *line_end = original_char;
-        
         current_pos = (next_newline != NULL) ? (next_newline + 1) : end;
     }
     free(buffer);
@@ -285,6 +316,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    // --- Call Tree Construction ---
     if (args.force_sort) {
         qsort(all_nodes, total_nodes, sizeof(Node*), compare_nodes);
     }
@@ -293,27 +325,74 @@ int main(int argc, char* argv[]) {
     int stack_top = -1;
     Node** root_calls = NULL;
     int root_count = 0;
+    std::ofstream outFile("depth_cut.txt");
 
     for (int i = 0; i < total_nodes; i++) {
         Node* call = all_nodes[i];
-        while (stack_top > -1 && call->ts_end >= stack[stack_top]->ts_end) {
+        bool found = false;
+
+        while (stack_top > -1 && call->ts >= stack[stack_top]->ts_end) {
             stack_top--;
         }
+
         if (stack_top > -1) {
             Node* parent = stack[stack_top];
-            if (parent->children_count >= parent->children_capacity) {
-                parent->children_capacity = (parent->children_capacity == 0) ? 4 : parent->children_capacity * 2;
-                parent->children = (Node**)realloc(parent->children, parent->children_capacity * sizeof(Node*));
+            call->depth = parent->depth + 1;
+
+            if (call->depth > args.depth_cut) {
+                excluded_time += call->dur;
+                if (outFile.is_open()) {
+                    outFile << call->name << " " << call->dur << std::endl;
+                }
+                continue; 
             }
-            parent->children[parent->children_count++] = call;
-        } else {
-            root_calls = (Node**)realloc(root_calls, (root_count + 1) * sizeof(Node*));
-            root_calls[root_count++] = call;
+
+            if (args.aggregate) {
+                for (int j = 0; j < parent->children_count; j++) {
+                    if (strcmp(parent->children[j]->name, call->name) == 0) {
+                        if (parent->children[j]->max < call->dur) parent->children[j]->max = call->dur;
+                        if (parent->children[j]->min > call->dur) parent->children[j]->min = call->dur;
+                        parent->children[j]->dur += call->dur;
+                        parent->children[j]->count++;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!found) {
+                if (parent->children_count >= parent->children_capacity) {
+                    parent->children_capacity = (parent->children_capacity == 0) ? 4 : parent->children_capacity * 2;
+                    parent->children = (Node**)realloc(parent->children, parent->children_capacity * sizeof(Node*));
+                }
+                parent->children[parent->children_count++] = call;
+            }
+        } else { // Is a root call
+            call->depth = 0;
+            if (args.aggregate) {
+                for (int j = 0; j < root_count; j++) {
+                    if (strcmp(root_calls[j]->name, call->name) == 0) {
+                        if (root_calls[j]->max < call->dur) root_calls[j]->max = call->dur;
+                        if (root_calls[j]->min > call->dur) root_calls[j]->min = call->dur;
+                        root_calls[j]->dur += call->dur;
+                        root_calls[j]->count++;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found) {
+                root_calls = (Node**)realloc(root_calls, (root_count + 1) * sizeof(Node*));
+                root_calls[root_count++] = call;
+            }
         }
+        
         stack[++stack_top] = call;
     }
     free(stack);
+    outFile.close();
 
+    // --- Data Processing and Output ---
     calculate_exclusive_times(root_calls, root_count);
 
     if (args.output_format == FORMAT_DOT) {
@@ -331,6 +410,7 @@ int main(int argc, char* argv[]) {
             if (args.output_format == FORMAT_TEXT) {
                 printf("Found %d instance(s) of '%s'.\n\n", focused_count, args.focus_function);
             }
+            
             for (int i = 0; i < focused_count; i++) {
                 if (args.output_format == FORMAT_TEXT) {
                     printf("============================================================\n");
@@ -338,24 +418,30 @@ int main(int argc, char* argv[]) {
                     printf("Total time for this instance: %lld\n", focused_nodes[i]->dur);
                     printf("============================================================\n");
                 }
+                
                 print_tree(&focused_nodes[i], 1, &args, focused_nodes[i]->dur, "", -1, "");
+                printf("============================================================\n");
                 if (args.output_format == FORMAT_TEXT) printf("\n");
             }
             free(focused_nodes);
         }
     } else {
         if (total_nodes > 0) {
-            long long min_ts = all_nodes[0]->ts;
-            long long max_ts_end = 0;
-            for(int i = 0; i < total_nodes; i++) {
-                if(all_nodes[i]->ts_end > max_ts_end) max_ts_end = all_nodes[i]->ts_end;
+            long long min_ts = -1, max_ts_end = 0;
+            if (total_nodes > 0) { // Ensure all_nodes is not empty
+                min_ts = all_nodes[0]->ts;
+                for(int i = 0; i < total_nodes; i++) {
+                    if(all_nodes[i]->ts < min_ts) min_ts = all_nodes[i]->ts;
+                    if(all_nodes[i]->ts_end > max_ts_end) max_ts_end = all_nodes[i]->ts_end;
+                }
             }
-            long long total_run_time = max_ts_end - min_ts;
+            long long total_run_time = (min_ts != -1) ? (max_ts_end - min_ts) : 0;
             
             if (args.output_format == FORMAT_TEXT) {
                 printf("============================================================\n");
                 printf(" Call Graph\n");
                 printf("Total Trace Duration: %lld\n", total_run_time);
+                printf("Excluded Time (due to depth cut): %lld(%f%% of total time)\n", excluded_time, (total_run_time > 0) ? (excluded_time * 100.0 / total_run_time) : 0.0);
                 printf("============================================================\n");
             }
             print_tree(root_calls, root_count, &args, total_run_time, "", -1, "");
@@ -366,6 +452,7 @@ int main(int argc, char* argv[]) {
         printf("}\n");
     }
 
+    // --- Final Cleanup ---
     for (int i = 0; i < total_nodes; i++) {
         free(all_nodes[i]->name);
         free(all_nodes[i]->children);
@@ -379,8 +466,3 @@ int main(int argc, char* argv[]) {
     }
     return 0;
 }
-
-
-// --- Function Implementations ---
-
-
