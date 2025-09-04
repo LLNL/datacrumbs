@@ -91,7 +91,7 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
         if (!name.empty()) {
           char buffer[32];
           unsigned long offset = static_cast<unsigned long>(
-              syms[j].st_value);  // - static_cast<unsigned long>(base_address_);
+              syms[j].st_value);  // TODO(Hari): Explore if i have to relocate for virtual address space - static_cast<unsigned long>(base_address_);
           DC_LOG_DEBUG("found name: %s st_value: 0x%lx offset: 0x%lx base_address: 0x%lx",
                        name.c_str(), static_cast<unsigned long>(syms[j].st_value), offset,
                        static_cast<unsigned long>(base_address_));
