@@ -225,6 +225,19 @@ int ProbeGenerator::run() {
 
     json_object_put(jarray);  // free memory
     DC_LOG_TRACE("ProbeExplorer::writeProbesToJson - end");
+  } else {
+    DC_LOG_INFO("No manual probes were added.");
+    // Remove existing manual probe file if it exists
+    std::error_code ec;
+    if (std::filesystem::exists(configManager_->manual_probe_path, ec)) {
+      std::filesystem::remove(configManager_->manual_probe_path, ec);
+      if (ec) {
+        DC_LOG_ERROR("Failed to remove file: %s", configManager_->manual_probe_path.c_str());
+      } else {
+        DC_LOG_INFO("Removed existing manual probe file: %s",
+                    configManager_->manual_probe_path.c_str());
+      }
+    }
   }
   // Append all generated probe files as includes to generated.bpf.c
   const char* gen_path = DATACRUMBS_SRC_GEN_PATH;

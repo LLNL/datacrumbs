@@ -3,7 +3,12 @@
 namespace datacrumbs {
 
 ElfSymbolExtractor::ElfSymbolExtractor(const std::string& path, bool include_offsets)
-    : fd_(-1), data_(nullptr), size_(0), include_offsets_(include_offsets) {
+    : fd_(-1), data_(nullptr), size_(0), include_offsets_(include_offsets), base_address_(0),
+      kExcludedFunctions({
+          "_init",
+          "_fini",
+          "_start"
+      }) {
   DC_LOG_TRACE("ElfSymbolExtractor: constructor start for file: %s", path.c_str());
   fd_ = open(path.c_str(), O_RDONLY);
   if (fd_ < 0) {
@@ -125,16 +130,20 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
 
   std::vector<std::string> symbols;
   for (const auto& pair : symbols_map) {
+    // Skip if symbol is in kExcludedFunctions
+    if (kExcludedFunctions.find(pair.first) != kExcludedFunctions.end()) {
+      continue;
+    }
     if (pair.second.size() > 1) {
       DC_LOG_WARN("Symbol %s has multiple offsets, using all occurrences", pair.first.c_str());
       for (const auto& offset : pair.second) {
-        symbols.push_back(pair.first + ":" + offset);
+      symbols.push_back(pair.first + ":" + offset);
       }
     } else {
       if (include_offsets_) {
-        symbols.push_back(pair.first + ":" + *pair.second.begin());
+      symbols.push_back(pair.first + ":" + *pair.second.begin());
       } else {
-        symbols.push_back(pair.first);
+      symbols.push_back(pair.first);
       }
     }
   }
