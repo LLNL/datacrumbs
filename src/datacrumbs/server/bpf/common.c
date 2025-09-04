@@ -20,7 +20,3 @@ DATACRUMBS_MAP(usdt_profile, struct usdt_profile_key_t, struct profile_value_t, 
 DATACRUMBS_MAP(latest_interval, int, unsigned long long, 128);
 #endif
 DATACRUMBS_MAP(file_map, char[MAX_STR_READ_LEN], u32, 1024);
-
-#if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
-DATACRUMBS_TRIE(inclusion_path_trie, struct string_t, u32);
-#endif

@@ -56,8 +56,8 @@
     __uint(key_size, sizeof(map_key));                   \
     __uint(value_size, sizeof(map_value));               \
     __uint(max_entries, 10000);                          \
-    __uint(map_flags, BPF_F_NO_PREALLOC);                \
     __uint(pinning, LIBBPF_PIN_BY_NAME);                 \
+    __uint(map_flags, BPF_F_NO_PREALLOC);                \
   } name SEC(".maps");
 
 #define DATACRUMBS_TRIE_4_ARGS(name, map_key, map_value, size) \
@@ -66,8 +66,8 @@
     __uint(max_entries, size);                                 \
     __type(key, map_key);                                      \
     __type(value, map_value);                                  \
-    __uint(map_flags, BPF_F_NO_PREALLOC);                      \
     __uint(pinning, LIBBPF_PIN_BY_NAME);                       \
+    __uint(map_flags, BPF_F_NO_PREALLOC);                      \
   } name SEC(".maps");
 
 #define DATACRUMBS_TRIE_MACRO_CHOOSER(...) \
@@ -122,7 +122,7 @@
 #define DATACRUMBS_MAP_EXTERN(...) DATACRUMBS_MAP_EXTERN_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 
 #define DATACRUMBS_TRIE_EXTERN_3_ARGS(name, map_key, map_value) \
-  extern struct {                                               \
+  __weak struct {                                               \
     __uint(type, BPF_MAP_TYPE_LPM_TRIE);                        \
     __uint(key_size, sizeof(map_key));                          \
     __uint(value_size, sizeof(map_value));                      \
@@ -132,7 +132,7 @@
   } name SEC(".maps");
 
 #define DATACRUMBS_TRIE_EXTERN_4_ARGS(name, map_key, map_value, size) \
-  extern struct {                                                     \
+  __weak struct {                                                     \
     __uint(type, BPF_MAP_TYPE_LPM_TRIE);                              \
     __uint(max_entries, size);                                        \
     __type(key, map_key);                                             \

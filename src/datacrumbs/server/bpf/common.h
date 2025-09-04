@@ -25,7 +25,7 @@ DATACRUMBS_MAP_EXTERN(latest_interval, int, unsigned long long, 128);
 DATACRUMBS_MAP_EXTERN(file_map, char[MAX_STR_READ_LEN], u32, 1024);
 
 #if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
-DATACRUMBS_TRIE_EXTERN(inclusion_path_trie, struct string_t, u32);
+DATACRUMBS_TRIE_EXTERN(inclusion_path_trie, struct string_t, struct string_t);
 #endif
 
 static inline __attribute__((always_inline)) u32 hash_str(const char* str, size_t len) {
@@ -53,13 +53,33 @@ static inline __attribute__((always_inline)) u32 hash_and_store(struct string_t*
 // Returns 1 if any prefix in trie matches 'str' of length 'len', else 0
 static inline __attribute__((always_inline)) int prefix_search(void* trie, struct string_t* key) {
   // key->len = MAX_STR_READ_LEN;
-  unsigned int* found = bpf_map_lookup_elem(trie, key);
-  if (found && *found != 1) {
-    DBG_PRINTK("Found string:%s value:%u", key->str, *found);
-    return 1;
+  struct string_t* found = (struct string_t*)bpf_map_lookup_elem(trie, key);
+  if (found) {
+    int prefix_len = 0;
+    int is_prefix = 1;
+    for (int i = 0; i < MAX_STR_READ_LEN && i < found->len; ++i) {
+      if (found->str[i] == '\0') break;
+      if (found->str[i] != key->str[i]) {
+        is_prefix = 0;
+        break;
+      }
+      prefix_len++;
+    }
+    if (is_prefix && prefix_len * 8 == found->len) {
+      // found->str is an exact prefix of key->str
+      is_prefix = 1;
+    } else {
+      is_prefix = 0;
+    }
+    if (is_prefix) {
+      DBG_PRINTK("Found prefix:%s value:%u", key->str, prefix_len);
+      return 1;
+    } else {
+      DBG_PRINTK("Not Found prefix:%s value:%d found-len:%d", key->str, prefix_len, found->len);
+      return 0;
+    }
   }
-  DBG_PRINTK("Not Found string:%s value:%u", key->str, found ? *found : 0);
-
+  DBG_PRINTK("Not Found prefix:%s", key->str);
   return 0;
 }
 #else
@@ -220,7 +240,7 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
   struct string_t local_str = {};                                                      // 100
   long len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)clazz);  // 90
-  local_str.len = len;
+  local_str.len = len * 8;
 #if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
   int found = prefix_search(&inclusion_path_trie, &local_str);
   if (!found) {
@@ -260,7 +280,7 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
   struct string_t local_str = {};                                                      // 100
   long len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)clazz);  // 90
-  local_str.len = len;
+  local_str.len = len * 8;
 
 #if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
   int found = prefix_search(&inclusion_path_trie, &local_str);

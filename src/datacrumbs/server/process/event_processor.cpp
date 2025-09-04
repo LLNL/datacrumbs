@@ -520,7 +520,7 @@ int main(int argc, char** argv) {
   }
   struct string_t* cur_key = NULL;
   struct string_t next_key = {};
-  unsigned int value;
+  struct string_t value;
   for (;;) {
     err = bpf_map_get_next_key(inclusion_trie, cur_key, &next_key);
     if (err) break;
@@ -530,30 +530,25 @@ int main(int argc, char** argv) {
 
   // Get inclusion_path from configuration manager and build inclusion_list
   std::unordered_map<unsigned int, string_t> inclusion_list;
-  inclusion_list.insert({1, {2, "/"}});  // Reserve index 1 for empty string
   std::string inclusion_paths = event_processor.configManager_->inclusion_path;
   if (!inclusion_paths.empty()) {
     std::stringstream ss(inclusion_paths);
     std::string path;
-    unsigned int idx = 2;
+    unsigned int idx = 1;
     while (std::getline(ss, path, ':')) {
       if (!path.empty()) {
         string_t s;
         size_t copy_len = path.size();
-        if (copy_len % 8 != 0) {
-          copy_len = (copy_len / 8) * 8;
-          if (copy_len == 0) copy_len = 2;
-        }
         if (copy_len > sizeof(s.str) - 1) copy_len = sizeof(s.str) - 1;
         strncpy(s.str, path.c_str(), copy_len);
-        s.str[copy_len - 1] = '\0';
-        s.len = copy_len;
+        s.str[copy_len] = '\0';
+        s.len = copy_len * 8;
         inclusion_list[idx++] = s;
       }
     }
   }
   for (const auto& pair : inclusion_list) {
-    if (bpf_map_update_elem(inclusion_trie, &pair.second, &pair.first, BPF_ANY) < 0) {
+    if (bpf_map_update_elem(inclusion_trie, &pair.second, &pair.second, BPF_ANY) < 0) {
       DC_LOG_ERROR("Failed to update inclusion path trie for %s", pair.second.str);
       datacrumbs_bpf__destroy(skel);
       return 1;
