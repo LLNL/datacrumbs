@@ -33,7 +33,7 @@ static inline __attribute__((always_inline)) u32 hash_str(const char* str, size_
 #pragma unroll
   for (int i = 0; i < 128; ++i) {
     if (i >= len) break;
-    hash = ((hash << 5) + hash) + str[i];  // hash * 33 + c
+    hash = ((hash << 5) + hash) + str[i];
   }
   return hash;
 }
@@ -52,7 +52,6 @@ static inline __attribute__((always_inline)) u32 hash_and_store(struct string_t*
 #if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
 // Returns 1 if any prefix in trie matches 'str' of length 'len', else 0
 static inline __attribute__((always_inline)) int prefix_search(void* trie, struct string_t* key) {
-  // key->len = MAX_STR_READ_LEN;
   struct string_t* found = (struct string_t*)bpf_map_lookup_elem(trie, key);
   if (found) {
     int prefix_len = 0;
@@ -331,7 +330,6 @@ static inline __attribute__((always_inline)) int generic_fork_exit(struct pt_reg
   key.event_id = event_id;
   u64 start_ts;
   if (need_tracing(&key, &start_ts)) {
-    // u64 id = bpf_get_current_pid_tgid();
     u64 tsp = bpf_ktime_get_ns();
     u32 pid = PT_REGS_RC(ctx);
     (void)pid;
