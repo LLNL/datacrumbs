@@ -7,6 +7,7 @@ namespace datacrumbs {
 ProbeExplorer::ProbeExplorer(int argc, char** argv) {
   DC_LOG_TRACE("ProbeExplorer::ProbeExplorer - start");
   configManager_ = datacrumbs::Singleton<ConfigurationManager>::get_instance(argc, argv);
+  has_invalid_probes_ = false;
   DC_LOG_TRACE("ProbeExplorer::ProbeExplorer - end");
 }
 
@@ -63,7 +64,6 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
   }
 
   std::vector<std::shared_ptr<Probe>> probes;
-
   // Iterate over all capture probes from configuration
   for (const auto& capture_probe : configManager_->capture_probes) {
     std::vector<std::string> functionNames;
@@ -249,10 +249,14 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
     // Validate the probe before adding
     if (!probe->validate()) {
       DC_LOG_ERROR("Probe validation failed for: %s", probe->name.c_str());
+      has_invalid_probes_ = true;
       continue;  // Skip invalid probes
     }
     DC_LOG_INFO("Valid probe extracted: %s", probe->name.c_str());
     probes.push_back(probe);
+  }
+  if (has_invalid_probes_) {
+    DC_LOG_ERROR("One or more probes failed validation. Please check the logs above.");
   }
   DC_LOG_TRACE("ProbeExplorer::extractProbes - end");
   return probes;
@@ -345,5 +349,9 @@ int main(int argc, char** argv) {
   timer.pauseTime();  // Stop timer and accumulate elapsed time
   DC_LOG_PRINT("Elapsed time in Probe Explorer: %f seconds", timer.getElapsedTime());
   DC_LOG_TRACE("main - end");
+  if (explorer.has_invalid_probes_) {
+    DC_LOG_ERROR("Probe exploration completed with errors due to invalid probes.");
+    return 1;  // Indicate error due to invalid probes
+  }
   return 0;
 }

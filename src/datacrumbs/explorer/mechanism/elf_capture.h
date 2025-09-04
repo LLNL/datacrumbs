@@ -55,6 +55,7 @@ class ElfSymbolExtractor {
   bool include_offsets_;   ///< Whether to include offsets in the extraction.
   uint64_t base_address_;  ///< Base address for relative symbols (0 for ET_DYN, entry point for
                            ///< ET_EXEC).
+  std::unordered_set<std::string> kExcludedFunctions; ///< Set of functions to exclude from extraction.
 };
 
 }  // namespace datacrumbs

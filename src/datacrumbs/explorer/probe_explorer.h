@@ -38,6 +38,8 @@ class ProbeExplorer {
   // Returns a vector of shared pointers to Probe objects
   std::vector<std::shared_ptr<Probe>> writeProbesToJson();
 
+  bool has_invalid_probes_ = false;  // Flag to indicate if any invalid probes were found
+
  private:
   // Configuration manager instance for managing configuration settings
   std::shared_ptr<ConfigurationManager> configManager_;
