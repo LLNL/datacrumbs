@@ -5,6 +5,10 @@
 #pragma message("DATACRUMBS_BUILD_CLIENT_SO = " STR(DATACRUMBS_BUILD_CLIENT_SO))
 #endif
 
+#ifndef DATACRUMBS_LIBC_SO
+#define DATACRUMBS_LIBC_SO "/lib64/libc.so.6"
+#endif
+
 static inline __attribute__((always_inline)) int generic_trace_datacrumbs_start() {
   u64 tsp = bpf_ktime_get_ns();
   u64 id = bpf_get_current_pid_tgid();
@@ -35,59 +39,4 @@ int BPF_UPROBE(trace_datacrumbs_start) {
 SEC((DATACRUMBS_STOP))
 int BPF_UPROBE(trace_datacrumbs_stop) {
   return generic_trace_datacrumbs_stop();
-}
-
-static inline __attribute__((always_inline)) int generic_fork_exit(struct pt_regs* ctx,
-                                                                   u64 event_id) {
-  struct fn_key_t key = {};
-  key.event_id = event_id;
-  u64 start_ts;
-  if (need_tracing(&key, &start_ts)) {
-    // u64 id = bpf_get_current_pid_tgid();
-    u64 tsp = bpf_ktime_get_ns();
-    u32 pid = PT_REGS_RC(ctx);
-    (void)pid;
-    if (pid != 0) {
-      DBG_PRINTK("Collect forked tracing PID %d", pid);
-      bpf_map_update_elem(&pid_map, &pid, &tsp, BPF_ANY);
-    }
-  }
-  return generic_exit(ctx, event_id);
-}
-
-SEC("ksyscall/fork")
-int BPF_KSYSCALL(fork_entry, struct pt_regs* regs) {
-  return generic_entry(ctx, 100);
-}
-
-SEC("kretsyscall/fork")
-int BPF_KRETPROBE(fork_exit, struct pt_regs* regs) {
-  return generic_fork_exit(ctx, 100);
-}
-
-SEC("ksyscall/vfork")
-int BPF_KSYSCALL(vfork_entry, struct pt_regs* regs) {
-  return generic_entry(ctx, 101);
-}
-SEC("kretsyscall/vfork")
-int BPF_KRETPROBE(vfork_exit, struct pt_regs* regs) {
-  return generic_fork_exit(ctx, 101);
-}
-
-SEC("uprobe//usr/lib64/libc.so.6:__GI___fork")
-int BPF_UPROBE(__GI___fork_entry) {
-  return generic_entry(ctx, 102);
-}
-SEC("uretprobe//usr/lib64/libc.so.6:__GI___fork")
-int BPF_URETPROBE(__GI___fork_exit) {
-  return generic_fork_exit(ctx, 102);
-}
-
-SEC("uprobe//usr/lib64/libc.so.6:__GI___vfork")
-int BPF_UPROBE(__GI___vfork_entry) {
-  return generic_entry(ctx, 103);
-}
-SEC("uretprobe//usr/lib64/libc.so.6:__GI___vfork")
-int BPF_URETPROBE(__GI___vfork_exit) {
-  return generic_fork_exit(ctx, 103);
 }

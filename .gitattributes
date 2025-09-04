@@ -15,3 +15,8 @@ tests/output/ops-64_ts-64m/RAW-DIRECT.pfw.gz.zindex filter=lfs diff=lfs merge=lf
 tests/output/ops-8192_ts-4m/write.pfw.gz.zindex filter=lfs diff=lfs merge=lfs -text
 *.pfw.gz.jsonl filter=lfs diff=lfs merge=lfs -text
 *.pfw.gz filter=lfs diff=lfs merge=lfs -text
+*.json filter=lineignore
+*.pfw filter=lineignore
+*.pfw.gz filter=lineignore
+*.txt filter=lineignore
+*.log filter=lineignore

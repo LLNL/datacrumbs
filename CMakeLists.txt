@@ -35,17 +35,32 @@ if(NOT DATACRUMBS_EXTERNALLY_CONFIGURED)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
     set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec)
 endif()
+
 function(print_all_variables)
-  message(STATUS "CMake Variables:")
-  get_cmake_property(_variableNames VARIABLES)
-  list(SORT _variableNames)
-  foreach (_variableName ${_variableNames})
-    message(STATUS "${_variableName}=${${_variableName}}")
-  endforeach()
+    message(STATUS "CMake Variables:")
+    get_cmake_property(_variableNames VARIABLES)
+    list(SORT _variableNames)
+
+    foreach(_variableName ${_variableNames})
+        message(STATUS "${_variableName}=${${_variableName}}")
+    endforeach()
 endfunction()
+
 option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
 option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" ON)
 option(BPFTOOL_EXECUTABLE "Path to bpftool executable" "")
+
+if(BPFTOOL_EXECUTABLE STREQUAL "OFF")
+    set(BPFTOOL_EXECUTABLE "")
+endif()
+
+option(DATACRUMBS_LOG_LEVEL "Set log level (0=PRINT, 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG, 5=TRACE)" 3)
+
+if(DATACRUMBS_LOG_LEVEL STREQUAL "OFF")
+    set(DATACRUMBS_LOG_LEVEL 3)
+endif()
+
+message(STATUS "[${UPPER_PROJECT_NAME}] DATACRUMBS_LOG_LEVEL is ${DATACRUMBS_LOG_LEVEL}")
 
 # Optionally allow user to specify host name via CMake option
 option(DATACRUMBS_HOST "Host name for datacrumbs (numbers will be stripped if not set)" "")
@@ -76,12 +91,21 @@ add_custom_target_with_clean(clean_all)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+find_library(LIBC_SO NAMES libc.so.6 libc.so PATHS /lib /usr/lib /lib64 /usr/lib64 /usr/local/lib /usr/local/lib64 /usr/lib/x86_64-linux-gnu NO_DEFAULT_PATH)
+
+if(LIBC_SO)
+    message(STATUS "[${UPPER_PROJECT_NAME}] Found libc: ${LIBC_SO}")
+else()
+    message(WARNING "[${UPPER_PROJECT_NAME}] libc.so not found!")
+endif()
+
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBBPF libbpf)
 
 if(LIBBPF_VERSION VERSION_LESS "1.0.0")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf version 1.0.0 or newer is required, but found ${LIBBPF_VERSION}")
 endif()
+
 # print_all_variables()
 if(LIBBPF_FOUND)
     set(LIBBPF_VERSION "${LIBBPF_VERSION}")
@@ -141,7 +165,7 @@ else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] yaml-cpp is needed for ${PROJECT_NAME} build")
 endif()
 
-find_package(LLVM 19.1.7 REQUIRED CONFIG COMPONENTS Clang)
+find_package(LLVM REQUIRED CONFIG COMPONENTS Clang)
 
 if(LLVM_FOUND)
     message(STATUS "[${UPPER_PROJECT_NAME}] found LLVM at ${LLVM_INCLUDE_DIRS}")
@@ -149,6 +173,7 @@ if(LLVM_FOUND)
     link_directories(${LLVM_LIBRARY_DIRS})
     set(DEPENDENCY_LIB ${DEPENDENCY_LIB} ${LLVM_LIBRARIES} -lclang)
     set(CLANG_EXECUTABLE ${LLVM_TOOLS_BINARY_DIR}/clang)
+
     if(NOT EXISTS ${CLANG_EXECUTABLE})
         message(FATAL_ERROR "clang executable not found at ${CLANG_EXECUTABLE}. Please check your LLVM installation.")
     else()
@@ -159,7 +184,7 @@ if(LLVM_FOUND)
         )
         message(STATUS "[${UPPER_PROJECT_NAME}] Found clang executable: ${CLANG_EXECUTABLE}")
         message(STATUS "[${UPPER_PROJECT_NAME}] clang version: ${CLANG_VERSION_OUTPUT}")
-endif()
+    endif()
 
 else()
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] LLVM is needed for ${PROJECT_NAME} build")
@@ -187,6 +212,7 @@ endif()
 
 add_executable(${PROJECT_NAME}_explorer ${DATACRUMBS_EXPLORER_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(${PROJECT_NAME}_explorer ${DEPENDENCY_LIB})
+target_compile_definitions(${PROJECT_NAME}_explorer PRIVATE -DDATACRUMBS_LOG_LEVEL=${DATACRUMBS_LOG_LEVEL})
 install(
     TARGETS ${PROJECT_NAME}_explorer
     EXPORT ${DATACRUMBS_EXPORTED_TARGETS}
@@ -220,6 +246,7 @@ set(DATACRUMBS_GENERATOR_SRC
 )
 add_executable(${PROJECT_NAME}_generator ${DATACRUMBS_GENERATOR_SRC} ${DATACRUMBS_COMMON_SRC})
 target_compile_definitions(${PROJECT_NAME}_generator PRIVATE -DDATACRUMBS_SRC_GEN_PATH="${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}")
+target_compile_definitions(${PROJECT_NAME}_generator PRIVATE -DDATACRUMBS_LOG_LEVEL=${DATACRUMBS_LOG_LEVEL})
 target_link_libraries(${PROJECT_NAME}_generator ${DEPENDENCY_LIB})
 install(
     TARGETS ${PROJECT_NAME}_generator
@@ -245,8 +272,18 @@ include_directories(${DATACRUMBS_INSTALL_LIBEXEC})
 include_directories(${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 
 # Generate vmlinux.h using bpftool before building datacrumbs_bpf
-if(NOT BPFTOOL_EXECUTABLE)
-    find_program(BPFTOOL_EXECUTABLE NAMES bpftool REQUIRED)
+if(BPFTOOL_EXECUTABLE AND NOT BPFTOOL_EXECUTABLE STREQUAL "OFF")
+    message(STATUS "[${UPPER_PROJECT_NAME}] Using user-specified bpftool executable: ${BPFTOOL_EXECUTABLE}")
+else()
+    find_program(BPFTOOL_EXECUTABLE_SEARCH bpftool PATHS /usr/sbin/ /usr/bin/ /usr/local/bin/ /usr/local/sbin/)
+    message(STATUS "[${UPPER_PROJECT_NAME}] $ENV{PATH} ${BPFTOOL_EXECUTABLE_SEARCH}")
+    set(BPFTOOL_EXECUTABLE ${BPFTOOL_EXECUTABLE_SEARCH})
+
+    if(NOT BPFTOOL_EXECUTABLE)
+        message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] bpftool executable not found! Please install bpftool or specify its path via BPFTOOL_EXECUTABLE.")
+    endif()
+
+    message(STATUS "[${UPPER_PROJECT_NAME}] Found bpftool executable: ${BPFTOOL_EXECUTABLE}")
 endif()
 
 set(VMLINUX_BTF_PATH "/sys/kernel/btf/vmlinux")
@@ -262,8 +299,6 @@ add_custom_command(
 )
 
 add_custom_target(vmlinux_header ALL DEPENDS ${VMLINUX_HEADER})
-
-
 
 set(BPF_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/main.bpf.c)
 set(BPF_OUTPUT ${CMAKE_BINARY_DIR}/bpf/datacrumbs.bpf.o)
@@ -293,7 +328,7 @@ add_custom_command(
     OUTPUT ${BPF_OUTPUT}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bpf
     COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Compiling BPF program: ${BPF_SOURCE} (timing start)"
-    COMMAND ${CMAKE_COMMAND} -E time ${CLANG_EXECUTABLE} -target bpf -DDATACRUMBS_BUILD_CLIENT_SO=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so -I${LIBBPF_INCLUDEDIR} -DDATACRUMBS_INSTALL_CLIENT_SO=${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so -D__TARGET_ARCH_${DATACRUMBS_ARCH} -I${CMAKE_INCLUDE_OUTPUT_DIRECTORY} -I${CMAKE_LIBEXEC_OUTPUT_DIRECTORY} -I${DATACRUMBS_INSTALL_LIBEXEC} -I${CMAKE_CURRENT_SOURCE_DIR}/include -I${CMAKE_CURRENT_SOURCE_DIR}/src -Wall -g -O2 -c ${BPF_SOURCE} -o ${BPF_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E time ${CLANG_EXECUTABLE} -target bpf -DDATACRUMBS_LOG_LEVEL=${DATACRUMBS_LOG_LEVEL} -DDATACRUMBS_LIBC_SO=${LIBC_SO} -DDATACRUMBS_BUILD_CLIENT_SO=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so -I${LIBBPF_INCLUDEDIR} -DDATACRUMBS_INSTALL_CLIENT_SO=${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so -D__TARGET_ARCH_${DATACRUMBS_ARCH} -I${CMAKE_INCLUDE_OUTPUT_DIRECTORY} -I${CMAKE_LIBEXEC_OUTPUT_DIRECTORY} -I${DATACRUMBS_INSTALL_LIBEXEC} -I${CMAKE_CURRENT_SOURCE_DIR}/include -I${CMAKE_CURRENT_SOURCE_DIR}/src -Wall -g -O2 -c ${BPF_SOURCE} -o ${BPF_OUTPUT}
     DEPENDS ${BPF_SOURCE}
     COMMENT "Compiling BPF program: ${BPF_SOURCE} (timed)"
     VERBATIM
@@ -325,6 +360,7 @@ set(DATACRUMBS_PROCESS_EVENTS_SRC
 )
 include_directories(${CMAKE_INCLUDE_OUTPUT_DIRECTORY})
 add_executable(${PROJECT_NAME} ${DATACRUMBS_PROCESS_EVENTS_SRC} ${DATACRUMBS_COMMON_SRC})
+target_compile_definitions(${PROJECT_NAME} PRIVATE -DDATACRUMBS_LOG_LEVEL=${DATACRUMBS_LOG_LEVEL})
 target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB} -l:libbpf.so -lelf -lz -lpthread)
 add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel)
 
@@ -345,3 +381,22 @@ add_custom_target(extra_clean
 )
 add_subdirectory(tools)
 add_subdirectory(tests)
+install(
+    TARGETS callgraph_creator
+    RUNTIME DESTINATION ${DATACRUMBS_INSTALL_BINARYDIR}/tools
+)
+
+add_executable(callgraph_creator
+    tools/callgraph.cpp
+    tools/cJSON.c
+)
+enable_testing()
+
+add_test(NAME datacrumbs COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs ${DATACRUMBS_HOST} ${configuration_variables})
+add_test(NAME datacrumbs_pretest COMMAND bash -c "ulimit -n 4096")
+set_tests_properties(datacrumbs PROPERTIES DEPENDS datacrumbs_pretest)
+
+add_test(NAME test_simple_dd
+    COMMAND bash -c "dd if=/dev/zero of=/tmp/img_temp.bat bs=1M count=16"
+)
+set_tests_properties(test_simple_dd PROPERTIES ENVIRONMENT "LD_PRELOAD=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so")

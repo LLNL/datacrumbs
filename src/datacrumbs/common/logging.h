@@ -15,8 +15,10 @@
 #define LOG_LEVEL_TRACE 5
 
 // Set default log level if not defined by CMake
-#ifndef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+#ifndef DATACRUMBS_LOG_LEVEL
+#define DATACRUMBS_LOG_LEVEL LOG_LEVEL_INFO
+#else
+
 #endif
 
 #include <cstdarg>
@@ -92,7 +94,7 @@ inline void log_message_no_new_line(const char* level, const char* fmt, Args&&..
 }
 
 // Trace-level logging with file and line info
-#if LOG_LEVEL >= LOG_LEVEL_DEBUG
+#if DATACRUMBS_LOG_LEVEL >= LOG_LEVEL_DEBUG
 inline void log_message_trace(const char* level, const char* file, int line, const char* fmt, ...) {
   std::lock_guard<std::mutex> lock(get_log_mutex());
   FILE* out = get_log_file();
@@ -121,31 +123,31 @@ inline void log_message_trace(const char* level, const char* file, int line, con
 #endif
 
 // Macros for logging
-#if LOG_LEVEL >= LOG_LEVEL_ERROR
+#if DATACRUMBS_LOG_LEVEL >= LOG_LEVEL_ERROR
 #define DC_LOG_ERROR(...) datacrumbs::logging_internal::log_message("ERROR", __VA_ARGS__)
 #else
 #define DC_LOG_ERROR(...) (void)0
 #endif
 
-#if LOG_LEVEL >= LOG_LEVEL_WARN
+#if DATACRUMBS_LOG_LEVEL >= LOG_LEVEL_WARN
 #define DC_LOG_WARN(...) datacrumbs::logging_internal::log_message("WARN", __VA_ARGS__)
 #else
 #define DC_LOG_WARN(...) (void)0
 #endif
 
-#if LOG_LEVEL >= LOG_LEVEL_INFO
+#if DATACRUMBS_LOG_LEVEL >= LOG_LEVEL_INFO
 #define DC_LOG_INFO(...) datacrumbs::logging_internal::log_message("INFO", __VA_ARGS__)
 #else
 #define DC_LOG_INFO(...) (void)0
 #endif
 
-#if LOG_LEVEL >= LOG_LEVEL_DEBUG
+#if DATACRUMBS_LOG_LEVEL >= LOG_LEVEL_DEBUG
 #define DC_LOG_DEBUG(...) datacrumbs::logging_internal::log_message("DEBUG", __VA_ARGS__)
 #else
 #define DC_LOG_DEBUG(...) (void)0
 #endif
 
-#if LOG_LEVEL >= LOG_LEVEL_TRACE
+#if DATACRUMBS_LOG_LEVEL >= LOG_LEVEL_TRACE
 #define DC_LOG_TRACE(...) datacrumbs::logging_internal::log_message("TRACE", __VA_ARGS__)
 #else
 #define DC_LOG_TRACE(...) (void)0
