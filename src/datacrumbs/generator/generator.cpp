@@ -72,14 +72,6 @@ int ProbeGenerator::run() {
     // Iterate over each function in the probe
     for (size_t func_index = 0; func_index < probe.functions.size(); ++func_index) {
       const auto& func = probe.functions[func_index];
-      auto combined_name = probe.name + "_" + func;
-      // Check and insert into global set to avoid duplicates
-      if (!global_function_names.insert(combined_name).second) {
-        DC_LOG_WARN(
-            "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from %s.",
-            func.c_str(), probe.name.c_str());
-        continue;
-      }
 
       int current_event_id = 0;
       if (probe.type != ProbeType::CUSTOM) {
@@ -98,6 +90,15 @@ int ProbeGenerator::run() {
       // Generate code based on probe type
       switch (probe.type) {
         case ProbeType::KPROBE: {
+          auto combined_name = func;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
           DC_LOG_DEBUG("[ProbeGenerator] Using KProbeGenerator for function: %s (event_id: %d)",
                        func.c_str(), current_event_id);
           KProbeGenerator generator(current_event_id, func);
@@ -119,6 +120,15 @@ int ProbeGenerator::run() {
             function_name = func;
             offset = "";
           }
+          auto combined_name = uprobe.binary_path + "_" + function_name + "_" + offset;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
           if (is_manual) {
             DC_LOG_DEBUG("[ProbeGenerator] Adding manual uprobe for function: %s", func.c_str());
             manual_probe->functions.push_back(std::to_string(current_event_id));
@@ -133,17 +143,45 @@ int ProbeGenerator::run() {
           DC_LOG_DEBUG("[ProbeGenerator] Using SyscallGenerator for function: %s (event_id: %d)",
                        func.c_str(), current_event_id);
           SyscallGenerator syscall_gen(current_event_id, func);
+          auto combined_name = func;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
           ss << syscall_gen.generate().str() << std::endl;
+
           break;
         }
         case ProbeType::USDT: {
           DC_LOG_DEBUG("[ProbeGenerator] Using USDTGenerator for function: %s (event_id: %d)",
                        func.c_str(), current_event_id);
           auto usdt = USDTProbe::fromJson(jprobe);
+          auto combined_name = usdt.binary_path + "_" + usdt.provider + "_" + func;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
           USDTGenerator usdt_gen(current_event_id, func, usdt.binary_path, usdt.provider);
           ss << usdt_gen.generate().str() << std::endl;
         } break;
         case ProbeType::CUSTOM: {
+          auto combined_name = func;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
         } break;
         default: {
           DC_LOG_ERROR("Unknown probe type: %d", static_cast<int>(probe.type));
