@@ -62,6 +62,47 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
       DC_LOG_DEBUG("  Excluded Function: %s", func.c_str());
     }
   }
+
+  // Load additional invalid probes from file if specified
+  if (!configManager_->probe_invalid_file_path.empty() &&
+      std::filesystem::exists(configManager_->probe_invalid_file_path)) {
+    std::ifstream ifs(configManager_->probe_invalid_file_path);
+    if (ifs.is_open()) {
+      std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+      json_object* jobj = json_tokener_parse(content.c_str());
+      if (jobj && json_object_get_type(jobj) == json_type_array) {
+        int arr_len = json_object_array_length(jobj);
+        for (int i = 0; i < arr_len; ++i) {
+          json_object* probe_obj = json_object_array_get_idx(jobj, i);
+          if (!probe_obj) continue;
+          json_object* name_obj = nullptr;
+          json_object* funcs_obj = nullptr;
+          if (json_object_object_get_ex(probe_obj, "name", &name_obj) &&
+              json_object_object_get_ex(probe_obj, "functions", &funcs_obj) &&
+              json_object_get_type(name_obj) == json_type_string &&
+              json_object_get_type(funcs_obj) == json_type_array) {
+            std::string probe_name = json_object_get_string(name_obj);
+            std::unordered_set<std::string> func_set;
+            int func_len = json_object_array_length(funcs_obj);
+            for (int j = 0; j < func_len; ++j) {
+              json_object* func_obj = json_object_array_get_idx(funcs_obj, j);
+              if (func_obj && json_object_get_type(func_obj) == json_type_string) {
+                func_set.insert(json_object_get_string(func_obj));
+              }
+            }
+            // Merge with existing exclusion map if present
+            auto& existing_set = exclusionMap[probe_name];
+            existing_set.insert(func_set.begin(), func_set.end());
+          }
+        }
+      }
+      if (jobj) json_object_put(jobj);
+    } else {
+      DC_LOG_ERROR("Failed to open invalid probes file: %s",
+                   configManager_->probe_invalid_file_path.string().c_str());
+    }
+  }
+
   static std::unordered_set<std::string> global_function_names;
   std::vector<std::shared_ptr<Probe>> probes;
   // Iterate over all capture probes from configuration

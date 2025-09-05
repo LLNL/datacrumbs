@@ -434,6 +434,8 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
   DC_LOG_INFO("  Data dir: %s", this->data_dir.string().c_str());
   DC_LOG_INFO("  Probe file path: %s", this->probe_file_path.string().c_str());
   DC_LOG_INFO("  Probe exclusion file path: %s", this->probe_exclusion_file_path.string().c_str());
+  DC_LOG_INFO("  Probe invalid file path: %s", this->probe_invalid_file_path.string().c_str());
+  DC_LOG_INFO("  Manual probe path: %s", this->manual_probe_path.string().c_str());
   DC_LOG_INFO("  Category map path: %s", this->category_map_path.string().c_str());
   DC_LOG_INFO("  Profiling interval: %f", this->profiling_interval);
   DC_LOG_INFO("  User: %s", this->user.c_str());
@@ -496,6 +498,12 @@ void ConfigurationManager::derive_configurations() {
   this->probe_exclusion_file_path = this->data_dir / probe_exclusion_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Probe exclusion file path: %s",
                this->probe_exclusion_file_path.string().c_str());
+
+  // Construct probe invalid file name: probes-invalid-user-host.json
+  std::string probe_invalid_file_name = "probes-invalid-" + user + "-" + hostname_str + ".json";
+  this->probe_invalid_file_path = this->data_dir / probe_invalid_file_name;
+  DC_LOG_DEBUG("[ConfigurationManager] Probe invalid path: %s",
+               this->probe_invalid_file_path.string().c_str());
 
   // Construct categories file name: categories-user-host.json
   std::string categories_file_name = "categories-" + user + "-" + hostname_str + ".json";
