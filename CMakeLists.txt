@@ -527,10 +527,12 @@ endforeach()
 # message(STATUS "BPF Extra Sources: ${DATACRUMBS_BPF_EXTRA_SOURCES}")
 set(DATACRUMBS_BPF_OBJECTS "")
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bpf)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bpf/server)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bpf/validator)
 
 foreach(BPF_SRC_FILE ${DATACRUMBS_BPF_EXTRA_SOURCES})
     get_filename_component(BPF_SRC_NAME ${BPF_SRC_FILE} NAME_WE)
-    set(BPF_OBJ_FILE "${CMAKE_BINARY_DIR}/bpf/${BPF_SRC_NAME}.o")
+    set(BPF_OBJ_FILE "${CMAKE_BINARY_DIR}/bpf/server/${BPF_SRC_NAME}.o")
 
     add_custom_command(
         OUTPUT ${BPF_OBJ_FILE}
@@ -591,6 +593,60 @@ add_executable(${PROJECT_NAME} ${DATACRUMBS_PROCESS_EVENTS_SRC} ${DATACRUMBS_COM
 target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel)
 
+set(DATACRUMBS_VALIDATE_BPF_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/validator/bpf/probe.bpf.c
+)
+set(DATACRUMBS_VALIDATE_BPF_OBJ_FILE ${CMAKE_BINARY_DIR}/bpf/validator/probe.bpf.o)
+add_custom_command(
+    OUTPUT ${DATACRUMBS_VALIDATE_BPF_OBJ_FILE}
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Compiling BPF object: ${DATACRUMBS_VALIDATE_BPF_OBJ_FILE} (timed)"
+    COMMAND /usr/bin/time -f "Elapsed time for ${DATACRUMBS_VALIDATE_BPF_OBJ_FILE}: %E" ${CLANG_EXECUTABLE}
+    -target bpf
+    -D__TARGET_ARCH_${DATACRUMBS_ARCH}
+    -Wall -g -O2
+    ${DATACRUMBS_BPF_INCLUDE_FLAGS}
+    -c ${DATACRUMBS_VALIDATE_BPF_SRC}
+    -o ${DATACRUMBS_VALIDATE_BPF_OBJ_FILE}
+    DEPENDS ${DATACRUMBS_VALIDATE_BPF_SRC} vmlinux_header
+    COMMENT "Compiling BPF object: ${DATACRUMBS_VALIDATE_BPF_OBJ_FILE} (timed)"
+    VERBATIM
+)
+
+set(DATACRUMBS_VALIDATOR_BPF_OUTPUT ${CMAKE_BINARY_DIR}/bpf/validator/validator.o)
+
+add_custom_command(
+    OUTPUT ${DATACRUMBS_VALIDATOR_BPF_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Linking all BPF objects into ${DATACRUMBS_VALIDATOR_BPF_OUTPUT} (timed)"
+    COMMAND /usr/bin/time -f "Elapsed time for linking: %E" ${BPFTOOL_EXECUTABLE} gen object ${DATACRUMBS_VALIDATOR_BPF_OUTPUT} ${DATACRUMBS_VALIDATE_BPF_OBJ_FILE}
+    DEPENDS ${DATACRUMBS_VALIDATE_BPF_OBJ_FILE}
+    COMMENT "Linking all BPF objects into ${DATACRUMBS_VALIDATOR_BPF_OUTPUT} (timed)"
+    VERBATIM
+)
+add_custom_target(datacrumbs_validator_bpf ALL DEPENDS ${DATACRUMBS_VALIDATOR_BPF_OUTPUT})
+add_dependencies(datacrumbs_validator_bpf vmlinux_header)
+
+# Generate Skeleton header for Datacrumbs
+set(DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT ${CMAKE_BINARY_DIR}/include/datacrumbs/bpf/datacrumbs_validator.skel.h)
+add_custom_command(
+    OUTPUT ${DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/include/datacrumbs/bpf
+    COMMAND ${BPFTOOL_EXECUTABLE} gen skeleton ${DATACRUMBS_VALIDATOR_BPF_OUTPUT} > ${DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT}
+    DEPENDS ${DATACRUMBS_VALIDATOR_BPF_OUTPUT}
+    COMMENT "Generating BPF skeleton: ${DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT}"
+    VERBATIM
+)
+add_custom_target(datacrumbs_validator_bpf_skel ALL DEPENDS ${DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT})
+add_dependencies(datacrumbs_validator_bpf_skel datacrumbs_validator_bpf)
+
+# Processing Executable
+set(DATACRUMBS_VALIDATOR_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/validator/probe_validator.cpp
+    ${DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT}
+)
+add_executable(${PROJECT_NAME}_validator ${DATACRUMBS_VALIDATOR_SRC} ${DATACRUMBS_COMMON_SRC})
+target_link_libraries(${PROJECT_NAME}_validator ${DEPENDENCY_LIB})
+add_dependencies(${PROJECT_NAME}_validator datacrumbs_validator_bpf_skel)
+
 # ------------------------------------------------------------------------------
 # Custom executables for Datacrumbs
 # ------------------------------------------------------------------------------
@@ -611,6 +667,9 @@ add_test(NAME datacrumbs_pretest COMMAND bash -c "ulimit -n 4096")
 add_test(NAME datacrumbs COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs PROPERTIES DEPENDS ${PROJECT_NAME})
+
+add_test(NAME datacrumbs_validator COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs_validator ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+set_tests_properties(datacrumbs_validator PROPERTIES DEPENDS ${PROJECT_NAME}_validator)
 
 add_subdirectory(tools)
 add_subdirectory(tests)

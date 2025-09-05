@@ -59,16 +59,24 @@ struct EventWithId {
 // Base class representing a generic probe
 class Probe {
  public:
+  Probe() {}
+  // Copy constructor
+  Probe(const Probe& other) : type(other.type), name(other.name), functions(other.functions) {
+    DC_LOG_TRACE("Probe copy constructor called");
+  }
+
+  // Move constructor
+  Probe(Probe&& other) noexcept
+      : type(other.type), name(std::move(other.name)), functions(std::move(other.functions)) {
+    DC_LOG_TRACE("Probe move constructor called");
+  }
   // Constructor initializing the probe type
   Probe(ProbeType _type) : type(_type) { DC_LOG_TRACE("Probe constructor called"); }
 
   ProbeType type;                      // The type of probe (e.g., SYSCALLS, KPROBE, etc.)
   std::string name;                    // Name of the probe
   std::vector<std::string> functions;  // List of functions or arguments for the probe
-  // Copy constructor
-  Probe(const Probe& other) : type(other.type), name(other.name), functions(other.functions) {
-    DC_LOG_TRACE("Probe copy constructor called");
-  }
+
   // Validates the probe's configuration
   virtual bool validate() const {
     DC_LOG_TRACE("Probe::validate called");

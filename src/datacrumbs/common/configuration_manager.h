@@ -68,6 +68,9 @@ class ConfigurationManager {
   // Derived configuration: path to the probe exclusion file
   std::filesystem::path probe_exclusion_file_path;
 
+  // Derived configuration: path to the probe invalid file
+  std::filesystem::path probe_invalid_file_path;
+
   // Derived configuration: path to the category map file
   std::filesystem::path category_map_path;
 
