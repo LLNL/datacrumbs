@@ -6,7 +6,7 @@
 		// Sets the run context to one level up instead of the .devcontainer folder.
 		"context": "..",
 		// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
-		"dockerfile": "../Dockerfile",
+		"dockerfile": "../infrastrutcure/docker/Dockerfile",
 	},
 	"runArgs": [
 		"-ti",
@@ -28,6 +28,11 @@
 		"--privileged",
 		"-v",
 		"/sys/fs/bpf:/sys/fs/bpf"
+	],
+	"postStartCommand": [
+		"/bin/bash",
+		"-c",
+		"/workspaces/build/bin/datacrumbs \"docker\" \"--user\" \"root\" \"--config_path\" \"/workspaces/datacrumbs/etc/datacrumbs/configs\" \"--data_dir\" \"/workspaces/datacrumbs/etc/datacrumbs/data\" \"--trace_log_dir\" \"/workspaces/logs\" & DATACRUMBS_PID=$!; sleep 10; LD_PRELOAD=/workspaces/build/lib64/libdatacrumbs_client.so dd if=/dev/zero of=/tmp/img_temp.bat bs=1M count=16;  sleep 10;  kill -SIGINT $DATACRUMBS_PID; wait $DATACRUMBS_PID; echo '--- LOGS ---'; for f in /workspaces/logs/*; do gzip -dc \"$f\" || cat \"$f\"; done; echo '\nCompleted' "
 	]
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},

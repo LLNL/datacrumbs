@@ -23,7 +23,8 @@ RUN yum install -y \
     python3-pip \
     cmake \
     llvm-devel.aarch64 \
-    mpich-devel.aarch64
+    mpich-devel.aarch64 \
+    time
 
 RUN dnf update -y
 
@@ -63,8 +64,30 @@ RUN cd /workspaces/json-c && \
     make install
 ENV CC=/usr/lib64/mpich/bin/mpicc
 ENV CXX=/usr/lib64/mpich/bin/mpic++
-# Set working directory
-WORKDIR /workspace
 
-# By default, run bash. eBPF programs require --privileged and --cap-add=ALL when running the container.
-CMD ["/bin/bash"]
+# # Set working directory
+# WORKDIR /workspace
+
+# # By default, run bash. eBPF programs require --privileged and --cap-add=ALL when running the container.
+# CMD ["/bin/bash"]
+
+COPY ../../ /workspaces/datacrumbs
+
+# Enable devtoolset-11 for subsequent commands in the Dockerfile
+# and set it as the default for interactive shells
+ENV PATH="/opt/rh/gcc-toolset-11/root/usr/bin/:${PATH}"
+ENV LD_LIBRARY_PATH="/opt/rh/gcc-toolset-11/root/usr/lib64:${LD_LIBRARY_PATH}"
+# Verify GCC version
+RUN gcc --version
+
+RUN cd /workspaces && \
+    mkdir -p build && \
+    rm -rf build/* && \
+    cd build && \
+    cmake -DDATACRUMBS_HOST=docker -DDATACRUMBS_USER=root /workspaces/datacrumbs/ && \
+    make
+
+RUN mkdir -p /workspaces/logs
+
+# Set up the default command to run the datacrumbs process, wait, run dd, send SIGINT, and wait for exit
+CMD ["/bin/bash", "-c", "/workspaces/build/bin/datacrumbs \"docker\" \"--user\" \"root\" \"--config_path\" \"/workspaces/datacrumbs/etc/datacrumbs/configs\" \"--data_dir\" \"/workspaces/datacrumbs/etc/datacrumbs/data\" \"--trace_log_dir\" \"/workspaces/logs\" & DATACRUMBS_PID=$!; sleep 60; dd if=/dev/zero of=/tmp/img_temp.bat bs=1M count=16; kill -SIGINT $DATACRUMBS_PID; wait $DATACRUMBS_PID"]
