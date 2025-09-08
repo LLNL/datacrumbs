@@ -512,7 +512,7 @@ int main(int argc, char** argv) {
   }
 
 #if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
-  int inclusion_trie = bpf_obj_get("/sys/fs/bpf/inclusion_path_trie");
+  int inclusion_trie = bpf_map__fd(skel->maps.inclusion_path_trie);
   if (inclusion_trie < 0) {
     DC_LOG_ERROR("Failed to get inclusion path trie: %d", inclusion_trie);
     datacrumbs_bpf__destroy(skel);

@@ -128,7 +128,6 @@
     __uint(value_size, sizeof(map_value));                      \
     __uint(max_entries, 10000);                                 \
     __uint(map_flags, BPF_F_NO_PREALLOC);                       \
-    __uint(pinning, LIBBPF_PIN_BY_NAME);                        \
   } name SEC(".maps");
 
 #define DATACRUMBS_TRIE_EXTERN_4_ARGS(name, map_key, map_value, size) \
@@ -138,7 +137,6 @@
     __type(key, map_key);                                             \
     __type(value, map_value);                                         \
     __uint(map_flags, BPF_F_NO_PREALLOC);                             \
-    __uint(pinning, LIBBPF_PIN_BY_NAME);                              \
   } name SEC(".maps");
 
 #define DATACRUMBS_TRIE_EXTERN_MACRO_CHOOSER(...) \
