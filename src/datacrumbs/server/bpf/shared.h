@@ -4,6 +4,7 @@
 #include <datacrumbs/datacrumbs_config.h>
 
 static int DATACRUMBS_TS_KEY = 1;
+static int DATACRUMBS_FAILED_EVENTS_KEY = 2;
 
 struct general_event_t {
   unsigned int type;

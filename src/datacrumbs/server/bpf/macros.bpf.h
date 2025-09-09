@@ -161,11 +161,14 @@
   } while (0)
 #endif
 
-#define DATACRUMBS_RB_RESERVE(name, type, event)                                   \
-  event = bpf_ringbuf_reserve(&name, sizeof(type), 0);                             \
-  if (!event) {                                                                    \
-    DBG_PRINTK("Failed to reserve space for event:%llu in ring buffer", event_id); \
-    return 0;                                                                      \
+#define DATACRUMBS_RB_RESERVE(name, type, event)                                                \
+  event = bpf_ringbuf_reserve(&name, sizeof(type), 0);                                          \
+  if (!event) {                                                                                 \
+    u32 failed_count = mark_failed_events();                                                    \
+    (void)failed_count;                                                                         \
+    DBG_PRINTK("Failed to reserve %d events space for event:%llu in ring buffer", failed_count, \
+               event_id);                                                                       \
+    return 0;                                                                                   \
   }
 
 #define DATACRUMBS_SKIP_SMALL_EVENTS(fn, te)                                                     \

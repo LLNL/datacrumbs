@@ -63,6 +63,7 @@ class EventProcessor {
  public:
   std::shared_ptr<ConfigurationManager> configManager_;
   std::shared_ptr<datacrumbs::ChromeWriter> writer_;
+  int failed_events;  // Count of failed events
 
  private:
   std::atomic<uint64_t> event_index{0};                // Atomic index for event processing
