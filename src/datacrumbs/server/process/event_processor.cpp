@@ -168,6 +168,7 @@ EventProcessor::EventProcessor(int argc, char** argv) {
   if (!writer_) {
     DC_LOG_ERROR("Failed to create ChromeWriter instance");
   }
+  failed_events = 0;
 }
 int EventProcessor::handle_event(void* data, size_t data_sz) {
   DC_LOG_TRACE("handle_event: start");
@@ -258,7 +259,9 @@ int EventProcessor::handle_event(void* data, size_t data_sz) {
     DC_LOG_WARN("No category found for event_id %llu", event->event_id);
   }
   DC_LOG_TRACE("handle_event: end");
-  DC_LOG_PROGRESS_SINGLE("Processed event", event_index);
+  std::string progress_msg =
+      "Processed events failed: " + std::to_string(failed_events) + " current:";
+  DC_LOG_PROGRESS_SINGLE(progress_msg.c_str(), event_index);
   return 0;
 }
 int EventProcessor::update_filename(const char* filename, unsigned int hash) {
@@ -570,6 +573,12 @@ int main(int argc, char** argv) {
   }
 #endif
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
+  int failed_events_fd = bpf_map__fd(skel->maps.failed_request);
+  if (failed_events_fd < 0) {
+    DC_LOG_ERROR("Failed to get failed events fd: %d", failed_events_fd);
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
   // Prepare context for event handler
   // Create ring buffer for event processing
   rb = ring_buffer__new(bpf_map__fd(skel->maps.output), handle_event, &event_processor, NULL);
@@ -672,6 +681,11 @@ int main(int argc, char** argv) {
     }
     err = 0;
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
+    int failed_events = 0;
+    err = bpf_map_lookup_elem(failed_events_fd, &DATACRUMBS_FAILED_EVENTS_KEY, &failed_events);
+    if (err == 0) {
+      event_processor.failed_events = failed_events;
+    }
     err = ring_buffer__poll(rb, 10);
     // Ctrl-C gives -EINTR
     if (err == -EINTR) {
@@ -764,6 +778,11 @@ int main(int argc, char** argv) {
   while (LOOKUP_9_CALL() != -1);
 #endif
 #endif
+  int failed_events = 0;
+  err = bpf_map_lookup_elem(failed_events_fd, &DATACRUMBS_FAILED_EVENTS_KEY, &failed_events);
+  if (err == 0) {
+    DC_LOG_PRINT("Total %d events failed", failed_events);
+  }
   DC_LOG_PRINT("Collecting string metadata from file_map...");
   while (lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch) ==
          1) {

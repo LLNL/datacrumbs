@@ -16,6 +16,7 @@ DATACRUMBS_MAP_EXTERN(pid_map, u32, u64, 1024);
 DATACRUMBS_MAP_EXTERN(fn_pid_map, struct fn_key_t, struct fn_value_t);
 
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
+DATACRUMBS_MAP_EXTERN(failed_request, u32, u32, 128);
 DATACRUMBS_RINGBUF_EXTERN(output, 1024 * 1024 * 16U);  // 16MB ring buffer
 #else
 DATACRUMBS_MAP_EXTERN(profile, struct profile_key_t, struct profile_value_t, 1024);
@@ -85,6 +86,31 @@ static inline __attribute__((always_inline)) int prefix_search(void* trie, struc
 static inline __attribute__((always_inline)) int prefix_search(void* trie, struct string_t* key) {
   return 1;
 }
+#endif
+
+#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
+static inline __attribute__((always_inline)) int mark_failed_events() {
+  u32 key = DATACRUMBS_FAILED_EVENTS_KEY;
+  u32* failed_value = bpf_map_lookup_elem(&failed_request, &key);
+  if (failed_value == NULL) {
+    u32 init_val = 0;
+    bpf_map_update_elem(&failed_request, &key, &init_val, BPF_NOEXIST);
+    failed_value =
+        bpf_map_lookup_elem(&failed_request, &key);  // Lookup again to get the new value's address
+  }
+  if (failed_value != NULL) {
+    (*failed_value)++;
+    DBG_PRINTK("Captured failed event: %d %d\n", key, *failed_value);
+    return *failed_value;
+  }
+  return 0;
+}
+#else
+static inline __attribute__((always_inline)) int mark_failed_events() {
+  return 0;
+}
+#endif
 #endif
 
 #if defined(DATACRUMBS_TRACE_ALL_PROCESSES) && (DATACRUMBS_TRACE_ALL_PROCESSES == 1)
