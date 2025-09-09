@@ -139,22 +139,6 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         if (auto headerProbe = std::static_pointer_cast<HeaderCaptureProbe>(capture_probe)) {
           DC_LOG_DEBUG("Header Name: %s", headerProbe->file.c_str());
           functionNames = HeaderFunctionExtractor(headerProbe->file).extractFunctionNames();
-          std::vector<std::string> validFunctionNames;
-          for (const auto& name : functionNames) {
-            DC_LOG_INFO("[ProbeGenerator] Function name '%s' from %s.", name.c_str(),
-                        capture_probe->name.c_str());
-            auto combined_name = name;
-            // Check and insert into global set to avoid duplicates
-            if (!global_function_names.insert(combined_name).second) {
-              DC_LOG_WARN(
-                  "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate "
-                  "from %s.",
-                  name.c_str(), capture_probe->name.c_str());
-              continue;
-            }
-            validFunctionNames.push_back(name);
-          }
-          functionNames = std::move(validFunctionNames);
         }
         if (capture_probe->probe_type == ProbeType::KPROBE) {
           DC_LOG_DEBUG("KPROBE: Extracting symbols from header...");
@@ -183,20 +167,6 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
             if (auto uprobe = std::dynamic_pointer_cast<UProbe>(probe)) {
               uprobe->binary_path = binaryProbe->file;
               uprobe->include_offsets = binaryProbe->include_offsets;
-              std::vector<std::string> validFunctionNames;
-              for (const auto& name : functionNames) {
-                auto combined_name = binaryProbe->file + "_" + name;
-                // Check and insert into global set to avoid duplicates
-                if (!global_function_names.insert(combined_name).second) {
-                  DC_LOG_WARN(
-                      "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate "
-                      "from %s.",
-                      name.c_str(), capture_probe->name.c_str());
-                  continue;
-                }
-                validFunctionNames.push_back(name);
-              }
-              functionNames = std::move(validFunctionNames);
             }
           }
         }
@@ -211,21 +181,6 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
               usdt_probe->provider = usdtProbe->provider;
 
               functionNames = USDTFunctionExtractor(usdtProbe->provider).extractFunctionNames();
-              std::vector<std::string> validFunctionNames;
-              for (const auto& name : functionNames) {
-                auto combined_name =
-                    usdtProbe->binary_path + "_" + usdtProbe->provider + "_" + name;
-                // Check and insert into global set to avoid duplicates
-                if (!global_function_names.insert(combined_name).second) {
-                  DC_LOG_WARN(
-                      "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate "
-                      "from %s.",
-                      name.c_str(), capture_probe->name.c_str());
-                  continue;
-                }
-                validFunctionNames.push_back(name);
-              }
-              functionNames = std::move(validFunctionNames);
             }
           }
         }
@@ -235,20 +190,6 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         if (auto ksymProbe = std::static_pointer_cast<KernelCaptureProbe>(capture_probe)) {
           functionNames = datacrumbs::Singleton<KSymCapture>::get_instance()->getFunctionsByRegex(
               ksymProbe->regex);
-          std::vector<std::string> validFunctionNames;
-          for (const auto& name : functionNames) {
-            auto combined_name = name;
-            // Check and insert into global set to avoid duplicates
-            if (!global_function_names.insert(combined_name).second) {
-              DC_LOG_WARN(
-                  "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate "
-                  "from %s.",
-                  name.c_str(), capture_probe->name.c_str());
-              continue;
-            }
-            validFunctionNames.push_back(name);
-          }
-          functionNames = std::move(validFunctionNames);
         }
         break;
       case CaptureType::CUSTOM:
@@ -295,22 +236,6 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
             custom_probe->start_event_id = customProbe->start_event_id;
             custom_probe->process_header = customProbe->process_header;
             custom_probe->event_type = customProbe->event_type;
-            std::vector<std::string> validFunctionNames;
-            for (const auto& name : functionNames) {
-              DC_LOG_DEBUG("[ProbeGenerator] Function name '%s' from %s.", name.c_str(),
-                           capture_probe->name.c_str());
-              auto combined_name = name;
-              // Check and insert into global set to avoid duplicates
-              if (!global_function_names.insert(combined_name).second) {
-                DC_LOG_WARN(
-                    "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate "
-                    "from %s.",
-                    name.c_str(), capture_probe->name.c_str());
-                continue;
-              }
-              validFunctionNames.push_back(name);
-            }
-            functionNames = std::move(validFunctionNames);
           }
         }
         break;
@@ -353,6 +278,9 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
           if (excludedFuncs.find(name) == excludedFuncs.end() &&
               excludedFuncs.find(base_name) == excludedFuncs.end()) {
             filteredNames.push_back(name);
+          } else {
+            DC_LOG_INFO("Excluding function '%s' from probe '%s' as per exclusion list.", name.c_str(),
+                        capture_probe->name.c_str());
           }
         }
         functionNames = std::move(filteredNames);
@@ -361,6 +289,117 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
     if (capture_probe->probe_type != ProbeType::CUSTOM) {
       std::sort(functionNames.begin(), functionNames.end());
     }
+
+    switch (capture_probe->type) {
+      case CaptureType::HEADER: {
+        DC_LOG_INFO("Deduplicating header probes...");
+        std::vector<std::string> validFunctionNames;
+        for (const auto& name : functionNames) {
+          DC_LOG_INFO("[ProbeExplorer] Function name '%s' from %s.", name.c_str(),
+                      capture_probe->name.c_str());
+          auto combined_name = name;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeExplorer] Function name '%s' already processed. Skipping duplicate "
+                "from %s.",
+                name.c_str(), capture_probe->name.c_str());
+            continue;
+          }
+          validFunctionNames.push_back(name);
+        }
+        functionNames = std::move(validFunctionNames);
+
+        break;
+      }
+      case CaptureType::BINARY: {
+        DC_LOG_INFO("Deduplicating binary probes...");
+        if (auto binaryProbe = std::static_pointer_cast<BinaryCaptureProbe>(capture_probe)) {
+          if (capture_probe->probe_type == ProbeType::UPROBE) {
+            std::vector<std::string> validFunctionNames;
+            for (const auto& name : functionNames) {
+              auto combined_name = binaryProbe->file + "_" + name;
+              // Check and insert into global set to avoid duplicates
+              if (!global_function_names.insert(combined_name).second) {
+                DC_LOG_WARN(
+                    "[ProbeExplorer] Function name '%s' already processed. Skipping duplicate "
+                    "from %s.",
+                    name.c_str(), capture_probe->name.c_str());
+                continue;
+              }
+              validFunctionNames.push_back(name);
+            }
+            functionNames = std::move(validFunctionNames);
+          }
+        }
+        break;
+      }
+      case CaptureType::USDT: {
+        DC_LOG_INFO("Deduplicating USDT probes...");
+        if (auto usdtProbe = std::static_pointer_cast<USDTCaptureProbe>(capture_probe)) {
+          if (capture_probe->probe_type == ProbeType::USDT) {
+            std::vector<std::string> validFunctionNames;
+            for (const auto& name : functionNames) {
+              auto combined_name = usdtProbe->binary_path + "_" + usdtProbe->provider + "_" + name;
+              // Check and insert into global set to avoid duplicates
+              if (!global_function_names.insert(combined_name).second) {
+                DC_LOG_WARN(
+                    "[ProbeExplorer] Function name '%s' already processed. Skipping duplicate "
+                    "from %s.",
+                    name.c_str(), capture_probe->name.c_str());
+                continue;
+              }
+              validFunctionNames.push_back(name);
+            }
+            functionNames = std::move(validFunctionNames);
+          }
+        }
+        break;
+      }
+      case CaptureType::KSYM: {
+        DC_LOG_INFO("Deduplicating kernel symbol probes...");
+        if (auto ksymProbe = std::static_pointer_cast<KernelCaptureProbe>(capture_probe)) {
+          std::vector<std::string> validFunctionNames;
+          for (const auto& name : functionNames) {
+            auto combined_name = name;
+            // Check and insert into global set to avoid duplicates
+            if (!global_function_names.insert(combined_name).second) {
+              DC_LOG_WARN(
+                  "[ProbeExplorer] Function name '%s' already processed. Skipping duplicate "
+                  "from %s.",
+                  name.c_str(), capture_probe->name.c_str());
+              continue;
+            }
+            validFunctionNames.push_back(name);
+          }
+          functionNames = std::move(validFunctionNames);
+        }
+        break;
+      }
+      case CaptureType::CUSTOM: {
+        DC_LOG_INFO("Deduplicating custom probes...");
+        std::vector<std::string> validFunctionNames;
+        for (const auto& name : functionNames) {
+          DC_LOG_DEBUG("[ProbeExplorer] Function name '%s' from %s.", name.c_str(),
+                       capture_probe->name.c_str());
+          auto combined_name = name;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeExplorer] Function name '%s' already processed. Skipping duplicate "
+                "from %s.",
+                name.c_str(), capture_probe->name.c_str());
+            continue;
+          }
+          validFunctionNames.push_back(name);
+        }
+        functionNames = std::move(validFunctionNames);
+        break;
+      }
+      default:
+        DC_LOG_WARN("Unknown capture type encountered!");
+    }
+
     probe->functions = functionNames;
 
     // Validate the probe before adding
