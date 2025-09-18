@@ -29,11 +29,14 @@ class ProbeExplorer {
  public:
   // Constructor: Initializes ProbeExplorer with command-line arguments
   ProbeExplorer(int argc, char** argv);
-
+  // Extracts exclusion mappings and check for invalid entries
+  // Returns a map of probe names to sets of function names to be excluded
+  std::unordered_map<std::string, std::unordered_set<std::string>> Extract_Exclusions();
   // Extracts probes from a given data source (dummy implementation)
   // Returns a vector of shared pointers to Probe objects
   std::vector<std::shared_ptr<Probe>> extractProbes();
-
+  // Creates an exclusion file from the provided probes if the file does not exist
+  void create_exclusion_file(std::vector<std::shared_ptr<Probe>> probes);
   // Writes extracted probes to a JSON file
   // Returns a vector of shared pointers to Probe objects
   std::vector<std::shared_ptr<Probe>> writeProbesToJson();
