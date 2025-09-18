@@ -59,6 +59,7 @@ struct EventWithId {
 // Base class representing a generic probe
 class Probe {
  public:
+  // Default constructor
   Probe() {}
   // Copy constructor
   Probe(const Probe& other) : type(other.type), name(other.name), functions(other.functions) {
@@ -92,16 +93,21 @@ class Probe {
   }
 
   // Serializes the probe to a JSON object
-  virtual json_object* toJson() const {
+  virtual json_object* toJson(bool include_functions=true) const {
     DC_LOG_TRACE("Probe::toJson called");
     json_object* j = json_object_new_object();
     json_object_object_add(j, "type", json_object_new_int(static_cast<int>(type)));
     json_object_object_add(j, "name", json_object_new_string(name.c_str()));
-
+    
     json_object* funcs = json_object_new_array();
+    if(include_functions){
     for (const auto& func : functions) {
       json_object_array_add(funcs, json_object_new_string(func.c_str()));
+    }}
+    else{
+      json_object_array_add(funcs, json_object_new_string(""));
     }
+    
     json_object_object_add(j, "functions", funcs);
 
     return j;
@@ -140,10 +146,10 @@ struct SysCallProbe : public Probe {
   }
 
   // Serializes the syscall probe to a JSON object
-  json_object* toJson() const override {
+  json_object* toJson(bool include_functions=true) const override {
     DC_LOG_TRACE("SysCallProbe::toJson called");
     // No extra fields, just use base
-    return Probe::toJson();
+    return Probe::toJson(include_functions);
   }
 
   // Deserializes a syscall probe from a JSON object
@@ -172,10 +178,10 @@ struct KProbe : public Probe {
   }
 
   // Serializes the kprobe to a JSON object
-  json_object* toJson() const override {
+  json_object* toJson(bool include_functions=true) const override {
     DC_LOG_TRACE("KProbe::toJson called");
     // No extra fields, just use base
-    return Probe::toJson();
+    return Probe::toJson(include_functions);
   }
 
   // Deserializes a kprobe from a JSON object
@@ -214,9 +220,9 @@ struct UProbe : public Probe {
   }
 
   // Serializes the uprobe to a JSON object
-  json_object* toJson() const override {
+  json_object* toJson(bool include_functions=true) const override {
     DC_LOG_TRACE("UProbe::toJson called");
-    json_object* j = Probe::toJson();
+    json_object* j = Probe::toJson(include_functions);
     json_object_object_add(j, "binary_path", json_object_new_string(binary_path.c_str()));
     json_object_object_add(j, "include_offsets", json_object_new_boolean(include_offsets));
     return j;
@@ -269,9 +275,9 @@ struct USDTProbe : public Probe {
   }
 
   // Serializes the USDT probe to a JSON object
-  json_object* toJson() const override {
+  json_object* toJson(bool include_functions=true) const override {
     DC_LOG_TRACE("USDTProbe::toJson called");
-    json_object* j = Probe::toJson();
+    json_object* j = Probe::toJson(include_functions);
     json_object_object_add(j, "binary_path", json_object_new_string(binary_path.c_str()));
     json_object_object_add(j, "provider", json_object_new_string(provider.c_str()));
     return j;
@@ -341,9 +347,9 @@ struct CustomProbe : public Probe {
   }
 
   // Serializes the USDT probe to a JSON object
-  json_object* toJson() const override {
+  json_object* toJson(bool include_functions=true) const override {
     DC_LOG_TRACE("CustomProbe::toJson called");
-    json_object* j = Probe::toJson();
+    json_object* j = Probe::toJson(include_functions);
     json_object_object_add(j, "bpf_path", json_object_new_string(bpf_path.c_str()));
     json_object_object_add(j, "start_event_id", json_object_new_int64(start_event_id));
     json_object_object_add(j, "process_header", json_object_new_string(process_header.c_str()));
