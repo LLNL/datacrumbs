@@ -84,20 +84,32 @@ include_directories(${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 # ------------------------------------------------------------------------------
 # Options for CMake
 # ------------------------------------------------------------------------------
-option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
-option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" ON)
-option(DATACRUMBS_TRACE "Enable tracing" ON)
+option(DATACRUMBS_ENABLE_OPT "Enable tracing" ON)
+option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
+set(DATACRUMBS_INCLUSION_PATH "NONE" CACHE STRING "Inclusion path for datacrumbs")
+option(DATACRUMBS_BPF_PRINT_ENABLE "Enable BPF print" OFF)
+set(DATACRUMBS_MODE_STR "TRACE" CACHE STRING "Mode for datacrumbs (TRACE or PROFILE)")
+set_property(CACHE DATACRUMBS_MODE_STR PROPERTY STRINGS TRACE PROFILE)
+
+# options for managing installation
 set(BPFTOOL_EXECUTABLE "NONE" CACHE STRING "Path to bpftool executable")
-set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPER_PROJECT_NAME}")
-set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEBUG TRACE)
 set(DATACRUMBS_HOST "NONE" CACHE STRING "Host name for datacrumbs (numbers will be stripped if not set)")
 set(DATACRUMBS_USER "$ENV{USER}" CACHE STRING "User name for datacrumbs (default: current environment user)")
+
+# Configure Make steps
+option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
+option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" OFF)
+
+# Tracing Options
+set(DATACRUMBS_TRACE_RINGBUF_SIZE_MB "16" CACHE STRING "Ring buffer size in MB for BPF tracing")
 set(DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS "1000" CACHE STRING "Threshold in microseconds for skipping events")
-option(DATACRUMBS_ENABLE_TRACING "Enable tracing" ON)
+
+# Profiling Options
 set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval in nanosecond")
-option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
-set(DATACRUMBS_INCLUSION_PATH "NONE" CACHE STRING "Inclusion path for profiling")
-option(DATACRUMBS_BPF_PRINT_ENABLE "Enable BPF print" OFF)
+
+# Other options
+set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPER_PROJECT_NAME}")
+set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEBUG TRACE)
 
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
@@ -114,7 +126,7 @@ elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "TRACE")
     set(DATACRUMBS_LOG_LEVEL 5)
 endif()
 
-if(DATACRUMBS_TRACE AND DATACRUMBS_TRACE STREQUAL "ON")
+if(DATACRUMBS_MODE_STR AND DATACRUMBS_MODE_STR STREQUAL "TRACE")
     set(DATACRUMBS_MODE 1)
 else()
     set(DATACRUMBS_MODE 2)
@@ -133,15 +145,15 @@ if(BPFTOOL_EXECUTABLE STREQUAL "NONE")
 endif()
 
 if(NOT DATACRUMBS_SKIP_PROBE_EXPLORING)
-    set(ENABLE_PROBE_EXPLORER ON)
+    set(ENABLE_PROBE_EXPLORER 1)
 else()
-    set(ENABLE_PROBE_EXPLORER OFF)
+    set(ENABLE_PROBE_EXPLORER 0)
 endif()
 
 if(NOT DATACRUMBS_SKIP_PROBE_GENERATION)
-    set(ENABLE_PROBE_GENERATOR ON)
+    set(ENABLE_PROBE_GENERATOR 1)
 else()
-    set(ENABLE_PROBE_GENERATOR OFF)
+    set(ENABLE_PROBE_GENERATOR 0)
 endif()
 
 if(DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
@@ -169,10 +181,10 @@ set(DATACRUMBS_CONFIG_PATH ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs)
 set(DATACRUMBS_LOG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
 set(DATACRUMBS_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data)
 
-if(DATACRUMBS_ENABLE_TRACING AND DATACRUMBS_ENABLE_TRACING STREQUAL "ON")
-    set(DATACRUMBS_TRACING_ENABLE 1)
+if(DATACRUMBS_ENABLE_OPT AND DATACRUMBS_ENABLE_OPT STREQUAL "ON")
+    set(DATACRUMBS_ENABLE 1)
 else()
-    set(DATACRUMBS_TRACING_ENABLE 0)
+    set(DATACRUMBS_ENABLE 0)
 endif()
 
 # ------------------------------------------------------------------------------
@@ -257,11 +269,14 @@ message(STATUS "             - Detected architecture: ${DATACRUMBS_ARCH}")
 message(STATUS "[${UPPER_PROJECT_NAME}] Set Variables for CMake")
 message(STATUS "             - DATACRUMBS_LOG_LEVEL: ${DATACRUMBS_LOG_LEVEL}")
 message(STATUS "             - DATACRUMBS_MODE: ${DATACRUMBS_MODE}")
-message(STATUS "             - DATACRUMBS_TRACING_ENABLE: ${DATACRUMBS_TRACING_ENABLE}")
+message(STATUS "             - DATACRUMBS_ENABLE: ${DATACRUMBS_ENABLE}")
 message(STATUS "             - DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS: ${DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS}")
 message(STATUS "             - DATACRUMBS_TRACE_ALL_PROCESSES: ${DATACRUMBS_TRACE_ALL_PROCESSES}")
 message(STATUS "             - DATACRUMBS_TIME_INTERVAL_NS: ${DATACRUMBS_TIME_INTERVAL_NS}")
 message(STATUS "             - DATACRUMBS_BPF_PRINT_ENABLE_FLAG: ${DATACRUMBS_BPF_PRINT_ENABLE_FLAG}")
+message(STATUS "             - DATACRUMBS_SKIP_PROBE_EXPLORING: ${DATACRUMBS_SKIP_PROBE_EXPLORING}")
+message(STATUS "             - DATACRUMBS_SKIP_PROBE_GENERATION: ${DATACRUMBS_SKIP_PROBE_GENERATION}")
+message(STATUS "             - DATACRUMBS_TRACE_RINGBUF_SIZE_MB: ${DATACRUMBS_TRACE_RINGBUF_SIZE_MB}")
 
 message(STATUS "             - DATACRUMBS_SRC_GEN_PATH: ${DATACRUMBS_SRC_GEN_PATH}")
 message(STATUS "             - DATACRUMBS_LIBC_SO: ${DATACRUMBS_LIBC_SO}")
@@ -423,11 +438,19 @@ add_executable(${PROJECT_NAME}_explorer ${DATACRUMBS_EXPLORER_SRC} ${DATACRUMBS_
 target_link_libraries(${PROJECT_NAME}_explorer ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME}_explorer ${PROJECT_NAME}_client clean_all)
 
-add_custom_target(run_explorer
-    COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}_explorer ${DATACRUMBS_HOST} ${DATACRUMBS_VARS}
-    DEPENDS ${PROJECT_NAME}_explorer
-    COMMENT "Running ${PROJECT_NAME}_explorer with argument '${DATACRUMBS_HOST}'"
-)
+if(NOT DEFINED DATACRUMBS_SKIP_PROBE_EXPLORING OR NOT DATACRUMBS_SKIP_PROBE_EXPLORING)
+    add_custom_target(run_explorer
+        COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}_explorer ${DATACRUMBS_HOST} ${DATACRUMBS_VARS}
+        DEPENDS ${PROJECT_NAME}_explorer
+        COMMENT "Running ${PROJECT_NAME}_explorer with argument '${DATACRUMBS_HOST}'"
+    )
+else()
+    add_custom_target(run_explorer
+        COMMAND ${CMAKE_COMMAND} -E echo "Dummy run_explorer target skipped probe exploration"
+        COMMENT "Dummy run_explorer target: probe exploration is skipped"
+    )
+endif()
+
 add_dependencies(run_explorer ${PROJECT_NAME}_client)
 
 # Datacrumbs generator
@@ -438,11 +461,20 @@ add_executable(${PROJECT_NAME}_generator ${DATACRUMBS_GENERATOR_SRC} ${DATACRUMB
 target_link_libraries(${PROJECT_NAME}_generator ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME}_generator ${PROJECT_NAME}_explorer)
 
-add_custom_target(run_generator
-    COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}_generator ${DATACRUMBS_HOST} ${DATACRUMBS_VARS}
-    DEPENDS ${PROJECT_NAME}_generator
-    COMMENT "Running ${PROJECT_NAME}_generator with argument '${DATACRUMBS_HOST}'"
-)
+if(NOT DEFINED DATACRUMBS_SKIP_PROBE_GENERATION OR NOT DATACRUMBS_SKIP_PROBE_GENERATION)
+    add_custom_target(run_generator
+        COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}_generator ${DATACRUMBS_HOST} ${DATACRUMBS_VARS}
+        DEPENDS ${PROJECT_NAME}_generator
+        COMMENT "Running ${PROJECT_NAME}_generator with argument '${DATACRUMBS_HOST}'"
+    )
+    add_dependencies(${PROJECT_NAME}_generator ${PROJECT_NAME}_explorer)
+    add_dependencies(run_generator run_explorer)
+else()
+    add_custom_target(run_generator
+        COMMAND ${CMAKE_COMMAND} -E echo "Dummy run_generator target skipped probe generation"
+        COMMENT "Dummy run_generator target: probe generation is skipped"
+    )
+endif()
 
 add_dependencies(${PROJECT_NAME}_generator ${PROJECT_NAME}_explorer)
 add_dependencies(run_generator run_explorer)
@@ -567,7 +599,10 @@ add_custom_command(
 )
 
 add_custom_target(datacrumbs_bpf ALL DEPENDS ${BPF_OUTPUT})
-add_dependencies(datacrumbs_bpf vmlinux_header run_generator)
+
+if(NOT DEFINED DATACRUMBS_SKIP_PROBE_GENERATION OR NOT DATACRUMBS_SKIP_PROBE_GENERATION)
+    add_dependencies(datacrumbs_bpf vmlinux_header run_generator)
+endif()
 
 # Generate Skeleton header for Datacrumbs
 set(BPF_SKEL_OUTPUT ${CMAKE_BINARY_DIR}/include/datacrumbs/bpf/datacrumbs.skel.h)
@@ -650,13 +685,20 @@ add_dependencies(${PROJECT_NAME}_validator datacrumbs_validator_bpf_skel)
 # ------------------------------------------------------------------------------
 # Custom executables for Datacrumbs
 # ------------------------------------------------------------------------------
-add_custom_target(clean_all
-    COMMAND ${CMAKE_COMMAND} -E rm -rf
-    ${BPF_OUTPUT}
-    ${BPF_SKEL_OUTPUT}
-    ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs
-    COMMENT "Cleaning BPF build artifacts (ignoring if cannot remove)"
-)
+if(NOT DEFINED DATACRUMBS_SKIP_PROBE_GENERATION OR NOT DATACRUMBS_SKIP_PROBE_GENERATION)
+    add_custom_target(clean_all
+        COMMAND ${CMAKE_COMMAND} -E rm -rf
+        ${BPF_OUTPUT}
+        ${BPF_SKEL_OUTPUT}
+        ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs
+        COMMENT "Cleaning BPF build artifacts (ignoring if cannot remove)"
+    )
+else()
+    add_custom_target(clean_all
+        COMMAND ${CMAKE_COMMAND} -E echo "Dummy clean_all target skipped cleaning BPF build artifacts"
+        COMMENT "Dummy clean_all target: skipping cleaning BPF build artifacts"
+    )
+endif()
 
 # ------------------------------------------------------------------------------
 # Run configurations for DataCrumbs executables.
