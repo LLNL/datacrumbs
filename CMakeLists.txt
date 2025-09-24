@@ -534,7 +534,6 @@ set(DATACRUMBS_CAPTURE_PROBES_LIST "")
 # Find the capture_probes block
 string(REGEX MATCH "capture_probes:[^\n]*\n([^\n]*\n)*" _CAPTURE_PROBES_BLOCK "${DATACRUMBS_CONFIG_YAML}")
 
-# message(STATUS "Capture probes: ${_CAPTURE_PROBES_BLOCK}")
 # Split the _CAPTURE_PROBES_BLOCK into lines
 string(REPLACE "\n" ";" _CAPTURE_PROBES_LINES "${_CAPTURE_PROBES_BLOCK}")
 
@@ -566,8 +565,6 @@ foreach(_probe_name ${DATACRUMBS_CAPTURE_PROBES_LIST})
 endforeach()
 
 # Find all .c source files in ${CMAKE_BINARY_DIR}/libexec/datacrumbs/server/bpf
-# file(GLOB DATACRUMBS_BPF_EXTRA_SOURCES "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/*.c")
-# message(STATUS "BPF Extra Sources: ${DATACRUMBS_BPF_EXTRA_SOURCES}")
 set(DATACRUMBS_BPF_OBJECTS "")
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bpf)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bpf/server)
@@ -595,9 +592,6 @@ foreach(BPF_SRC_FILE ${DATACRUMBS_BPF_EXTRA_SOURCES})
 endforeach()
 
 string(REPLACE ";" " " DATACRUMBS_BPF_OBJECTS_STR "${DATACRUMBS_BPF_OBJECTS}")
-
-# message(STATUS "BPF Objects: ${DATACRUMBS_BPF_OBJECTS}")
-# message(STATUS "[${UPPER_PROJECT_NAME}] BPFTOOL LINK COMMAND: ${BPFTOOL_EXECUTABLE} gen object ${BPF_OUTPUT} ${DATACRUMBS_BPF_OBJECTS_STR}")
 
 # Link all object files into a single object file
 add_custom_command(
