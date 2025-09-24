@@ -514,6 +514,15 @@ int main(int argc, char** argv) {
     DC_LOG_WARN("Failed to read probes file: %s", config_manager->manual_probe_path.c_str());
   }
 
+#if !(defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1))
+  DC_LOG_WARN("DATACRUMBS_ENABLE_OPT is set to OFF. Nothing will be captured");
+#endif
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
+  DC_LOG_PRINT("DataCrumbs in Tracer mode");
+#else
+  DC_LOG_PRINT("DataCrumbs in Profiler mode");
+#endif
+
 #if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
   int inclusion_trie = bpf_map__fd(skel->maps.inclusion_path_trie);
   if (inclusion_trie < 0) {
@@ -778,11 +787,13 @@ int main(int argc, char** argv) {
   while (LOOKUP_9_CALL() != -1);
 #endif
 #endif
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   int failed_events = 0;
   err = bpf_map_lookup_elem(failed_events_fd, &DATACRUMBS_FAILED_EVENTS_KEY, &failed_events);
   if (err == 0) {
     DC_LOG_PRINT("Total %d events failed", failed_events);
   }
+#endif
   DC_LOG_PRINT("Collecting string metadata from file_map...");
   while (lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch) ==
          1) {
