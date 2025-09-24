@@ -10,10 +10,10 @@ endif()
 
 set(DATACRUMBS_TEST_DIR "/tmp" CACHE STRING "Directory for Datacrumbs test files")
 
-if(ENABLE_IOR_TESTS)
+if(ENABLE_IOR_TESTS AND ENABLE_MPIRUN_TEST)
     add_test(
         NAME ior_posix_file_per_process
-        COMMAND mpirun -np 16
+        COMMAND ${MPIRUN_EXECUTABLE} -np 16
         -x LD_PRELOAD=${DATACRUMBS_BUILD_CLIENT_SO}
         ${IOR_EXECUTABLE}
         -a POSIX
@@ -24,7 +24,7 @@ if(ENABLE_IOR_TESTS)
     )
     add_test(
         NAME ior_mpiio_collective_shared
-        COMMAND mpirun -np 16
+        COMMAND ${MPIRUN_EXECUTABLE} -np 16
         -x LD_PRELOAD=${DATACRUMBS_BUILD_CLIENT_SO}
         ${IOR_EXECUTABLE}
         -a MPIIO
@@ -36,7 +36,7 @@ if(ENABLE_IOR_TESTS)
     )
     add_test(
         NAME ior_hdf5_collective_shared
-        COMMAND mpirun -np 16
+        COMMAND ${MPIRUN_EXECUTABLE} -np 16
         -x LD_PRELOAD=${DATACRUMBS_BUILD_CLIENT_SO}
         ${IOR_EXECUTABLE}
         -a HDF5
@@ -49,7 +49,7 @@ if(ENABLE_IOR_TESTS)
 
     add_test(
         NAME ior_hdf5_file_per_process
-        COMMAND mpirun -np 16
+        COMMAND ${MPIRUN_EXECUTABLE} -np 16
         -x LD_PRELOAD=${DATACRUMBS_BUILD_CLIENT_SO}
         ${IOR_EXECUTABLE}
         -a HDF5
