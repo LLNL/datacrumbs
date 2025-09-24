@@ -7,11 +7,14 @@
  * This file defines the ConfigurationManager class, which is responsible for
  * managing, validating, and deriving configuration settings for the DataCrumbs library.
  */
-
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>
 
+// std headers
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -65,10 +68,16 @@ class ConfigurationManager {
   // Derived configuration: path to the probe exclusion file
   std::filesystem::path probe_exclusion_file_path;
 
+  // Derived configuration: path to the probe invalid file
+  std::filesystem::path probe_invalid_file_path;
+
   // Derived configuration: path to the category map file
   std::filesystem::path category_map_path;
 
-  // Dervived configuration: category map for event IDs
+  // Derived configuration: path to the manual probe file
+  std::filesystem::path manual_probe_path;
+
+  // Derived configuration: category map for event IDs
   std::unordered_map<uint64_t, std::pair<std::string, std::string>> category_map;
 
   /**

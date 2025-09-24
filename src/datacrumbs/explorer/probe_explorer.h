@@ -1,14 +1,25 @@
 #pragma once
-
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/logging.h>  // Use custom logging macros
 #include <datacrumbs/common/singleton.h>
+#include <datacrumbs/common/utils.h>
 #include <datacrumbs/explorer/mechanism/elf_capture.h>
 #include <datacrumbs/explorer/mechanism/header_capture.h>
+#include <datacrumbs/explorer/mechanism/ksym_capture.h>
+#include <datacrumbs/explorer/mechanism/usdt_functions.h>
+
+// dependency libraries
 #include <json-c/json.h>
 
+// std headers
 #include <fstream>
+#include <regex>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace datacrumbs {
@@ -26,6 +37,8 @@ class ProbeExplorer {
   // Writes extracted probes to a JSON file
   // Returns a vector of shared pointers to Probe objects
   std::vector<std::shared_ptr<Probe>> writeProbesToJson();
+
+  bool has_invalid_probes_ = false;  // Flag to indicate if any invalid probes were found
 
  private:
   // Configuration manager instance for managing configuration settings

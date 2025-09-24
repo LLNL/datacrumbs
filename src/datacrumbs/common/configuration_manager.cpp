@@ -54,21 +54,6 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
 #define DC_YAML_INCLUSION_PATH "inclusion_path"
 
 /**
- * Default configuration paths (can be overridden by build system)
- */
-#ifndef DATACRUMBS_CONFIG_PATH
-#define DATACRUMBS_CONFIG_PATH "/home/haridev/datacrumbs/etc/datacrumbs/configs"
-#endif
-
-#ifndef DATACRUMBS_LOG_DIR
-#define DATACRUMBS_LOG_DIR "/home/haridev/datacrumbs/etc/datacrumbs/logs"
-#endif
-
-#ifndef DATACRUMBS_DATA_DIR
-#define DATACRUMBS_DATA_DIR "/home/haridev/datacrumbs/etc/datacrumbs/data"
-#endif
-
-/**
  * @class ArgumentParser
  * @brief Parses command-line arguments for DataCrumbs configuration.
  *
@@ -248,6 +233,16 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
               } else {
                 DC_LOG_ERROR("[ConfigurationManager] Binary path missing for BINARY capture type.");
                 throw std::invalid_argument("Binary path is required for BINARY capture type.");
+              }
+              if (probe_node["include_offsets"]) {
+                binary_probe->include_offsets = probe_node["include_offsets"].as<bool>();
+                DC_LOG_DEBUG("[ConfigurationManager] BINARY include_offsets set to: %s",
+                             binary_probe->include_offsets ? "true" : "false");
+              } else {
+                DC_LOG_DEBUG(
+                    "[ConfigurationManager] No include_offsets provided for BINARY, using default: "
+                    "false");
+                binary_probe->include_offsets = false;  // Default value
               }
               probe = binary_probe;
               break;
@@ -439,6 +434,8 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
   DC_LOG_INFO("  Data dir: %s", this->data_dir.string().c_str());
   DC_LOG_INFO("  Probe file path: %s", this->probe_file_path.string().c_str());
   DC_LOG_INFO("  Probe exclusion file path: %s", this->probe_exclusion_file_path.string().c_str());
+  DC_LOG_INFO("  Probe invalid file path: %s", this->probe_invalid_file_path.string().c_str());
+  DC_LOG_INFO("  Manual probe path: %s", this->manual_probe_path.string().c_str());
   DC_LOG_INFO("  Category map path: %s", this->category_map_path.string().c_str());
   DC_LOG_INFO("  Profiling interval: %f", this->profiling_interval);
   DC_LOG_INFO("  User: %s", this->user.c_str());
@@ -465,15 +462,6 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
 void ConfigurationManager::derive_configurations() {
   DC_LOG_TRACE("[ConfigurationManager] Deriving configurations...");
 
-  char hostname[256];
-  if (gethostname(hostname, sizeof(hostname)) != 0) {
-    DC_LOG_WARN("[ConfigurationManager] Failed to get hostname, using 'unknownhost'.");
-    std::strncpy(hostname, "unknownhost", sizeof(hostname));
-    hostname[sizeof(hostname) - 1] = '\0';
-  } else {
-    DC_LOG_DEBUG("[ConfigurationManager] Hostname: %s", hostname);
-  }
-
   pid_t pid = getpid();
   DC_LOG_DEBUG("[ConfigurationManager] Process ID: %d", pid);
 
@@ -484,7 +472,7 @@ void ConfigurationManager::derive_configurations() {
 
   // Simple encoding: base64 of hostname + pid + timestamp
   std::stringstream ss;
-  ss << hostname << "_" << pid << "_" << timestamp;
+  ss << this->name << "_" << pid << "_" << timestamp;
   std::string raw = ss.str();
   auto encoded =
       datacrumbs::utils::base64_encode(std::vector<unsigned char>(raw.begin(), raw.end()));
@@ -493,7 +481,7 @@ void ConfigurationManager::derive_configurations() {
   DC_LOG_DEBUG("[ConfigurationManager] Trace file path: %s",
                this->trace_file_path.string().c_str());
 
-  std::string hostname_str(hostname);
+  std::string hostname_str(this->name);
   // Remove digits from hostname for file naming
   hostname_str.erase(std::remove_if(hostname_str.begin(), hostname_str.end(), ::isdigit),
                      hostname_str.end());
@@ -511,11 +499,23 @@ void ConfigurationManager::derive_configurations() {
   DC_LOG_DEBUG("[ConfigurationManager] Probe exclusion file path: %s",
                this->probe_exclusion_file_path.string().c_str());
 
+  // Construct probe invalid file name: probes-invalid-user-host.json
+  std::string probe_invalid_file_name = "probes-invalid-" + user + "-" + hostname_str + ".json";
+  this->probe_invalid_file_path = this->data_dir / probe_invalid_file_name;
+  DC_LOG_DEBUG("[ConfigurationManager] Probe invalid path: %s",
+               this->probe_invalid_file_path.string().c_str());
+
   // Construct categories file name: categories-user-host.json
   std::string categories_file_name = "categories-" + user + "-" + hostname_str + ".json";
   this->category_map_path = this->data_dir / categories_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Category map path: %s",
                this->category_map_path.string().c_str());
+
+  // Construct manual probe file name: manual-probes-user-host.json
+  std::string manual_probe_file_name = "manual-probes-" + user + "-" + hostname_str + ".json";
+  this->manual_probe_path = this->data_dir / manual_probe_file_name;
+  DC_LOG_DEBUG("[ConfigurationManager] Manual probe path: %s",
+               this->manual_probe_path.string().c_str());
 
   // Load category_map from JSON file using json-c
   std::string category_json_path = category_map_path.string();

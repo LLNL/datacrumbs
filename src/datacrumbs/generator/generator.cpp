@@ -1,11 +1,5 @@
-#include <datacrumbs/common/data_structures.h>
-#include <datacrumbs/common/logging.h>  // Added for logging macros
-#include <datacrumbs/common/utils.h>
-#include <datacrumbs/generator/generator.h>
 
-#include <string>
-#include <unordered_set>
-#include <vector>
+#include <datacrumbs/generator/generator.h>
 namespace datacrumbs {
 
 // Constructor for ProbeGenerator
@@ -20,7 +14,7 @@ int ProbeGenerator::run() {
     DC_LOG_ERROR("ConfigurationManager is not initialized.");
     return -1;
   }
-
+  json_object* jarray = json_object_new_array();
   // Global set to track unique function names
   static std::unordered_set<std::string> global_function_names;
 
@@ -43,11 +37,33 @@ int ProbeGenerator::run() {
   // Track total number of generated probes
   size_t total_probes_generated = 0;
   update_event("M", "SH", 0);
-
+  bool manual_probe_added = false;
   // Iterate over each probe in the JSON array
   for (int i = 0; i < arr_len; ++i) {
     struct json_object* jprobe = json_object_array_get_idx(probesJson, i);
     auto probe = Probe::fromJson(jprobe);
+    std::shared_ptr<Probe> manual_probe;
+    switch (probe.type) {
+      case ProbeType::UPROBE:
+        manual_probe = std::make_shared<UProbe>(UProbe::fromJson(jprobe));
+        break;
+      case ProbeType::SYSCALLS:
+        manual_probe = std::make_shared<SysCallProbe>(SysCallProbe::fromJson(jprobe));
+        break;
+      case ProbeType::USDT:
+        manual_probe = std::make_shared<USDTProbe>(USDTProbe::fromJson(jprobe));
+        break;
+      case ProbeType::KPROBE:
+        manual_probe = std::make_shared<KProbe>(KProbe::fromJson(jprobe));
+        break;
+      case ProbeType::CUSTOM:
+        manual_probe = std::make_shared<CustomProbe>(CustomProbe::fromJson(jprobe));
+        break;
+      default:
+        DC_LOG_ERROR("Unknown probe type encountered in extractProbes()");
+        throw std::runtime_error("Unknown probe type encountered in extractProbes()");
+    }
+    manual_probe->functions.clear();  // Clear functions for manual probe
     DC_LOG_INFO("[ProbeGenerator] Processing probe: %s", probe.name.c_str());
 
     std::stringstream ss;
@@ -56,14 +72,6 @@ int ProbeGenerator::run() {
     // Iterate over each function in the probe
     for (size_t func_index = 0; func_index < probe.functions.size(); ++func_index) {
       const auto& func = probe.functions[func_index];
-
-      // Check and insert into global set to avoid duplicates
-      if (!global_function_names.insert(func).second) {
-        DC_LOG_WARN(
-            "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from %s.",
-            func.c_str(), probe.name.c_str());
-        continue;
-      }
 
       int current_event_id = 0;
       if (probe.type != ProbeType::CUSTOM) {
@@ -82,6 +90,15 @@ int ProbeGenerator::run() {
       // Generate code based on probe type
       switch (probe.type) {
         case ProbeType::KPROBE: {
+          auto combined_name = func;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
           DC_LOG_DEBUG("[ProbeGenerator] Using KProbeGenerator for function: %s (event_id: %d)",
                        func.c_str(), current_event_id);
           KProbeGenerator generator(current_event_id, func);
@@ -92,8 +109,33 @@ int ProbeGenerator::run() {
           DC_LOG_DEBUG("[ProbeGenerator] Using UProbeGenerator for function: %s (event_id: %d)",
                        func.c_str(), current_event_id);
           auto uprobe = UProbe::fromJson(jprobe);
-          const auto& offset = uprobe.function_offsets[func_index];
-          UProbeGenerator uprobe_gen(current_event_id, func, offset, uprobe.binary_path);
+          std::string function_name, offset;
+          auto pos = func.find(':');
+          bool is_manual = false;
+          if (pos != std::string::npos) {
+            function_name = func.substr(0, pos);
+            offset = func.substr(pos + 1);
+            is_manual = true;
+          } else {
+            function_name = func;
+            offset = "";
+          }
+          auto combined_name = uprobe.binary_path + "_" + function_name + "_" + offset;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
+          if (is_manual) {
+            DC_LOG_DEBUG("[ProbeGenerator] Adding manual uprobe for function: %s", func.c_str());
+            manual_probe->functions.push_back(std::to_string(current_event_id));
+          }
+          // if (!uprobe.include_offsets) offset = "";
+          UProbeGenerator uprobe_gen(current_event_id, function_name, offset, uprobe.binary_path,
+                                     is_manual);
           ss << uprobe_gen.generate().str() << std::endl;
           break;
         }
@@ -101,17 +143,45 @@ int ProbeGenerator::run() {
           DC_LOG_DEBUG("[ProbeGenerator] Using SyscallGenerator for function: %s (event_id: %d)",
                        func.c_str(), current_event_id);
           SyscallGenerator syscall_gen(current_event_id, func);
+          auto combined_name = func;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
           ss << syscall_gen.generate().str() << std::endl;
+
           break;
         }
         case ProbeType::USDT: {
           DC_LOG_DEBUG("[ProbeGenerator] Using USDTGenerator for function: %s (event_id: %d)",
                        func.c_str(), current_event_id);
           auto usdt = USDTProbe::fromJson(jprobe);
+          auto combined_name = usdt.binary_path + "_" + usdt.provider + "_" + func;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
           USDTGenerator usdt_gen(current_event_id, func, usdt.binary_path, usdt.provider);
           ss << usdt_gen.generate().str() << std::endl;
         } break;
         case ProbeType::CUSTOM: {
+          auto combined_name = func;
+          // Check and insert into global set to avoid duplicates
+          if (!global_function_names.insert(combined_name).second) {
+            DC_LOG_WARN(
+                "[ProbeGenerator] Function name '%s' already processed. Skipping duplicate from "
+                "%s.",
+                func.c_str(), probe.name.c_str());
+            continue;
+          }
         } break;
         default: {
           DC_LOG_ERROR("Unknown probe type: %d", static_cast<int>(probe.type));
@@ -120,11 +190,42 @@ int ProbeGenerator::run() {
       // Increment total probes generated
       ++total_probes_generated;
     }
-
+    if (manual_probe != nullptr && !manual_probe->functions.empty()) {
+      DC_LOG_INFO("[ProbeGenerator] Manual probe for %d functions added for probe: %s",
+                  manual_probe->functions.size(), probe.name.c_str());
+      manual_probe_added = true;
+      json_object* manual_jprobe = nullptr;
+      switch (manual_probe->type) {
+        case ProbeType::SYSCALLS:
+          manual_jprobe = std::dynamic_pointer_cast<SysCallProbe>(manual_probe)->toJson();
+          break;
+        case ProbeType::KPROBE:
+          manual_jprobe = std::dynamic_pointer_cast<KProbe>(manual_probe)->toJson();
+          break;
+        case ProbeType::UPROBE: {
+          auto manual_uprobe = std::dynamic_pointer_cast<UProbe>(manual_probe);
+          DC_LOG_DEBUG("[ProbeGenerator] Adding manual uprobe for function: %s",
+                       manual_uprobe->binary_path.c_str());
+          manual_jprobe = manual_uprobe->toJson();
+          break;
+        }
+        case ProbeType::USDT:
+          manual_jprobe = std::dynamic_pointer_cast<USDTProbe>(manual_probe)->toJson();
+          break;
+        case ProbeType::CUSTOM:
+          manual_jprobe = std::dynamic_pointer_cast<CustomProbe>(manual_probe)->toJson();
+          break;
+        default:
+          DC_LOG_ERROR("Unknown probe type encountered.");
+          continue;  // Skip unknown types
+      }
+      json_object_array_add(jarray, manual_jprobe);
+    }
     if (probe.type == ProbeType::CUSTOM) {
       auto custom = CustomProbe::fromJson(jprobe);
       probe_files.push_back(custom.bpf_path);
       process_headers.push_back(custom.process_header);
+      ss << "#include \"" << custom.bpf_path << "\"" << std::endl;
     }
     // Write generated code to file
     const char* gen_path = DATACRUMBS_SRC_GEN_PATH;
@@ -148,22 +249,37 @@ int ProbeGenerator::run() {
       }
     }
   }
+  if (manual_probe_added) {
+    // Write JSON to file
+    const char* json_str = json_object_to_json_string_ext(jarray, JSON_C_TO_STRING_PRETTY);
 
+    std::ofstream ofs(configManager_->manual_probe_path);
+    if (ofs.is_open()) {
+      ofs << json_str;
+      ofs.close();
+    } else {
+      DC_LOG_ERROR("Failed to open file: %s", configManager_->manual_probe_path.c_str());
+    }
+
+    json_object_put(jarray);  // free memory
+    DC_LOG_TRACE("ProbeExplorer::writeProbesToJson - end");
+  } else {
+    DC_LOG_INFO("No manual probes were added.");
+    // Remove existing manual probe file if it exists
+    std::error_code ec;
+    if (std::filesystem::exists(configManager_->manual_probe_path, ec)) {
+      std::filesystem::remove(configManager_->manual_probe_path, ec);
+      if (ec) {
+        DC_LOG_ERROR("Failed to remove file: %s", configManager_->manual_probe_path.c_str());
+      } else {
+        DC_LOG_INFO("Removed existing manual probe file: %s",
+                    configManager_->manual_probe_path.c_str());
+      }
+    }
+  }
   // Append all generated probe files as includes to generated.bpf.c
   const char* gen_path = DATACRUMBS_SRC_GEN_PATH;
   if (gen_path) {
-    std::string generated_filename =
-        (std::filesystem::path(gen_path) / "datacrumbs/server/bpf" / "generated.bpf.c").string();
-    std::ofstream generated_out(generated_filename);
-    if (!generated_out) {
-      DC_LOG_ERROR("Failed to open file for writing: %s", generated_filename.c_str());
-    } else {
-      for (const auto& probe_file : probe_files) {
-        generated_out << "#include \"" << probe_file << "\"" << std::endl;
-      }
-      generated_out.close();
-      DC_LOG_INFO("[ProbeGenerator] All probe files included in: %s", generated_filename.c_str());
-    }
     std::filesystem::create_directories(std::filesystem::path(gen_path) /
                                         "datacrumbs/server/process");
     std::string generated_process_filename =

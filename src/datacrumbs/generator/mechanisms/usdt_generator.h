@@ -1,6 +1,9 @@
 #pragma once
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/logging.h>  // Logging macros
-
+// std headers
 #include <algorithm>
 #include <sstream>
 #include <string>
@@ -33,7 +36,7 @@ class USDTGenerator {
   std::stringstream generate() const {
     DC_LOG_TRACE("USDTGenerator::generate() start for function: %s", func_name_.c_str());
 
-    std::string sanitized_func_name = func_name_;
+    std::string sanitized_func_name = func_name_.substr(0, 10);
     // Replace '.' and '@' with '_' to sanitize the function name for use in identifiers.
     std::replace(sanitized_func_name.begin(), sanitized_func_name.end(), '.', '_');
     std::replace(sanitized_func_name.begin(), sanitized_func_name.end(), '@', '_');

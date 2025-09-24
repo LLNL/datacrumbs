@@ -1,31 +1,31 @@
 #pragma once
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/logging.h>  // Include logging header
-
+// std headers
 #include <string>
 #include <vector>
 
 namespace datacrumbs {
 namespace utils {
 
-// Base64 encoding table
+// Base64 encoding table (URL-safe, no special characters)
 static const std::string base64_chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
-    "0123456789+/";
+    "0123456789-_";
 
-// Check if a character is base64
+// Check if a character is base64 (URL-safe)
 inline bool is_base64(unsigned char c) {
-  // Trace function entry
   DC_LOG_TRACE("Entering is_base64 with char: %c", c);
-  bool result = (isalnum(c) || (c == '+') || (c == '/'));
-  // Debug log for result
+  bool result = (isalnum(c) || (c == '-') || (c == '_'));
   DC_LOG_DEBUG("is_base64(%c) = %d", c, result);
-  // Trace function exit
   DC_LOG_TRACE("Exiting is_base64");
   return result;
 }
 
-// Encode a byte vector to base64 string
+// Encode a byte vector to base64 string (URL-safe, no special chars)
 inline std::string base64_encode(const std::vector<unsigned char>& bytes_to_encode) {
   DC_LOG_TRACE("Start base64_encode, input size: %zu", bytes_to_encode.size());
   std::string ret;
@@ -58,16 +58,16 @@ inline std::string base64_encode(const std::vector<unsigned char>& bytes_to_enco
 
     for (int j = 0; j < i + 1; j++) ret += base64_chars[char_array_4[j]];
 
-    while ((i++ < 3)) ret += '=';
+    // No padding for URL-safe base64
+    // while ((i++ < 3)) ret += '=';
   }
 
-  // Info log for progress
   DC_LOG_INFO("base64_encode completed, output size: %zu", ret.size());
   DC_LOG_TRACE("End base64_encode");
   return ret;
 }
 
-// Decode a base64 string to byte vector
+// Decode a base64 string to byte vector (URL-safe, no special chars)
 inline std::vector<unsigned char> base64_decode(const std::string& encoded_string) {
   DC_LOG_TRACE("Start base64_decode, input size: %zu", encoded_string.size());
   int in_len = encoded_string.size();
@@ -76,7 +76,7 @@ inline std::vector<unsigned char> base64_decode(const std::string& encoded_strin
   unsigned char char_array_4[4], char_array_3[3];
   std::vector<unsigned char> ret;
 
-  while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_])) {
+  while (in_len-- && is_base64(encoded_string[in_])) {
     char_array_4[i++] = encoded_string[in_];
     in_++;
     if (i == 4) {
@@ -103,12 +103,10 @@ inline std::vector<unsigned char> base64_decode(const std::string& encoded_strin
     for (int j = 0; j < i - 1; j++) ret.push_back(char_array_3[j]);
   }
 
-  // Warn if output is empty
   if (ret.empty()) {
     DC_LOG_WARN("base64_decode: Decoded output is empty for input of size %zu",
                 encoded_string.size());
   }
-  // Info log for progress
   DC_LOG_INFO("base64_decode completed, output size: %zu", ret.size());
   DC_LOG_TRACE("End base64_decode");
   return ret;

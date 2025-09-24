@@ -1,7 +1,10 @@
 #pragma once
-
+// include first
+#include <datacrumbs/datacrumbs_config.h>
+// other headers
 #include <datacrumbs/common/logging.h>
-
+#include <datacrumbs/common/singleton.h>
+// std headers
 #include <fstream>
 #include <regex>
 #include <sstream>

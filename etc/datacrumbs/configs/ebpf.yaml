@@ -2,9 +2,12 @@ name: ebpf
 mode: tracer
 trace_file_path: /scratch/haridev/logs/lead2-trace.pfw
 capture_probes:
-  - name: sys
-    probe: syscalls
-    type: header
-    file: /usr/src/linux-hwe-6.5-headers-6.5.0-44/include/linux/syscalls.h
-    regex: sys_.*
+  - name: custom1
+    start_event_id: 100000
+    probe: custom
+    type: custom
+    file: /home/cc/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/sysio.bpf.c
+    probes: /home/cc/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/probes.json
+    process_header: /home/cc/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/sysio_process.h
+    event_type: 2
 profiling_interval: 0.0001
