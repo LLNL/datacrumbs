@@ -17,7 +17,8 @@ DATACRUMBS_MAP_EXTERN(fn_pid_map, struct fn_key_t, struct fn_value_t);
 
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 DATACRUMBS_MAP_EXTERN(failed_request, u32, u32, 128);
-DATACRUMBS_RINGBUF_EXTERN(output, 1024 * 1024 * 16U);  // 16MB ring buffer
+DATACRUMBS_RINGBUF_EXTERN(output,
+                          1024 * 1024U * DATACRUMBS_TRACE_RINGBUF_SIZE_MB);
 #else
 DATACRUMBS_MAP_EXTERN(profile, struct profile_key_t, struct profile_value_t, 1024);
 DATACRUMBS_MAP_EXTERN(usdt_profile, struct usdt_profile_key_t, struct profile_value_t, 1024);
@@ -88,7 +89,7 @@ static inline __attribute__((always_inline)) int prefix_search(void* trie, struc
 }
 #endif
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int mark_failed_events() {
   u32 key = DATACRUMBS_FAILED_EVENTS_KEY;
@@ -129,7 +130,7 @@ static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* k
 }
 #endif
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
@@ -164,7 +165,7 @@ static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* c
   return 0;
 }
 #endif
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
   u64 te = bpf_ktime_get_ns();
@@ -228,7 +229,7 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
 }
 #endif
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx, u64 event_id) {
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -249,7 +250,7 @@ static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx,
 }
 #endif
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
                                                            long clazz, long method) {
@@ -349,7 +350,7 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
 }
 #endif
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 static inline __attribute__((always_inline)) int generic_fork_exit(struct pt_regs* ctx,
                                                                    u64 event_id) {
   struct fn_key_t key = {};

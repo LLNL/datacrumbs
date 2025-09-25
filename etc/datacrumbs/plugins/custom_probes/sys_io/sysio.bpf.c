@@ -16,7 +16,7 @@ DATACRUMBS_MAP(sysio_profile, struct sysio_counter_key_t, struct sysio_counter_v
 #endif
 #define USER_EVENT_ID_START 100000
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 static inline __attribute__((always_inline)) int sysio_fd_init(u64 event_id, int fd) {
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -37,7 +37,7 @@ static inline __attribute__((always_inline)) int sysio_fd_init(u64 event_id, int
 }
 #endif
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs* ctx,
                                                                  u64 event_id) {
@@ -147,7 +147,7 @@ static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs*
 }
 #endif
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_regs* ctx,
                                                                      u64 event_id) {
@@ -255,7 +255,7 @@ static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_r
 }
 #endif
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 static inline __attribute__((always_inline)) int sysio_open_entry(struct pt_regs* ctx, u64 event_id,
                                                                   const char* filename) {
   struct fn_key_t key = {};
@@ -292,7 +292,7 @@ static inline __attribute__((always_inline)) int sysio_open_entry(struct pt_regs
 }
 #endif
 
-#if defined(DATACRUMBS_TRACING_ENABLE) && (DATACRUMBS_TRACING_ENABLE == 1)
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 static inline __attribute__((always_inline)) int sysio_open_exit(struct pt_regs* ctx,
                                                                  u64 event_id) {
