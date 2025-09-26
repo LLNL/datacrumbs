@@ -62,7 +62,7 @@ inline std::string base64_encode(const std::vector<unsigned char>& bytes_to_enco
     // while ((i++ < 3)) ret += '=';
   }
 
-  DC_LOG_INFO("base64_encode completed, output size: %zu", ret.size());
+  DC_LOG_DEBUG("base64_encode completed, output size: %zu", ret.size());
   DC_LOG_TRACE("End base64_encode");
   return ret;
 }

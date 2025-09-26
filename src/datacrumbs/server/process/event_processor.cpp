@@ -3,6 +3,22 @@
 #include <datacrumbs/server/process/processing/usdt_event.h>
 // Include generated
 #include <datacrumbs/server/process/generated_process.h>
+// std headers
+#include <fcntl.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <cstdio>
+#include <cstring>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+#include <string>
 
 #define GET_DATA_FUNCTION(INDEX)                                       \
   auto write_event = get_data_##INDEX(data, event_index.fetch_add(1)); \
@@ -14,7 +30,7 @@ namespace datacrumbs {
 
 EventProcessor::EventProcessor(int argc, char** argv) {
   configManager_ =
-      datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance(argc, argv);
+      datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance(argc, argv, false, 2);
   // Initialize the ChromeWriter singleton instance
   writer_ = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
   if (!writer_) {
@@ -229,7 +245,6 @@ static int manual_probes(datacrumbs::EventProcessor* event_processor, struct dat
             break;
           default:
             DC_LOG_ERROR("Unknown probe type encountered in extractProbes()");
-            throw std::runtime_error("Unknown probe type encountered in extractProbes()");
         }
         for (const auto& func : manual_probe->functions) {
           total_manual_probes += 2;
@@ -330,7 +345,168 @@ static int manual_probes(datacrumbs::EventProcessor* event_processor, struct dat
   return 0;
 }
 
-int main(int argc, char** argv) {
+static int sync_pipe[2];
+
+/**
+ * @brief Sends a signal to the parent process via a pipe to indicate completion.
+ *
+ * This function should be called by the child process after it has performed
+ * its necessary startup and initialization tasks.
+ */
+void daemon_notify_parent() {
+  char signal_byte = '!';
+  // The child process only needs the write end of the pipe.
+  // The read end has already been closed.
+  if (write(sync_pipe[1], &signal_byte, 1) == -1) {
+    // If write fails, it's likely the parent has already exited, which is fine.
+    if (errno != EPIPE) {
+      perror("write error in daemon_notify_parent");
+    }
+  }
+  // Always close the write end of the pipe after use.
+  close(sync_pipe[1]);
+}
+
+/**
+ * @brief Daemonizes the process, creating a new child and waiting for a signal.
+ *
+ * The initial parent process forks, and the child process continues the
+ * daemonization sequence. The parent blocks until the child signals success,
+ * then exits.
+ *
+ * @return Returns 0 in the daemon process, or a positive value representing
+ *         the daemon's PID in the original parent process. Returns -1 on failure.
+ */
+pid_t daemonize() {
+  pid_t pid;
+
+  // Create the pipe for synchronization before the first fork.
+  if (pipe(sync_pipe) == -1) {
+    perror("pipe error");
+    return -1;
+  }
+
+  // First fork to detach from the controlling terminal.
+  pid = fork();
+  if (pid < 0) {
+    perror("fork error");
+    close(sync_pipe[0]);
+    close(sync_pipe[1]);
+    return -1;
+  }
+
+  // Parent process (the original caller).
+  if (pid > 0) {
+    // Parent closes the write end of the pipe.
+    close(sync_pipe[1]);
+
+    char signal_byte;
+    // Wait to read a byte from the pipe. This blocks until the child writes.
+    if (read(sync_pipe[0], &signal_byte, 1) == -1) {
+      perror("read error in parent");
+      close(sync_pipe[0]);
+      return -1;
+    }
+
+    // Child signaled success. Parent can now exit cleanly.
+    close(sync_pipe[0]);
+    exit(EXIT_SUCCESS);
+  }
+
+  // First child process.
+  // Close the read end of the pipe, as the child will only write.
+  close(sync_pipe[0]);
+
+  // Become a session leader to detach from the controlling terminal.
+  if (setsid() < 0) {
+    perror("setsid error");
+    exit(EXIT_FAILURE);
+  }
+
+  // Second fork to ensure the daemon can't reacquire a controlling terminal.
+  signal(SIGHUP, SIG_IGN);
+  pid = fork();
+  if (pid < 0) {
+    perror("fork error");
+    exit(EXIT_FAILURE);
+  }
+
+  // First child exits, orphaning the second child.
+  if (pid > 0) {
+    // The first child exits, leaving the second child as the daemon.
+    exit(EXIT_SUCCESS);
+  }
+
+  // This code runs only in the second child (the actual daemon).
+
+  // Close all open file descriptors.
+  int x;
+  for (x = sysconf(_SC_OPEN_MAX); x >= 0; x--) {
+    if (x != sync_pipe[1]) {  // Keep the write end of the pipe open for the signal
+      close(x);
+    }
+  }
+
+  // Reopen standard file descriptors to /dev/null.
+  open("/dev/null", O_RDWR);  // stdin
+  dup(0);                     // stdout
+  dup(0);                     // stderr
+
+  return 0;  // Return 0 in the daemon process.
+}
+
+std::string get_hostname() {
+  char hostname[HOST_NAME_MAX];
+  if (gethostname(hostname, sizeof(hostname)) == 0) {
+    return std::string(hostname);
+  }
+  struct utsname uts;
+  if (uname(&uts) == 0) {
+    return std::string(uts.nodename);
+  }
+  return "unknownhost";
+}
+
+std::string get_timestamp() {
+  time_t now = time(nullptr);
+  char buf[32];
+  strftime(buf, sizeof(buf), "%Y%m%d_%H%M%S", localtime(&now));
+  return std::string(buf);
+}
+
+void redirect_output(const std::string& logfile, const std::string& user) {
+  FILE* logf = freopen(logfile.c_str(), "a+", stdout);
+  if (!logf) {
+    perror("freopen failed to open log file");
+    exit(EXIT_FAILURE);
+  }
+  freopen(logfile.c_str(), "a+", stderr);
+  auto pwd = getpwnam(user.c_str());
+  uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+  gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+  // Set file ownership to user
+  chown(logfile.c_str(), uid, gid);
+  // Optionally set permissions (e.g., rw-r-----)
+  chmod(logfile.c_str(), 0640);
+}
+
+void write_pid_file(const std::string& pidfile, const std::string& user) {
+  if (access(pidfile.c_str(), F_OK) == 0) {
+    remove(pidfile.c_str());
+  }
+  std::ofstream ofs(pidfile);
+  ofs << getpid() << std::endl;
+  ofs.close();
+  auto pwd = getpwnam(user.c_str());
+  uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+  gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+  // Set file ownership to user
+  chown(pidfile.c_str(), uid, gid);
+  // Optionally set permissions (e.g., rw-r-----)
+  chmod(pidfile.c_str(), 0640);
+}
+
+int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_processor) {
   DC_LOG_TRACE("main: start");
   datacrumbs::utils::Timer timer;
   timer.resumeTime();
@@ -347,16 +523,13 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // Get configuration manager singleton instance
-  auto event_processor = datacrumbs::EventProcessor(argc, argv);
-
-  if (!event_processor.configManager_) {
+  if (!event_processor->configManager_) {
     DC_LOG_ERROR("ConfigurationManager is not initialized");
     datacrumbs_bpf__destroy(skel);
     return 1;
   }
 
-  if (!event_processor.writer_) {
+  if (!event_processor->writer_) {
     DC_LOG_ERROR("Failed to create ChromeWriter instance");
     datacrumbs_bpf__destroy(skel);
     return 1;
@@ -370,8 +543,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  auto config_manager = event_processor.configManager_;
-  manual_probes(&event_processor, skel);
+  auto config_manager = event_processor->configManager_;
+  manual_probes(event_processor, skel);
 #if !(defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1))
   DC_LOG_WARN("DATACRUMBS_ENABLE_OPT is set to OFF. Nothing will be captured");
 #endif
@@ -400,7 +573,7 @@ int main(int argc, char** argv) {
 
   // Get inclusion_path from configuration manager and build inclusion_list
   std::unordered_map<unsigned int, string_t> inclusion_list;
-  std::string inclusion_paths = event_processor.configManager_->inclusion_path;
+  std::string inclusion_paths = event_processor->configManager_->inclusion_path;
   if (!inclusion_paths.empty()) {
     std::stringstream ss(inclusion_paths);
     std::string path;
@@ -448,7 +621,7 @@ int main(int argc, char** argv) {
   }
   // Prepare context for event handler
   // Create ring buffer for event processing
-  rb = ring_buffer__new(bpf_map__fd(skel->maps.output), handle_event, &event_processor, NULL);
+  rb = ring_buffer__new(bpf_map__fd(skel->maps.output), handle_event, event_processor, NULL);
   if (!rb) {
     err = -1;
     DC_LOG_ERROR("Failed to create ring buffer");
@@ -497,7 +670,7 @@ int main(int argc, char** argv) {
   double elapsed = timer.pauseTime();
   DC_LOG_PRINT("Initialization of DataCrumbs elapsed time: %f seconds", elapsed);
   DC_LOG_PRINT("Ready to run the code.");
-
+  daemon_notify_parent();
   // Main event polling loop
   signal(SIGINT, sig_handler);
 
@@ -540,7 +713,7 @@ int main(int argc, char** argv) {
   auto time_unit = 1000000000 / DATACRUMBS_TIME_INTERVAL_NS;
   while (!stop) {
     err = 0;
-    err = lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch);
+    err = lookup_and_delete(file_hash_fd, event_processor, keys, values, batch_size, in_batch);
     if (err == -EINTR) {
       DC_LOG_INFO("\nReceived EINTR, exiting poll loop");
       err = 0;
@@ -551,7 +724,7 @@ int main(int argc, char** argv) {
     int failed_events = 0;
     err = bpf_map_lookup_elem(failed_events_fd, &DATACRUMBS_FAILED_EVENTS_KEY, &failed_events);
     if (err == 0) {
-      event_processor.failed_events = failed_events;
+      event_processor->failed_events = failed_events;
     }
     err = ring_buffer__poll(rb, 10);
     // Ctrl-C gives -EINTR
@@ -653,7 +826,7 @@ int main(int argc, char** argv) {
   }
 #endif
   DC_LOG_PRINT("Collecting string metadata from file_map...");
-  while (lookup_and_delete(file_hash_fd, &event_processor, keys, values, batch_size, in_batch) ==
+  while (lookup_and_delete(file_hash_fd, event_processor, keys, values, batch_size, in_batch) ==
          1) {
     // Continue until no more keys are found
   }
@@ -672,7 +845,7 @@ int main(int argc, char** argv) {
   timer.resumeTime();
 
   // Finalize ChromeWriter instance
-  event_processor.finalize();
+  event_processor->finalize();
 
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   // Cleanup resources
@@ -685,4 +858,74 @@ int main(int argc, char** argv) {
 
   DC_LOG_TRACE("main: end");
   return -err;
+}
+
+int main(int argc, char** argv);
+
+int main(int argc, char** argv) {
+  if (argc < 2) {
+    std::cerr << "Usage: " << argv[0] << " start|stop [args...]" << std::endl;
+    return 1;
+  }
+  std::string cmd = argv[1];
+  std::string hostname = get_hostname();
+  std::string timestamp = get_timestamp();
+  std::string pidfile = "/tmp/datacrumbs_" + hostname + ".pid";
+
+  if (cmd == "start") {
+    daemonize();
+    auto event_processor = datacrumbs::EventProcessor(argc, argv);
+    std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname +
+                          "_" + timestamp + ".log";
+    redirect_output(logfile, event_processor.configManager_->user);
+    DC_LOG_PRINT("Spawned daemon with pid %d, output redirected to %s\n", getpid(),
+                 logfile.c_str());
+    event_processor.configManager_->print_configurations();
+    write_pid_file(pidfile, event_processor.configManager_->user);
+    return main_process(argc, argv, &event_processor);
+  } else if (cmd == "stop") {
+    // Find and kill daemon by pid file
+    std::ifstream ifs(pidfile);
+    pid_t pid = 0;
+    ifs >> pid;
+    ifs.close();
+    if (pid > 0) {
+      kill(pid, SIGINT);
+      int status = 0;
+      if (pid > 0) {
+        // Wait for the process to terminate after sending SIGINT
+        // Check if process exists before calling waitpid
+        // Poll for process termination using ps
+        int max_retries = 600;  // Wait up to ~600 seconds (1s * 600)
+        DC_LOG_PRINT("Sent SIGINT. Waiting for %f minutes for pid:%d to exit", max_retries / 60.0,
+                     pid);
+        int i;
+        for (i = 0; i < max_retries; ++i) {
+          std::string ps_cmd = "ps -p " + std::to_string(pid) + " > /dev/null";
+          int ret = system(ps_cmd.c_str());
+          if (ret != 0) {
+            // Process no longer exists
+            break;
+          }
+          usleep(1000000);  // Sleep 1s
+        }
+        if (access(pidfile.c_str(), F_OK) == 0) {
+          remove(pidfile.c_str());
+        }
+        if (i == max_retries) {
+          DC_LOG_PRINT("Process %d did not terminate within the expected time.", pid);
+        } else {
+          DC_LOG_PRINT("Process %d has terminated.", pid);
+        }
+      }
+    } else {
+      DC_LOG_ERROR("Could not find pid to stop.\n");
+    }
+
+    exit(0);
+  } else {
+    DC_LOG_ERROR("Unknown command: %s\n", cmd.c_str());
+    DC_LOG_ERROR("Usage: %s start|stop [args...]\n", argv[0]);
+    exit(1);
+  }
 }
