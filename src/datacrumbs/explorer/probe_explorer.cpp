@@ -10,7 +10,8 @@ ProbeExplorer::ProbeExplorer(int argc, char** argv) {
   has_invalid_probes_ = false;
   DC_LOG_TRACE("ProbeExplorer::ProbeExplorer - end");
 }
-std::unordered_map<std::string, std::unordered_set<std::string>> ProbeExplorer::Extract_Exclusions() {
+std::unordered_map<std::string, std::unordered_set<std::string>>
+ProbeExplorer::Extract_Exclusions() {
   DC_LOG_TRACE("ProbeExplorer::validate_exclusion_file - start");
   std::unordered_map<std::string, std::unordered_set<std::string>> exclusionMap;
   if (!configManager_->probe_exclusion_file_path.empty() &&
@@ -24,7 +25,8 @@ std::unordered_map<std::string, std::unordered_set<std::string>> ProbeExplorer::
         for (int i = 0; i < arr_len; ++i) {
           json_object* probe_obj = json_object_array_get_idx(jobj, i);
           if (!probe_obj) {
-            DC_LOG_WARN("the %dth element of exclusion file is missing (null pointer returned).", i);
+            DC_LOG_WARN("the %dth element of exclusion file is missing (null pointer returned).",
+                        i);
             continue;
           }
           if (json_object_get_type(probe_obj) == json_type_null) {
@@ -42,24 +44,31 @@ std::unordered_map<std::string, std::unordered_set<std::string>> ProbeExplorer::
             int func_len = json_object_array_length(funcs_obj);
             for (int j = 0; j < func_len; ++j) {
               json_object* func_obj = json_object_array_get_idx(funcs_obj, j);
-              
+
               if (func_obj && json_object_get_type(func_obj) == json_type_string) {
-                //check the function name
+                // check the function name
                 std::string func_name = json_object_get_string(func_obj);
-                if(func_name.find('/')!= std::string::npos || func_name.find('\\') != std::string::npos || func_name.find(' ') != std::string::npos){
-                  DC_LOG_WARN("Exclusion file contains invalid function name '%s' for probe '%s'. Skipping this function.",
-                              func_name.c_str(), probe_name.c_str());
+                if (func_name.find('/') != std::string::npos ||
+                    func_name.find('\\') != std::string::npos ||
+                    func_name.find(' ') != std::string::npos) {
+                  DC_LOG_WARN(
+                      "Exclusion file contains invalid function name '%s' for probe '%s'. Skipping "
+                      "this function.",
+                      func_name.c_str(), probe_name.c_str());
                   continue;
                 }
                 func_set.insert(json_object_get_string(func_obj));
               }
             }
             exclusionMap[probe_name] = std::move(func_set);
-          }else{
-            DC_LOG_WARN("Exclusion file entry at index %d is missing 'name' or 'functions' field, or they are of incorrect type.", i);
+          } else {
+            DC_LOG_WARN(
+                "Exclusion file entry at index %d is missing 'name' or 'functions' field, or they "
+                "are of incorrect type.",
+                i);
           }
         }
-      }else{
+      } else {
         DC_LOG_WARN("Exclusion file is not a valid JSON array.");
       }
       if (jobj) json_object_put(jobj);
@@ -69,7 +78,7 @@ std::unordered_map<std::string, std::unordered_set<std::string>> ProbeExplorer::
     }
   }
   return exclusionMap;
-  
+
   DC_LOG_TRACE("ProbeExplorer::validate_exclusion_file - end");
 }
 // Extracts probes based on configuration and exclusion file
@@ -302,8 +311,8 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
               excludedFuncs.find(base_name) == excludedFuncs.end()) {
             filteredNames.push_back(name);
           } else {
-            DC_LOG_INFO("Excluding function '%s' from probe '%s' as per exclusion list.", name.c_str(),
-                        capture_probe->name.c_str());
+            DC_LOG_INFO("Excluding function '%s' from probe '%s' as per exclusion list.",
+                        name.c_str(), capture_probe->name.c_str());
           }
         }
         functionNames = std::move(filteredNames);
@@ -472,35 +481,34 @@ void ProbeExplorer::create_exclusion_file(std::vector<std::shared_ptr<Probe>> pr
     }
     json_object_array_add(jexarray, jexclude);
   }
-  if(!configManager_->probe_exclusion_file_path.empty() &&
+  if (!configManager_->probe_exclusion_file_path.empty() &&
       !std::filesystem::exists(configManager_->probe_exclusion_file_path)) {
-      const char* exclude_json_str = json_object_to_json_string_ext(jexarray, JSON_C_TO_STRING_PRETTY);
-      std::ofstream ofs(configManager_->probe_exclusion_file_path);
-      if (ofs.is_open()) {
-        ofs << exclude_json_str;
-        ofs.close();
-      } else {
-        DC_LOG_ERROR("Failed to open file: %s", configManager_->probe_exclusion_file_path.c_str());
-      }
+    const char* exclude_json_str =
+        json_object_to_json_string_ext(jexarray, JSON_C_TO_STRING_PRETTY);
+    std::ofstream ofs(configManager_->probe_exclusion_file_path);
+    if (ofs.is_open()) {
+      ofs << exclude_json_str;
+      ofs.close();
+    } else {
+      DC_LOG_ERROR("Failed to open file: %s", configManager_->probe_exclusion_file_path.c_str());
     }
+  }
 
   DC_LOG_TRACE("ProbeExplorer::create_exclusion_file - end");
 }
-
-
 
 // Writes extracted probes to a JSON file and returns the probe list
 std::vector<std::shared_ptr<Probe>> ProbeExplorer::writeProbesToJson() {
   DC_LOG_TRACE("ProbeExplorer::writeProbesToJson - start");
   auto probes = extractProbes();
-  if(probes.empty()) {
+  if (probes.empty()) {
     DC_LOG_WARN("No valid probes extracted. Skipping JSON write.");
     return probes;
   }
-  if(!configManager_->probe_exclusion_file_path.empty() &&
+  if (!configManager_->probe_exclusion_file_path.empty() &&
       !std::filesystem::exists(configManager_->probe_exclusion_file_path)) {
-        create_exclusion_file(probes);
-      }
+    create_exclusion_file(probes);
+  }
   json_object* jarray = json_object_new_array();
 
   // Serialize each probe to JSON
