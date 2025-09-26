@@ -72,8 +72,4 @@ class EventProcessor {
 
 }  // namespace datacrumbs
 
-// Include generated
-
-#include <datacrumbs/server/process/generated_process.h>
-
 #endif
