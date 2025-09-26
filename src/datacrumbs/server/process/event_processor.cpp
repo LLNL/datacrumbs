@@ -1,157 +1,8 @@
 #include <datacrumbs/server/process/event_processor.h>
-
-#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
-
-#define INITIALIZE_MAP_1()                                                  \
-  int profile_1_fd = bpf_map__fd(skel->maps.profile);                       \
-  if (profile_1_fd < 0) {                                                   \
-    DC_LOG_ERROR("Failed to get general profile map fd: %d", profile_1_fd); \
-    datacrumbs_bpf__destroy(skel);                                          \
-    return 1;                                                               \
-  }
-
-#define INITIALIZE_MAP_LOOKUP_1()                                                   \
-  struct profile_key_t* profile_keys =                                              \
-      (struct profile_key_t*)malloc(batch_size * sizeof(struct profile_key_t));     \
-  struct profile_value_t* profile_values =                                          \
-      (struct profile_value_t*)malloc(batch_size * sizeof(struct profile_value_t)); \
-  struct profile_key_t* profile_in_batch = nullptr;
-
-#define LOOKUP_1_CALL()                                                                         \
-  lookup_1(profile_1_fd, latest_ts, &event_processor, batch_size, profile_keys, profile_values, \
-           profile_in_batch)
-
-inline static int lookup_1(int map_fd, unsigned long long latest_timestamp,
-                           datacrumbs::EventProcessor* event_processor, unsigned int batch_size,
-                           struct profile_key_t* keys, struct profile_value_t* values,
-                           struct profile_key_t* in_batch) {
-  int ret = bpf_map_lookup_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
-  if (ret < 0 && errno != ENOENT) {
-    perror("bpf_map_lookup_batch general");
-    return -1;
-  }
-  if (batch_size < 1) {
-    return -1;
-  }
-  struct profile_key_t delete_keys[batch_size];
-  unsigned int j = 0;
-  // Process the retrieved keys and values
-  for (int i = 0; i < batch_size; ++i) {
-    if (latest_timestamp == 0 || keys[i].time_interval <= latest_timestamp) {
-      struct counter_event_t event;
-      event.key = &keys[i];
-      event.value = &values[i];
-      event_processor->handle_event(&event, 1024);
-      delete_keys[j++] = keys[i];
-    }
-  }
-  ret = bpf_map_delete_batch(map_fd, delete_keys, &j, NULL);
-  if (ret < 0) {
-    perror("bpf_map_delete_batch general");
-  }
-  // Check if the end of the map has been reached
-  if (ret < 0 && errno == ENOENT) {
-    return -1;
-  }
-  return 0;
-}
-
-#endif
-static datacrumbs::EventWithId* get_data_1(void* data, uint64_t index) {
-#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
-  struct general_event_t* base = (general_event_t*)data;
-
-  auto event = new datacrumbs::EventWithId(NORMAL_EVENT, index, base->type, base->id,
-                                           base->event_id, base->ts, base->dur, nullptr);
-#else
-  struct counter_event_t* base = (counter_event_t*)data;
-  auto args = new DataCrumbsArgs();
-  args->emplace("duration", base->value->duration);
-  args->emplace("frequency", base->value->frequency);
-  auto event = new datacrumbs::EventWithId(COUNTER_EVENT, index, base->key->type, base->key->id,
-                                           base->key->event_id, base->key->time_interval, 0, args);
-#endif
-  return event;
-}
-
-#define GET_DATA_3_EXISTS
-
-#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
-#define INITIALIZE_MAP_3()                                          \
-  int profile_3_fd = bpf_map__fd(skel->maps.usdt_profile);          \
-  if (profile_3_fd < 0) {                                           \
-    DC_LOG_ERROR("Failed to get profile map fd: %d", profile_3_fd); \
-    datacrumbs_bpf__destroy(skel);                                  \
-    return 1;                                                       \
-  }
-
-#define INITIALIZE_MAP_LOOKUP_3()                                                         \
-  struct usdt_profile_key_t* usdt_keys =                                                  \
-      (struct usdt_profile_key_t*)malloc(batch_size * sizeof(struct usdt_profile_key_t)); \
-  struct profile_value_t* usdt_values =                                                   \
-      (struct profile_value_t*)malloc(batch_size * sizeof(struct profile_value_t));       \
-  struct usdt_profile_key_t* usdt_in_batch = nullptr;
-
-#define LOOKUP_3_CALL()                                                                   \
-  lookup_3(profile_3_fd, latest_ts, &event_processor, batch_size, usdt_keys, usdt_values, \
-           usdt_in_batch)
-
-inline static int lookup_3(int map_fd, unsigned long long latest_timestamp,
-                           datacrumbs::EventProcessor* event_processor, unsigned int batch_size,
-                           struct usdt_profile_key_t* keys, struct profile_value_t* values,
-                           struct usdt_profile_key_t* in_batch) {
-  int ret = bpf_map_lookup_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
-  if (ret < 0 && errno != ENOENT) {
-    perror("bpf_map_lookup_batch usdt");
-    return -1;
-  }
-  if (batch_size < 1) {
-    return -1;
-  }
-  struct usdt_profile_key_t delete_keys[batch_size];
-  unsigned int j = 0;
-  // Process the retrieved keys and values
-  for (int i = 0; i < batch_size; ++i) {
-    if (latest_timestamp == 0 || keys[i].time_interval <= latest_timestamp) {
-      struct usdt_counter_event_t event;
-      event.key = &keys[i];
-      event.value = &values[i];
-      event_processor->handle_event(&event, 1024);
-      delete_keys[j++] = keys[i];
-    }
-  }
-  ret = bpf_map_delete_batch(map_fd, delete_keys, &j, NULL);
-  if (ret < 0) {
-    perror("bpf_map_delete_batch usdt");
-  }
-  // Check if the end of the map has been reached
-  if (ret < 0 && errno == ENOENT) {
-    return -1;
-  }
-  return 0;
-}
-#endif
-
-static datacrumbs::EventWithId* get_data_3(void* data, uint64_t index) {
-#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
-  struct usdt_event_t* base = (usdt_event_t*)data;
-  auto args = new DataCrumbsArgs();
-  args->emplace("clazz", base->class_hash);
-  args->emplace("method", base->method_hash);
-  auto event = new datacrumbs::EventWithId(NORMAL_EVENT, index, base->type, base->id,
-                                           base->event_id, base->ts, base->dur, args);
-#else
-  struct usdt_counter_event_t* base = (usdt_counter_event_t*)data;
-  auto args = new DataCrumbsArgs();
-  args->emplace("duration", base->value->duration);
-  args->emplace("frequency", base->value->frequency);
-  args->emplace("clazz", base->key->class_hash);
-  args->emplace("method", base->key->method_hash);
-  auto event = new datacrumbs::EventWithId(COUNTER_EVENT, index, base->key->type, base->key->id,
-                                           base->key->event_id, base->key->time_interval, 0, args);
-#endif
-  return event;
-}
+#include <datacrumbs/server/process/processing/general_event.h>
+#include <datacrumbs/server/process/processing/usdt_event.h>
+// Include generated
+#include <datacrumbs/server/process/generated_process.h>
 
 #define GET_DATA_FUNCTION(INDEX)                                       \
   auto write_event = get_data_##INDEX(data, event_index.fetch_add(1)); \
@@ -160,6 +11,7 @@ static datacrumbs::EventWithId* get_data_3(void* data, uint64_t index) {
   }
 
 namespace datacrumbs {
+
 EventProcessor::EventProcessor(int argc, char** argv) {
   configManager_ =
       datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance(argc, argv);
@@ -170,6 +22,7 @@ EventProcessor::EventProcessor(int argc, char** argv) {
   }
   failed_events = 0;
 }
+
 int EventProcessor::handle_event(void* data, size_t data_sz) {
   DC_LOG_TRACE("handle_event: start");
 
@@ -341,47 +194,8 @@ static void sig_handler(int) {
   DC_LOG_INFO("\nReceived SIGINT, setting loop variable");
 }
 
-int main(int argc, char** argv) {
-  DC_LOG_TRACE("main: start");
-  datacrumbs::utils::Timer timer;
-  timer.resumeTime();
-
-  struct datacrumbs_bpf* skel;
-  int err;
-  struct ring_buffer* rb = NULL;
-  libbpf_set_print(libbpf_print_fn);
-
-  // Open and load BPF skeleton
-  skel = datacrumbs_bpf__open_and_load();
-  if (!skel) {
-    DC_LOG_ERROR("Failed to open BPF object");
-    return 1;
-  }
-
-  // Get configuration manager singleton instance
-  auto event_processor = datacrumbs::EventProcessor(argc, argv);
-
-  if (!event_processor.configManager_) {
-    DC_LOG_ERROR("ConfigurationManager is not initialized");
-    datacrumbs_bpf__destroy(skel);
-    return 1;
-  }
-
-  if (!event_processor.writer_) {
-    DC_LOG_ERROR("Failed to create ChromeWriter instance");
-    datacrumbs_bpf__destroy(skel);
-    return 1;
-  }
-
-  // Attach BPF skeleton
-  err = datacrumbs_bpf__attach(skel);
-  if (err) {
-    DC_LOG_ERROR("Failed to attach BPF skeleton: %d", err);
-    datacrumbs_bpf__destroy(skel);
-    return 1;
-  }
-
-  auto config_manager = event_processor.configManager_;
+static int manual_probes(datacrumbs::EventProcessor* event_processor, struct datacrumbs_bpf* skel) {
+  auto config_manager = event_processor->configManager_;
   struct json_object* manual_probes_json =
       json_object_from_file(config_manager->manual_probe_path.c_str());
   if (manual_probes_json) {
@@ -513,7 +327,51 @@ int main(int argc, char** argv) {
   } else {
     DC_LOG_WARN("Failed to read probes file: %s", config_manager->manual_probe_path.c_str());
   }
+  return 0;
+}
 
+int main(int argc, char** argv) {
+  DC_LOG_TRACE("main: start");
+  datacrumbs::utils::Timer timer;
+  timer.resumeTime();
+
+  struct datacrumbs_bpf* skel;
+  int err;
+  struct ring_buffer* rb = NULL;
+  libbpf_set_print(libbpf_print_fn);
+
+  // Open and load BPF skeleton
+  skel = datacrumbs_bpf__open_and_load();
+  if (!skel) {
+    DC_LOG_ERROR("Failed to open BPF object");
+    return 1;
+  }
+
+  // Get configuration manager singleton instance
+  auto event_processor = datacrumbs::EventProcessor(argc, argv);
+
+  if (!event_processor.configManager_) {
+    DC_LOG_ERROR("ConfigurationManager is not initialized");
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
+
+  if (!event_processor.writer_) {
+    DC_LOG_ERROR("Failed to create ChromeWriter instance");
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
+
+  // Attach BPF skeleton
+  err = datacrumbs_bpf__attach(skel);
+  if (err) {
+    DC_LOG_ERROR("Failed to attach BPF skeleton: %d", err);
+    datacrumbs_bpf__destroy(skel);
+    return 1;
+  }
+
+  auto config_manager = event_processor.configManager_;
+  manual_probes(&event_processor, skel);
 #if !(defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1))
   DC_LOG_WARN("DATACRUMBS_ENABLE_OPT is set to OFF. Nothing will be captured");
 #endif
