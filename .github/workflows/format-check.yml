@@ -1,0 +1,25 @@
+name: Check code formatting
+
+on:
+  push:
+  pull_request:
+    branches: [ develop, stage-in ]
+  workflow_dispatch:
+
+jobs:
+  cpp-format-check:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install clang-format
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            clang-format-19
+
+    - name: Test formatting
+      run: |
+        ./scripts/formatting/check-formatting.sh /usr/bin/clang-format-19
