@@ -17,8 +17,7 @@ DATACRUMBS_MAP_EXTERN(fn_pid_map, struct fn_key_t, struct fn_value_t);
 
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 DATACRUMBS_MAP_EXTERN(failed_request, u32, u32, 128);
-DATACRUMBS_RINGBUF_EXTERN(output,
-                          1024 * 1024U * DATACRUMBS_TRACE_RINGBUF_SIZE_MB);
+DATACRUMBS_RINGBUF_EXTERN(output, 1024 * 1024U * DATACRUMBS_TRACE_RINGBUF_SIZE_MB);
 #else
 DATACRUMBS_MAP_EXTERN(profile, struct profile_key_t, struct profile_value_t, 1024);
 DATACRUMBS_MAP_EXTERN(usdt_profile, struct usdt_profile_key_t, struct profile_value_t, 1024);

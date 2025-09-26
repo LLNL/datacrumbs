@@ -2,8 +2,8 @@
 #define EXAMPLE_H
 
 struct event_t {
- int pid;
- int event_id;
+  int pid;
+  int event_id;
 };
 
 #endif
