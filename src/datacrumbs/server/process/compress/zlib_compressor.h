@@ -80,9 +80,9 @@ class ZlibCompression {
 
  private:
   void write_chunk() {
-    if (buffer_offset_ > 0) {
+    if (buffer_offset_ > 0 && file_) {
       if (std::fwrite(buffer_.data(), 1, buffer_offset_, file_) != buffer_offset_) {
-        throw std::runtime_error("Failed to write compressed chunk to file");
+        perror("Failed to write compressed chunk to file");
       }
       buffer_offset_ = 0;
     }
