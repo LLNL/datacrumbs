@@ -2,6 +2,7 @@
 // include first
 #include <datacrumbs/datacrumbs_config.h>
 // other headers
+#include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/typedefs.h>

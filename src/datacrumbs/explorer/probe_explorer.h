@@ -3,6 +3,7 @@
 #include <datacrumbs/datacrumbs_config.h>
 // other headers
 #include <datacrumbs/common/configuration_manager.h>
+#include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/logging.h>  // Use custom logging macros
 #include <datacrumbs/common/singleton.h>
 #include <datacrumbs/common/utils.h>

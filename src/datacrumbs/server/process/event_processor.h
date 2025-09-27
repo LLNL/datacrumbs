@@ -8,6 +8,7 @@
 #include <datacrumbs/datacrumbs_config.h>
 // other headers
 #include <datacrumbs/common/configuration_manager.h>
+#include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/logging.h>  // Logging header
 #include <datacrumbs/common/singleton.h>

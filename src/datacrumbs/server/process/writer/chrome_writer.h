@@ -3,6 +3,7 @@
 #include <datacrumbs/datacrumbs_config.h>
 // Other headers
 #include <datacrumbs/common/configuration_manager.h>
+#include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/singleton.h>
