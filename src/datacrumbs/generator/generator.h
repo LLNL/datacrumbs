@@ -5,6 +5,7 @@
 // other headers
 // Include necessary headers for configuration, data structures, enumerations, and probe generators
 #include <datacrumbs/common/configuration_manager.h>
+#include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>  // Added for logging macros
