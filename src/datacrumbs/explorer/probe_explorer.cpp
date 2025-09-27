@@ -230,10 +230,18 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
           // Load custom BPF file and extract functions
           if (!std::filesystem::exists(customProbe->bpf_file)) {
             DC_LOG_ERROR("Custom BPF file does not exist: %s", customProbe->bpf_file.c_str());
+            has_invalid_probes_ = true;
             continue;  // Skip this probe if the file is missing
           }
           if (!std::filesystem::exists(customProbe->probe_file)) {
             DC_LOG_ERROR("Custom probe file does not exist: %s", customProbe->probe_file.c_str());
+            has_invalid_probes_ = true;
+            continue;  // Skip this probe if the file is missing
+          }
+          if (!std::filesystem::exists(customProbe->process_header)) {
+            DC_LOG_ERROR("Custom process header file does not exist: %s",
+                         customProbe->process_header.c_str());
+            has_invalid_probes_ = true;
             continue;  // Skip this probe if the file is missing
           }
           std::ifstream probe_ifs(customProbe->probe_file);
