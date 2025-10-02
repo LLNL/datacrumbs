@@ -3,12 +3,12 @@
 namespace datacrumbs {
 
 ElfSymbolExtractor::ElfSymbolExtractor(const std::string& path, bool include_offsets)
-    : fd_(-1), data_(nullptr), size_(0), include_offsets_(include_offsets), base_address_(0),
-      kExcludedFunctions({
-          "_init",
-          "_fini",
-          "_start"
-      }) {
+    : fd_(-1),
+      data_(nullptr),
+      size_(0),
+      include_offsets_(include_offsets),
+      base_address_(0),
+      kExcludedFunctions({"_init", "_fini", "_start"}) {
   DC_LOG_TRACE("ElfSymbolExtractor: constructor start for file: %s", path.c_str());
   fd_ = open(path.c_str(), O_RDONLY);
   if (fd_ < 0) {
@@ -96,7 +96,8 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
         if (!name.empty()) {
           char buffer[32];
           unsigned long offset = static_cast<unsigned long>(
-              syms[j].st_value);  // TODO(Hari): Explore if i have to relocate for virtual address space - static_cast<unsigned long>(base_address_);
+              syms[j].st_value);  // TODO(Hari): Explore if i have to relocate for virtual address
+                                  // space - static_cast<unsigned long>(base_address_);
           DC_LOG_DEBUG("found name: %s st_value: 0x%lx offset: 0x%lx base_address: 0x%lx",
                        name.c_str(), static_cast<unsigned long>(syms[j].st_value), offset,
                        static_cast<unsigned long>(base_address_));
@@ -137,13 +138,13 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
     if (pair.second.size() > 1) {
       DC_LOG_WARN("Symbol %s has multiple offsets, using all occurrences", pair.first.c_str());
       for (const auto& offset : pair.second) {
-      symbols.push_back(pair.first + ":" + offset);
+        symbols.push_back(pair.first + ":" + offset);
       }
     } else {
       if (include_offsets_) {
-      symbols.push_back(pair.first + ":" + *pair.second.begin());
+        symbols.push_back(pair.first + ":" + *pair.second.begin());
       } else {
-      symbols.push_back(pair.first);
+        symbols.push_back(pair.first);
       }
     }
   }

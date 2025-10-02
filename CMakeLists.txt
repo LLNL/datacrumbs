@@ -711,9 +711,13 @@ endif()
 enable_testing()
 add_test(NAME datacrumbs_pretest COMMAND bash -c "ulimit -n 4096")
 
-add_test(NAME datacrumbs COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
-set_tests_properties(datacrumbs PROPERTIES DEPENDS datacrumbs_pretest)
-set_tests_properties(datacrumbs PROPERTIES DEPENDS ${PROJECT_NAME})
+add_test(NAME datacrumbs_start COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+set_tests_properties(datacrumbs_start PROPERTIES DEPENDS datacrumbs_pretest)
+set_tests_properties(datacrumbs_start PROPERTIES DEPENDS ${PROJECT_NAME})
+
+add_test(NAME datacrumbs_stop COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS datacrumbs_pretest)
+set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS ${PROJECT_NAME})
 
 add_test(NAME datacrumbs_validator COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs_validator ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_validator PROPERTIES DEPENDS ${PROJECT_NAME}_validator)

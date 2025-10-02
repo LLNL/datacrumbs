@@ -37,6 +37,8 @@ int ProbeGenerator::run() {
   // Track total number of generated probes
   size_t total_probes_generated = 0;
   update_event("M", "SH", 0);
+  update_event(DATACRUMBS_PROBE_CATEGORY, START_FUNCTION_NAME, START_EVENT_ID);
+  update_event(DATACRUMBS_PROBE_CATEGORY, END_FUNCTION_NAME, END_EVENT_ID);
   bool manual_probe_added = false;
   // Iterate over each probe in the JSON array
   for (int i = 0; i < arr_len; ++i) {
@@ -73,7 +75,7 @@ int ProbeGenerator::run() {
     for (size_t func_index = 0; func_index < probe.functions.size(); ++func_index) {
       const auto& func = probe.functions[func_index];
 
-      int current_event_id = 0;
+      int current_event_id = 1000;
       if (probe.type != ProbeType::CUSTOM) {
         current_event_id = this->eventIdCounter_++;
       } else {

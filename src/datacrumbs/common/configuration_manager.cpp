@@ -17,7 +17,6 @@
 #include <algorithm>
 #include <cstring>
 #include <fstream>
-#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -53,76 +52,52 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
 #define DC_YAML_USER "user"
 #define DC_YAML_INCLUSION_PATH "inclusion_path"
 
-/**
- * @class ArgumentParser
- * @brief Parses command-line arguments for DataCrumbs configuration.
- *
- * This class extracts configuration parameters from command-line arguments, such as
- * configuration name, mode, trace log directory, profiling interval, configuration path,
- * and user. It is designed to be used in conjunction with the ConfigurationManager class.
- */
-class ArgumentParser {
- public:
-  std::string config_name;                          ///< Name of the configuration to load
-  std::optional<std::string> mode;                  ///< Optional mode argument
-  std::optional<std::string> trace_log_dir;         ///< Optional trace log directory
-  std::optional<float> profiling_interval;          ///< Optional profiling interval
-  std::optional<std::string> config_path;           ///< Optional configuration file path
-  std::optional<std::string> data_dir;              ///< Optional data directory
-  std::optional<std::string> user;                  ///< Optional user argument
-  std::optional<uint64_t> skip_event_threshold_us;  ///< Optional skip event threshold
-  std::optional<std::string> inclusion_path;        ///< Optional inclusion path
+ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
+  DC_LOG_TRACE("[ArgumentParser] Parsing command line arguments...");
+  if (argc < 2) {
+    throw std::invalid_argument("Configuration name is required as the first argument.");
+  }
+  config_name = argv[start_index];
 
-  /**
-   * @brief Constructor that parses command-line arguments.
-   * @param argc Number of command-line arguments
-   * @param argv Array of command-line argument strings
-   * @throws std::invalid_argument if required arguments are missing or unknown arguments are found
-   */
-  ArgumentParser(int argc, char** argv) {
-    DC_LOG_TRACE("[ArgumentParser] Parsing command line arguments...");
-    if (argc < 2) {
-      throw std::invalid_argument("Configuration name is required as the first argument.");
-    }
-    config_name = argv[1];
-
-    for (int i = 2; i < argc; ++i) {
-      std::string arg = argv[i];
-      if (arg == "--mode" && i + 1 < argc) {
-        mode = argv[++i];
-        DC_LOG_DEBUG("[ArgumentParser] Mode set to: %s", mode->c_str());
-      } else if (arg == "--trace_log_dir" && i + 1 < argc) {
-        trace_log_dir = argv[++i];
-        DC_LOG_DEBUG("[ArgumentParser] Trace log dir set to: %s", trace_log_dir->c_str());
-      } else if (arg == "--data_dir" && i + 1 < argc) {
-        data_dir = argv[++i];
-        DC_LOG_DEBUG("[ArgumentParser] Data directory set to: %s", data_dir->c_str());
-      } else if (arg == "--profiling_interval" && i + 1 < argc) {
-        profiling_interval = std::stof(argv[++i]);
-        DC_LOG_DEBUG("[ArgumentParser] Profiling interval set to: %f", *profiling_interval);
-      } else if (arg == "--config_path" && i + 1 < argc) {
-        config_path = argv[++i];
-        DC_LOG_DEBUG("[ArgumentParser] Config path set to: %s", config_path->c_str());
-      } else if (arg == "--user" && i + 1 < argc) {
-        user = argv[++i];
-        DC_LOG_DEBUG("[ArgumentParser] User set to: %s", user->c_str());
-      } else if (arg == "--inclusion_path" && i + 1 < argc) {
-        inclusion_path = argv[++i];
-        DC_LOG_DEBUG("[ArgumentParser] Inclusion path set to: %s", inclusion_path->c_str());
-      } else if (arg == "--help" || arg == "-h") {
-        DC_LOG_PRINT(
-            "Usage: %s <config_name> [--mode <mode>] [--trace_log_dir <path>] "
-            "[--profiling_interval <seconds>] [--config_path <path>] [--user <user>] [--data_dir "
-            "<path>] [--inclusion_path <path>]",
-            argv[0]);
-        exit(0);
-      } else {
-        DC_LOG_ERROR("[ArgumentParser] Unknown argument: %s", arg.c_str());
-        throw std::invalid_argument("Unknown argument: " + arg);
-      }
+  for (int i = start_index + 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    if (arg == "--mode" && i + 1 < argc) {
+      mode = argv[++i];
+      DC_LOG_DEBUG("[ArgumentParser] Mode set to: %s", mode->c_str());
+    } else if (arg == "--trace_log_dir" && i + 1 < argc) {
+      trace_log_dir = argv[++i];
+      DC_LOG_DEBUG("[ArgumentParser] Trace log dir set to: %s", trace_log_dir->c_str());
+    } else if (arg == "--data_dir" && i + 1 < argc) {
+      data_dir = argv[++i];
+      DC_LOG_DEBUG("[ArgumentParser] Data directory set to: %s", data_dir->c_str());
+    } else if (arg == "--profiling_interval" && i + 1 < argc) {
+      profiling_interval = std::stof(argv[++i]);
+      DC_LOG_DEBUG("[ArgumentParser] Profiling interval set to: %f", *profiling_interval);
+    } else if (arg == "--config_path" && i + 1 < argc) {
+      config_path = argv[++i];
+      DC_LOG_DEBUG("[ArgumentParser] Config path set to: %s", config_path->c_str());
+    } else if (arg == "--user" && i + 1 < argc) {
+      user = argv[++i];
+      DC_LOG_DEBUG("[ArgumentParser] User set to: %s", user->c_str());
+    } else if (arg == "--inclusion_path" && i + 1 < argc) {
+      inclusion_path = argv[++i];
+      DC_LOG_DEBUG("[ArgumentParser] Inclusion path set to: %s", inclusion_path->c_str());
+    } else if (arg == "--log_dir" && i + 1 < argc) {
+      log_dir = argv[++i];
+      DC_LOG_DEBUG("[ArgumentParser] Log directory set to: %s", log_dir->c_str());
+    } else if (arg == "--help" || arg == "-h") {
+      DC_LOG_PRINT(
+          "Usage: %s <config_name> [--mode <mode>] [--trace_log_dir <path>] "
+          "[--profiling_interval <seconds>] [--config_path <path>] [--user <user>] [--data_dir "
+          "<path>] [--inclusion_path <path>] [--log_dir <path>]",
+          argv[0]);
+      exit(0);
+    } else {
+      DC_LOG_ERROR("[ArgumentParser] Unknown argument: %s", arg.c_str());
+      throw std::invalid_argument("Unknown argument: " + arg);
     }
   }
-};
+}
 
 /**
  * @brief ConfigurationManager constructor.
@@ -134,7 +109,7 @@ class ArgumentParser {
  * @param argc Number of command-line arguments
  * @param argv Array of command-line argument strings
  */
-ConfigurationManager::ConfigurationManager(int argc, char** argv)
+ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, int start_index)
     : path(DATACRUMBS_CONFIG_PATH),
       name("default"),
       mode(Mode::PROFILER),
@@ -143,7 +118,7 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
       profiling_interval(0.1f),  // Default profiling interval in seconds
       user("datacrumbs") {
   DC_LOG_TRACE("[ConfigurationManager] Initializing with arguments...");
-  ArgumentParser parser(argc, argv);
+  ArgumentParser parser(argc, argv, start_index);
   this->name = parser.config_name;
   // Override config path if provided as argument
   if (parser.config_path) {
@@ -366,7 +341,6 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
           }
         }
       }
-      DC_LOG_INFO("[ConfigurationManager] Capture probes loaded: %zu", this->capture_probes.size());
     }
     // Parse user from YAML or use default
     if (config[DC_YAML_USER]) {
@@ -419,13 +393,31 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
       DC_LOG_DEBUG("[ConfigurationManager] Inclusion path overridden by argument: %s",
                    parser.inclusion_path->c_str());
     }
+    // Override log dir if provided as argument
+    if (parser.log_dir) {
+      this->log_dir = *parser.log_dir;
+      DC_LOG_DEBUG("[ConfigurationManager] Log directory overridden by argument: %s",
+                   parser.log_dir->c_str());
+    } else {
+      this->log_dir = std::filesystem::current_path();
+      DC_LOG_DEBUG("[ConfigurationManager] No log directory specified, using default: %s",
+                   this->log_dir.c_str());
+    }
   }
   // Derive additional configuration values and validate
   derive_configurations();
   validate_configurations();
+  if (print) {
+    print_configurations();
+    DC_LOG_INFO("[ConfigurationManager] Initialization complete.");
+  }
+};
 
+void ConfigurationManager::print_configurations() {
   // Log final configuration for debugging
   DC_LOG_INFO("[ConfigurationManager] Final configuration:");
+  DC_LOG_INFO("[ConfigurationManager] Capture probes loaded: %zu", this->capture_probes.size());
+  DC_LOG_INFO("[ConfigurationManager] Category map loaded with %zu entries.", category_map.size());
   DC_LOG_INFO("  Path: %s", this->path.string().c_str());
   DC_LOG_INFO("  Name: %s", this->name.c_str());
   DC_LOG_INFO("  Mode: %d", static_cast<int>(this->mode));
@@ -439,6 +431,7 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
   DC_LOG_INFO("  Category map path: %s", this->category_map_path.string().c_str());
   DC_LOG_INFO("  Profiling interval: %f", this->profiling_interval);
   DC_LOG_INFO("  User: %s", this->user.c_str());
+  DC_LOG_INFO("  Hostname: %s", this->hostname.c_str());
   DC_LOG_INFO("  Capture probes: %d", static_cast<int>(this->capture_probes.size()));
   if (this->inclusion_path.empty()) {
     DC_LOG_INFO("  Inclusion path: Not set");
@@ -450,8 +443,7 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv)
                 static_cast<int>(probe->type), static_cast<int>(probe->probe_type),
                 probe->regex.c_str());
   }
-  DC_LOG_INFO("[ConfigurationManager] Initialization complete.");
-};
+}
 
 /**
  * @brief Derives additional configuration values based on current settings.
@@ -464,6 +456,17 @@ void ConfigurationManager::derive_configurations() {
 
   pid_t pid = getpid();
   DC_LOG_DEBUG("[ConfigurationManager] Process ID: %d", pid);
+
+  // Use this->hostname (std::string) instead of local char array
+  std::string hostname;
+  char hostname_buf[256] = {0};
+  if (gethostname(hostname_buf, sizeof(hostname_buf) - 1) != 0) {
+    DC_LOG_ERROR("[ConfigurationManager] Failed to get hostname.");
+    throw std::runtime_error("Failed to get hostname.");
+  }
+  hostname = hostname_buf;
+  this->hostname = hostname;
+  DC_LOG_DEBUG("[ConfigurationManager] Hostname: %s", this->hostname.c_str());
 
   auto now = std::chrono::system_clock::now();
   auto timestamp =
@@ -554,8 +557,6 @@ void ConfigurationManager::derive_configurations() {
       }
     }
     json_object_put(root);
-    DC_LOG_INFO("[ConfigurationManager] Category map loaded with %zu entries.",
-                category_map.size());
   } else {
     DC_LOG_WARN("[ConfigurationManager] Category map file does not exist: %s",
                 category_json_path.c_str());

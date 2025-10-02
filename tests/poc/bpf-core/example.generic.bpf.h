@@ -20,8 +20,8 @@
   } name SEC(".maps");
 
 struct lpm_key {
-    __u32 prefixlen;
-    __u32 addr;
+  __u32 prefixlen;
+  __u32 addr;
 };
 
 // Define the value structure for the LPM_TRIE.
@@ -29,14 +29,13 @@ struct lpm_key {
 typedef int lpm_value_t;
 
 extern struct {
-    __uint(type, BPF_MAP_TYPE_LPM_TRIE);
-    __uint(max_entries, 256);
-    __type(key, struct lpm_key);
-    __type(value, lpm_value_t);
-    __uint(map_flags, BPF_F_NO_PREALLOC);
-     __uint(pinning, LIBBPF_PIN_BY_NAME); 
+  __uint(type, BPF_MAP_TYPE_LPM_TRIE);
+  __uint(max_entries, 256);
+  __type(key, struct lpm_key);
+  __type(value, lpm_value_t);
+  __uint(map_flags, BPF_F_NO_PREALLOC);
+  __uint(pinning, LIBBPF_PIN_BY_NAME);
 } lpm_trie_map SEC(".maps");
-
 
 // anonymous struct assigned to rb variable
 DATACRUMBS_BPF_RING_BUF(output);
