@@ -1,0 +1,163 @@
+#!/bin/bash
+
+# The script creates indices for the dftracer traces
+# This has the following signature.
+#
+# usage: dftracer_create_index [-fcv] [-d input_directory]
+#   -f                      override indices
+#   -c                      compress input
+#   -v                      enable verbose mode
+#   -h                      display help
+#   -d input_directory      specify input directories. should contain .pfw or .pfw.gz files.
+
+LOG_FILE="/tmp/dftracer_create_index.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+date_echo() {
+  dt=$(date '+%d/%m/%Y %H:%M:%S');
+  echo "$dt  $*"
+}
+
+progress_date_echo() {
+  dt=$(date '+%d/%m/%Y %H:%M:%S')
+  echo -ne "$dt  $*"\\r
+}
+
+LOG_DIR=$PWD
+override=0
+compressed=0
+
+function usage {
+  echo "usage: $(basename "$0") [-fcv] [-d input_directory]"
+  echo "  -f                      override indices"
+  echo "  -c                      compress input"
+  echo "  -v                      enable verbose mode"
+  echo "  -h                      display help"
+  echo "  -d input_directory      specify input directories. should contain .pfw or .pfw.gz files."
+  exit 1
+}
+while getopts ':cvfd:h' opt; do
+  case "$opt" in
+  d)
+    LOG_DIR="${OPTARG}"
+    ;;
+  f)
+    override=1
+    ;;
+  v)
+    set -x
+    ;;
+  c)
+    compressed=1
+    ;;
+  h)
+    usage
+    ;;
+
+  :)
+    echo -e "option requires an argument.\n"
+    usage
+    ;;
+
+  ?)
+    echo -e "Invalid command option.\n"
+    usage
+    ;;
+  esac
+done
+
+
+LOG_DIR=$(realpath "$LOG_DIR")
+
+shift "$(($OPTIND -1))"
+cd "$LOG_DIR" || { date_echo "Failed to change directory to $LOG_DIR"; exit 1; }
+total=$(find . -type f -name "*.pfw*" 2>/dev/null | wc -l)
+date_echo "Number of *.pfw* files in $LOG_DIR: $total"
+
+if [ "$total" == "0" ]; then
+  date_echo "The folder does not contain any pfw or pfw.gz files."
+  exit 1
+fi
+if ! python -c "import zindex_py;"; then
+  date_echo "failure: zindex not found. Please install zindex with: pip install zindex_py"
+  exit 1
+fi
+
+zindex_exec=$(python -c 'import zindex_py;import site; sp=site.getsitepackages()[0]; print(f"{sp}/zindex_py/bin/zindex")')
+if [ ! -f "${zindex_exec}" ]; then
+  date_echo "failure: $?: zindex not found. Please install zindex with: pip install zindex_py"
+#   exit 1
+else
+  date_echo "Found zindex executable at ${zindex_exec}"
+fi
+zindex_exec=/home/haridev/datacrumbs/.venv/lib64/python3.9/site-packages/zindex_py/bin/zindex
+
+if [ "$override" == "1" ]; then
+  date_echo "Removing existing indices as override is passed."
+  files=("$LOG_DIR"/*.zindex)
+  for file_index in "${!files[@]}"; do
+  file=${files[$file_index]}
+  if [ -f "$file" ]; then
+    rm "$file"
+    date_echo "Removed index file: $file"
+  fi
+  done
+fi
+
+pushd "$LOG_DIR" > /dev/null || return
+JOBS_LIMIT=$(nproc --all)
+files=("$LOG_DIR"/*.pfw*)
+total=${#files[@]}
+# loop over logs
+for file_index in "${!files[@]}"; do
+  file=${files[$file_index]}
+  filename=$(basename -- "$file")
+  ext="${filename##*.}"
+  if [ "$ext" != "zindex" ]; then
+  running_jobs=$(jobs -rp | wc -l)
+  if [ $running_jobs -ge $JOBS_LIMIT ]; then
+    date_echo "waiting for Running $running_jobs jobs to be less than $JOBS_LIMIT"
+    while [ $running_jobs -ge $JOBS_LIMIT ]
+    do
+      sleep 1
+      running_jobs=$(jobs -rp | wc -l)
+    done
+    date_echo "Running $running_jobs jobs are now less than $JOBS_LIMIT"
+  fi
+  # only look at files
+  if [ -f "$file" ]; then
+    # calculate basename and copy files
+    filename=$(basename -- "$file")
+    ext="${filename##*.}"
+    if [ "$ext" == "gz" ]; then
+    {
+    # if file is gz get the name
+    name=${filename%.pfw.gz}
+    if [ ! -f "$file.zindex" ]; then
+      $zindex_exec "$file" --index-file file:"$file".zindex --regex 'id:([0-9]+)' --numeric --unique
+      date_echo "Created index for file $file"
+    fi
+    progress_date_echo "Created index for file $name $((file_index+1)) of $total"
+    } &
+    else
+    {
+    # if file is pfw get the name
+    name=${filename%.pfw}
+    if [ ! -f "$file.gz.zindex" ]; then
+      if [ $compressed == 1 ]; then
+      date_echo "Compressing file $name"
+      gzip "$file"
+      $zindex_exec "$file".gz --index-file file:"$file".gz.zindex --regex 'id:([0-9]+)' --numeric --unique
+      date_echo "Created index for compressed file $file.gz"
+      fi
+    fi
+    progress_date_echo "Created index for file $name.gz $((file_index+1)) of $total"
+    } &
+    fi
+  fi
+  fi
+done
+popd > /dev/null || return
+wait
+echo ""
+date_echo "Creation of index finished. Logs can be found at $LOG_FILE"

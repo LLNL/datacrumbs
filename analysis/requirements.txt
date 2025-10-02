@@ -8,9 +8,10 @@ jupyterlab
 jupyter-server-proxy
 ipywidgets
 pandas>=2.0.3
-zindex_py==0.0.2
+git+https://github.com/hariharan-devarajan/zindex.git
 tqdm
 scikit-learn
 seaborn
 jsonlines
 python-intervals
+bokeh
