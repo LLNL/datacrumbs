@@ -10,13 +10,9 @@ ProbeExplorer::ProbeExplorer(int argc, char** argv) {
   has_invalid_probes_ = false;
   DC_LOG_TRACE("ProbeExplorer::ProbeExplorer - end");
 }
-
-// Extracts probes based on configuration and exclusion file
-std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
-  DC_LOG_TRACE("ProbeExplorer::extractProbes - start");
+std::unordered_map<std::string, std::unordered_set<std::string>> ProbeExplorer::Extract_Exclusions() {
+  DC_LOG_TRACE("ProbeExplorer::validate_exclusion_file - start");
   std::unordered_map<std::string, std::unordered_set<std::string>> exclusionMap;
-
-  // Load exclusion map from file if specified
   if (!configManager_->probe_exclusion_file_path.empty() &&
       std::filesystem::exists(configManager_->probe_exclusion_file_path)) {
     std::ifstream ifs(configManager_->probe_exclusion_file_path);
@@ -27,7 +23,14 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         int arr_len = json_object_array_length(jobj);
         for (int i = 0; i < arr_len; ++i) {
           json_object* probe_obj = json_object_array_get_idx(jobj, i);
-          if (!probe_obj) continue;
+          if (!probe_obj) {
+            DC_LOG_WARN("the %dth element of exclusion file is missing (null pointer returned).", i);
+            continue;
+          }
+          if (json_object_get_type(probe_obj) == json_type_null) {
+            DC_LOG_WARN("exclusion file contains explicit JSON null at %dth element.", i);
+            continue;
+          }
           json_object* name_obj = nullptr;
           json_object* funcs_obj = nullptr;
           if (json_object_object_get_ex(probe_obj, "name", &name_obj) &&
@@ -39,13 +42,25 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
             int func_len = json_object_array_length(funcs_obj);
             for (int j = 0; j < func_len; ++j) {
               json_object* func_obj = json_object_array_get_idx(funcs_obj, j);
+              
               if (func_obj && json_object_get_type(func_obj) == json_type_string) {
+                //check the function name
+                std::string func_name = json_object_get_string(func_obj);
+                if(func_name.find('/')!= std::string::npos || func_name.find('\\') != std::string::npos || func_name.find(' ') != std::string::npos){
+                  DC_LOG_WARN("Exclusion file contains invalid function name '%s' for probe '%s'. Skipping this function.",
+                              func_name.c_str(), probe_name.c_str());
+                  continue;
+                }
                 func_set.insert(json_object_get_string(func_obj));
               }
             }
             exclusionMap[probe_name] = std::move(func_set);
+          }else{
+            DC_LOG_WARN("Exclusion file entry at index %d is missing 'name' or 'functions' field, or they are of incorrect type.", i);
           }
         }
+      }else{
+        DC_LOG_WARN("Exclusion file is not a valid JSON array.");
       }
       if (jobj) json_object_put(jobj);
     } else {
@@ -53,6 +68,14 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
                    configManager_->probe_exclusion_file_path.string().c_str());
     }
   }
+  return exclusionMap;
+  
+  DC_LOG_TRACE("ProbeExplorer::validate_exclusion_file - end");
+}
+// Extracts probes based on configuration and exclusion file
+std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
+  DC_LOG_TRACE("ProbeExplorer::extractProbes - start");
+  auto exclusionMap = Extract_Exclusions();
 
   // Log the contents of the exclusion map for debugging
   DC_LOG_DEBUG("Exclusion Map Contents:");
@@ -417,11 +440,67 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
   DC_LOG_TRACE("ProbeExplorer::extractProbes - end");
   return probes;
 }
+void ProbeExplorer::create_exclusion_file(std::vector<std::shared_ptr<Probe>> probes) {
+  DC_LOG_TRACE("ProbeExplorer::create_exclusion_file - start");
+  json_object* jexarray = json_object_new_array();
+  // Serialize each probe to JSON without functions
+  for (const auto& probe : probes) {
+    json_object* jexclude = nullptr;
+    switch (probe->type) {
+      case ProbeType::SYSCALLS:
+        jexclude = std::dynamic_pointer_cast<SysCallProbe>(probe)->toJson(false);
+        break;
+      case ProbeType::KPROBE:
+        jexclude = std::dynamic_pointer_cast<KProbe>(probe)->toJson(false);
+        break;
+      case ProbeType::UPROBE:
+        jexclude = std::dynamic_pointer_cast<UProbe>(probe)->toJson(false);
+        break;
+      case ProbeType::USDT:
+        jexclude = std::dynamic_pointer_cast<USDTProbe>(probe)->toJson(false);
+        break;
+      case ProbeType::CUSTOM:
+        jexclude = std::dynamic_pointer_cast<CustomProbe>(probe)->toJson(false);
+        break;
+      default:
+        DC_LOG_ERROR("Unknown probe type encountered.");
+        continue;  // Skip unknown types
+    }
+    if (!jexclude) {
+      DC_LOG_ERROR("Failed to serialize probe for exclusion: %s", probe->name.c_str());
+      continue;  // Skip serialization failure
+    }
+    json_object_array_add(jexarray, jexclude);
+  }
+  if(!configManager_->probe_exclusion_file_path.empty() &&
+      !std::filesystem::exists(configManager_->probe_exclusion_file_path)) {
+      const char* exclude_json_str = json_object_to_json_string_ext(jexarray, JSON_C_TO_STRING_PRETTY);
+      std::ofstream ofs(configManager_->probe_exclusion_file_path);
+      if (ofs.is_open()) {
+        ofs << exclude_json_str;
+        ofs.close();
+      } else {
+        DC_LOG_ERROR("Failed to open file: %s", configManager_->probe_exclusion_file_path.c_str());
+      }
+    }
+
+  DC_LOG_TRACE("ProbeExplorer::create_exclusion_file - end");
+}
+
+
 
 // Writes extracted probes to a JSON file and returns the probe list
 std::vector<std::shared_ptr<Probe>> ProbeExplorer::writeProbesToJson() {
   DC_LOG_TRACE("ProbeExplorer::writeProbesToJson - start");
   auto probes = extractProbes();
+  if(probes.empty()) {
+    DC_LOG_WARN("No valid probes extracted. Skipping JSON write.");
+    return probes;
+  }
+  if(!configManager_->probe_exclusion_file_path.empty() &&
+      !std::filesystem::exists(configManager_->probe_exclusion_file_path)) {
+        create_exclusion_file(probes);
+      }
   json_object* jarray = json_object_new_array();
 
   // Serialize each probe to JSON
