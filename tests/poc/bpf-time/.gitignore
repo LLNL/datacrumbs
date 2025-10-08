@@ -1,0 +1,7 @@
+*.o
+vmlinux.h
+file
+example
+*.skel.h
+malloc
+victim

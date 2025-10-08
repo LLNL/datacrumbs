@@ -1,0 +1,11 @@
+name: lead2
+install_dir: /home/haridev/datacrumbs/install
+mode: tracer
+trace_file_path: /scratch/haridev/logs/lead2-trace.pfw
+capture_probes:
+  - name: libc
+    probe: uprobe
+    type: binary
+    file: /usr/lib64/libc.so.6
+    regex: (?!.*_)(?!.*cold)(?!.*time)(?!.*grant)(?!.*poll)(?!.*signal)(?!.*harm)(?!.*hasm).*
+profiling_interval: 0.0001
