@@ -53,4 +53,7 @@ find etc/datacrumbs/plugins \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -n
 echo "Formatting C/C++ code in 'tests'"
 find tests \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 | xargs -0 -P "$(nproc)" $clang_format_exe -i
 
+echo "Formatting C/C++ code in 'tools'"
+find tools \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 | xargs -0 -P "$(nproc)" $clang_format_exe -i
+
 cd $curr_dir
