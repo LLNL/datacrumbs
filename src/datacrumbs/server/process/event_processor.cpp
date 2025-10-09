@@ -675,11 +675,13 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
   signal(SIGINT, sig_handler);
 
   unsigned int batch_size = 1024;
+#if defined(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG) && (DATACRUMBS_BPFTIME_COMPATIBLE_FLAG == 0)
 
   struct string_t* keys = (struct string_t*)malloc(batch_size * sizeof(struct string_t));
   unsigned int* values = (unsigned int*)malloc(batch_size * sizeof(unsigned int));
   // Initialize in_batch to NULL for the first iteration
   struct string_t* in_batch = NULL;
+#endif
 
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 2)
   INITIALIZE_MAP_LOOKUP_1();
@@ -713,12 +715,14 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
   auto time_unit = 1000000000 / DATACRUMBS_TIME_INTERVAL_NS;
   while (!stop) {
     err = 0;
+#if defined(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG) && (DATACRUMBS_BPFTIME_COMPATIBLE_FLAG == 0)
     err = lookup_and_delete(file_hash_fd, event_processor, keys, values, batch_size, in_batch);
     if (err == -EINTR) {
       DC_LOG_INFO("\nReceived EINTR, exiting poll loop");
       err = 0;
       break;
     }
+#endif
     err = 0;
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
     int failed_events = 0;
@@ -825,6 +829,8 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
     DC_LOG_PRINT("Total %d events failed", failed_events);
   }
 #endif
+
+#if defined(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG) && (DATACRUMBS_BPFTIME_COMPATIBLE_FLAG == 0)
   DC_LOG_PRINT("Collecting string metadata from file_map...");
   while (lookup_and_delete(file_hash_fd, event_processor, keys, values, batch_size, in_batch) ==
          1) {
@@ -836,7 +842,7 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
   if (values) {
     free(values);
   }
-
+#endif
   DC_LOG_PRINT("Finalizing DataCrumbs...");
   if (stop) {
     DC_LOG_INFO("Received SIGINT (Ctrl-C), exiting gracefully");
@@ -864,7 +870,7 @@ int main(int argc, char** argv);
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " start|stop [args...]" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " start|stop|run [args...]" << std::endl;
     return 1;
   }
   std::string cmd = argv[1];
@@ -872,7 +878,16 @@ int main(int argc, char** argv) {
   std::string timestamp = get_timestamp();
   std::string pidfile = "/tmp/datacrumbs_" + hostname + ".pid";
 
-  if (cmd == "start") {
+  if (cmd == "run") {
+    auto event_processor = datacrumbs::EventProcessor(argc, argv);
+    std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname +
+                          "_" + timestamp + ".log";
+    DC_LOG_PRINT("Spawned daemon with pid %d, output redirected to %s\n", getpid(),
+                 logfile.c_str());
+    event_processor.configManager_->print_configurations();
+    write_pid_file(pidfile, event_processor.configManager_->user);
+    return main_process(argc, argv, &event_processor);
+  } else if (cmd == "start") {
     daemonize();
     auto event_processor = datacrumbs::EventProcessor(argc, argv);
     std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname +
@@ -927,7 +942,7 @@ int main(int argc, char** argv) {
     exit(return_code);
   } else {
     DC_LOG_ERROR("Unknown command: %s\n", cmd.c_str());
-    DC_LOG_ERROR("Usage: %s start|stop [args...]\n", argv[0]);
+    DC_LOG_ERROR("Usage: %s start|stop|run [args...]\n", argv[0]);
     exit(1);
   }
 }

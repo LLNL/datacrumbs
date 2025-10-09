@@ -56,9 +56,13 @@ echo "Check formatting of C/C++ code in 'tests'"
 find tests \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 | xargs -0 -P "$(nproc)" $clang_format_exe --dry-run -Werror
 tests_check_rc=$?
 
+echo "Check formatting of C/C++ code in 'tools'"
+find tools \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 | xargs -0 -P "$(nproc)" $clang_format_exe --dry-run -Werror
+tools_check_rc=$?
+
 cd $curr_dir
 
-if [ $src_check_rc -ne 0 ] || [ $plugins_check_rc -ne 0 ] || [ $tests_check_rc -ne 0 ]; then
+if [ $src_check_rc -ne 0 ] || [ $plugins_check_rc -ne 0 ] || [ $tests_check_rc -ne 0 ] || [ $tools_check_rc -ne 0 ]; then
     echo "Some formatting checks failed. Please run 'autoformat.sh' to fix the issues."
     exit 2
 else

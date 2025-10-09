@@ -84,6 +84,7 @@ include_directories(${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 # ------------------------------------------------------------------------------
 # Options for CMake
 # ------------------------------------------------------------------------------
+option(DATACRUMBS_BPFTIME_COMPATIBLE "Enable compatibility with bpftime" OFF)
 option(DATACRUMBS_ENABLE_OPT "Enable tracing" ON)
 option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
 set(DATACRUMBS_INCLUSION_PATH "NONE" CACHE STRING "Inclusion path for datacrumbs")
@@ -114,6 +115,11 @@ set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEB
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
 # ------------------------------------------------------------------------------
+if(DATACRUMBS_BPFTIME_COMPATIBLE)
+    set(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG 1)
+else()
+    set(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG 0)
+endif()
 if(DATACRUMBS_LOG_LEVEL_STR STREQUAL "ERROR")
     set(DATACRUMBS_LOG_LEVEL 1)
 elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "WARN")
@@ -268,6 +274,7 @@ message(STATUS "             - Detected architecture: ${DATACRUMBS_ARCH}")
 # ------------------------------------------------------------------------------
 message(STATUS "[${UPPER_PROJECT_NAME}] Set Variables for CMake")
 message(STATUS "             - DATACRUMBS_LOG_LEVEL: ${DATACRUMBS_LOG_LEVEL}")
+message(STATUS "             - DATACRUMBS_BPFTIME_COMPATIBLE: ${DATACRUMBS_BPFTIME_COMPATIBLE}")
 message(STATUS "             - DATACRUMBS_MODE: ${DATACRUMBS_MODE}")
 message(STATUS "             - DATACRUMBS_ENABLE: ${DATACRUMBS_ENABLE}")
 message(STATUS "             - DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS: ${DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS}")
@@ -301,7 +308,7 @@ file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/)
 # Find all dependencies
 # ------------------------------------------------------------------------------
 set(DEPENDENCY_LIBRARY_DIRS "")
-set(DEPENDENCY_LIB ${CMAKE_EXE_LINKER_FLAGS} $ENV{LDFLAGS} -lpthread)
+set(DEPENDENCY_LIB ${CMAKE_EXE_LINKER_FLAGS} $ENV{LDFLAGS} -lpthread  -static-libstdc++)
 
 message(STATUS "[${UPPER_PROJECT_NAME}] Detecting dependencies")
 
