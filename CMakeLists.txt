@@ -70,6 +70,7 @@ include(datacrumbs-utils)
 # ------------------------------------------------------------------------------
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE PATH "Single Directory for all Executables.")
 set(CMAKE_INCLUDE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/include CACHE PATH "Store the headers.")
+set(CMAKE_CONFIG_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/configs CACHE PATH "Store the configuration generated.")
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all Libraries")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
@@ -111,6 +112,10 @@ set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval 
 # Other options
 set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPER_PROJECT_NAME}")
 set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEBUG TRACE)
+set(DATACRUMBS_KERNEL_VERSION "" CACHE STRING "Kernel version")
+set(DATACRUMBS_KERNEL_HEADERS_PATH "" CACHE STRING "Path to the kernel headers directory")
+
+
 
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
@@ -175,7 +180,7 @@ else()
 endif()
 
 set(DATACRUMBS_SRC_GEN_PATH ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
-set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs --data_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data --trace_log_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
+set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CONFIG_OUTPUT_DIRECTORY} --data_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data --trace_log_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
 
 if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
     set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
@@ -192,6 +197,8 @@ if(DATACRUMBS_ENABLE_OPT AND DATACRUMBS_ENABLE_OPT STREQUAL "ON")
 else()
     set(DATACRUMBS_ENABLE 0)
 endif()
+
+set(DATACRUMBS_PROJECT_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Detect system kernel version: major, minor, patch
 execute_process(
@@ -280,6 +287,8 @@ else()
     )
 endif()
 
+set(DATACRUMBS_UNAME_R ${KERNEL_VERSION_STR})
+
 # Normalize architecture names
 if(DATACRUMBS_ARCH STREQUAL "x86_64")
     set(DATACRUMBS_ARCH "x86")
@@ -316,8 +325,21 @@ message(STATUS "             - DATACRUMBS_LOG_DIR: ${DATACRUMBS_LOG_DIR}")
 message(STATUS "             - DATACRUMBS_DATA_DIR: ${DATACRUMBS_DATA_DIR}")
 message(STATUS "             - DATACRUMBS_ENABLE_INCLUSION_PATH: ${DATACRUMBS_ENABLE_INCLUSION_PATH}")
 message(STATUS "             - Kernel Version: ${KERNEL_VERSION_MAJOR}.${KERNEL_VERSION_MINOR}.${KERNEL_VERSION_PATCH}")
+message(STATUS "             - DATACRUMBS_BUILD_ONLY: ${DATACRUMBS_BUILD_ONLY}")
+message(STATUS "             - DATACRUMBS_INSTALL_USER: ${DATACRUMBS_INSTALL_USER}")
+message(STATUS "             - DATACRUMBS_USER: ${DATACRUMBS_USER}")
+message(STATUS "             - DATACRUMBS_KERNEL_VERSION: ${DATACRUMBS_KERNEL_VERSION}")
+message(STATUS "             - Found kernel headers at: ${DATACRUMBS_KERNEL_HEADERS_PATH}")
+message(STATUS "             - DATACRUMBS_KERNEL_UNAME_R: ${DATACRUMBS_KERNEL_UNAME_R}")
+
+# ------------------------------------------------------------------------------
+# Configure output files for build
+# ------------------------------------------------------------------------------
+
 configure_file("${CMAKE_SOURCE_DIR}/cmake/configure_files/datacrumbs_config.h.in"
     "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/datacrumbs_config.h" @ONLY)
+configure_file("${DATACRUMBS_CONFIG_PATH}/${DATACRUMBS_HOST}.yaml"
+    "${CMAKE_CONFIG_OUTPUT_DIRECTORY}/${DATACRUMBS_HOST}.yaml" @ONLY)
 
 # ------------------------------------------------------------------------------
 # Make output directories
@@ -728,7 +750,7 @@ install(TARGETS ${PROJECT_NAME}_validator
 )
 
 # Install host-specific config YAML
-set(_DATACRUMBS_HOST_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs/${DATACRUMBS_HOST}.yaml")
+set(_DATACRUMBS_HOST_CONFIG "${CMAKE_CONFIG_OUTPUT_DIRECTORY}/${DATACRUMBS_HOST}.yaml")
 if(EXISTS "${_DATACRUMBS_HOST_CONFIG}")
     install(FILES "${_DATACRUMBS_HOST_CONFIG}"
         DESTINATION "${DATACRUMBS_INSTALL_SYSCONFDIR}/configs"
