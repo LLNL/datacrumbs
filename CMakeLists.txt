@@ -722,6 +722,10 @@ add_test(NAME datacrumbs_start COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs start 
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS ${PROJECT_NAME})
 
+add_test(NAME datacrumbs_run COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs run ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+set_tests_properties(datacrumbs_run PROPERTIES DEPENDS datacrumbs_pretest)
+set_tests_properties(datacrumbs_run PROPERTIES DEPENDS ${PROJECT_NAME})
+
 add_test(NAME datacrumbs_stop COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS ${PROJECT_NAME})
