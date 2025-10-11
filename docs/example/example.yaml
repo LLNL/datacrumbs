@@ -1,0 +1,8 @@
+name: example
+capture_probes:
+  - name: libc
+    probe: uprobe
+    type: binary
+    file: /usr/lib64/libc.so.6
+    regex: (?!.*_)(?!.*cold)(?!.*time)(?!.*grant)(?!.*poll)(?!.*signal)(?!.*harm)(?!.*hasm).*
+profiling_interval: 0.0001
