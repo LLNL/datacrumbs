@@ -267,3 +267,4 @@ index eb9c5f8..bac265f 100644
  
 -install(TARGETS bpftime-cli-cpp CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ~/.bpftime)
 +install(TARGETS bpftime-cli-cpp CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+
