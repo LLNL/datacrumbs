@@ -76,7 +76,7 @@ static inline __attribute__((always_inline)) int sysio_data_exit(struct pt_regs*
   } else {
     DBG_PRINTK("Not Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
   }
-  DATACRUMBS_EVENT_SUBMIT(event);
+  DATACRUMBS_EVENT_SUBMIT(event, key.id, event_id);
   return 0;
 }
 #else
@@ -185,7 +185,7 @@ static inline __attribute__((always_inline)) int sysio_metadata_exit(struct pt_r
   } else {
     DBG_PRINTK("Not Found fd:%d, event_id:%llu\n", *fd_ptr, key.event_id);
   }
-  DATACRUMBS_EVENT_SUBMIT(event);
+  DATACRUMBS_EVENT_SUBMIT(event, key.id, event_id);
   return 0;
 }
 #else
@@ -327,7 +327,7 @@ static inline __attribute__((always_inline)) int sysio_open_exit(struct pt_regs*
       bpf_map_update_elem(&fd_fname, &file_key, fhash, BPF_ANY);
     }
   }
-  DATACRUMBS_EVENT_SUBMIT(event);
+  DATACRUMBS_EVENT_SUBMIT(event, key.id, event_id);
   return 0;
 }
 #else
