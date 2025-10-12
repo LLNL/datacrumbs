@@ -193,6 +193,28 @@ else()
     set(DATACRUMBS_ENABLE 0)
 endif()
 
+# Detect system kernel version: major, minor, patch
+execute_process(
+    COMMAND uname -r
+    OUTPUT_VARIABLE KERNEL_VERSION_STR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# Split kernel version string (e.g., "6.5.0-101-generic") into major, minor, patch
+string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" KERNEL_VERSION_MATCH "${KERNEL_VERSION_STR}")
+
+if(KERNEL_VERSION_MATCH)
+    string(REGEX REPLACE "^([0-9]+)\\..*" "\\1" KERNEL_VERSION_MAJOR "${KERNEL_VERSION_STR}")
+    string(REGEX REPLACE "^[0-9]+\\.([0-9]+)\\..*" "\\1" KERNEL_VERSION_MINOR "${KERNEL_VERSION_STR}")
+    string(REGEX REPLACE "^[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" KERNEL_VERSION_PATCH "${KERNEL_VERSION_STR}")
+else()
+    set(KERNEL_VERSION_MAJOR "0")
+    set(KERNEL_VERSION_MINOR "0")
+    set(KERNEL_VERSION_PATCH "0")
+endif()
+
+set(KERNEL_VERSION "(${KERNEL_VERSION_MAJOR}, ${KERNEL_VERSION_MINOR}, ${KERNEL_VERSION_PATCH})")
+
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
@@ -293,6 +315,7 @@ message(STATUS "             - DATACRUMBS_CONFIG_PATH: ${DATACRUMBS_CONFIG_PATH}
 message(STATUS "             - DATACRUMBS_LOG_DIR: ${DATACRUMBS_LOG_DIR}")
 message(STATUS "             - DATACRUMBS_DATA_DIR: ${DATACRUMBS_DATA_DIR}")
 message(STATUS "             - DATACRUMBS_ENABLE_INCLUSION_PATH: ${DATACRUMBS_ENABLE_INCLUSION_PATH}")
+message(STATUS "             - Kernel Version: ${KERNEL_VERSION_MAJOR}.${KERNEL_VERSION_MINOR}.${KERNEL_VERSION_PATCH}")
 configure_file("${CMAKE_SOURCE_DIR}/cmake/configure_files/datacrumbs_config.h.in"
     "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/datacrumbs_config.h" @ONLY)
 
