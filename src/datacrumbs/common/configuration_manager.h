@@ -43,9 +43,6 @@ class ConfigurationManager {
   // Name of the configuration file
   std::string name;
 
-  // Mode of operation (e.g., PROFILER or TRACER)
-  Mode mode;
-
   // Directory where trace logs will be stored
   std::filesystem::path trace_log_dir;
 
@@ -54,9 +51,6 @@ class ConfigurationManager {
 
   // User associated with the configuration
   std::string user;
-
-  // Profiling-specific configuration: interval for profiling in seconds
-  float profiling_interval;
 
   std::string inclusion_path;  // Path to the inclusion file
 
@@ -128,9 +122,7 @@ class ConfigurationManager {
 class ArgumentParser {
  public:
   std::string config_name;                          ///< Name of the configuration to load
-  std::optional<std::string> mode;                  ///< Optional mode argument
   std::optional<std::string> trace_log_dir;         ///< Optional trace log directory
-  std::optional<float> profiling_interval;          ///< Optional profiling interval
   std::optional<std::string> config_path;           ///< Optional configuration file path
   std::optional<std::string> data_dir;              ///< Optional data directory
   std::optional<std::string> user;                  ///< Optional user argument
