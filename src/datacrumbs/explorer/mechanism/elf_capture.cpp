@@ -108,27 +108,6 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
     }
   }
 
-  // First, collect base names (before '@') for versioned symbols
-  std::unordered_set<std::string> versioned_bases;
-  for (const auto& pair : symbols_map) {
-    const std::string& name = pair.first;
-    auto at_pos = name.find('@');
-    if (at_pos != std::string::npos) {
-      versioned_bases.insert(name.substr(0, at_pos));
-    }
-  }
-
-  // Now, remove non-versioned symbols if a versioned one with the same base exists
-  for (auto it = symbols_map.begin(); it != symbols_map.end();) {
-    const std::string& name = it->first;
-    if (versioned_bases.count(name) > 0) {
-      it = symbols_map.erase(it);
-    } else {
-      ++it;
-    }
-  }
-  DC_LOG_DEBUG("Filtered non-versioned symbols if versioned exists");
-
   std::vector<std::string> symbols;
   for (const auto& pair : symbols_map) {
     // Skip if symbol is in kExcludedFunctions

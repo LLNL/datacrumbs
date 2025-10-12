@@ -1,3 +1,4 @@
+#include <datacrumbs/server/bpf/compat/map.h>
 #include <datacrumbs/server/process/event_processor.h>
 #include <datacrumbs/server/process/processing/general_event.h>
 #include <datacrumbs/server/process/processing/usdt_event.h>
@@ -166,8 +167,8 @@ static int handle_event(void* ctx, void* data, size_t data_sz) {
 inline static int lookup_and_delete(int map_fd, datacrumbs::EventProcessor* event_processor,
                                     struct string_t* keys, unsigned int* values,
                                     unsigned int batch_size, struct string_t* in_batch) {
-  int ret =
-      bpf_map_lookup_and_delete_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
+  int ret = bpf_map_lookup_and_delete_batch_compat(map_fd, in_batch, &in_batch, keys, values,
+                                                   &batch_size, 0);
   if (ret < 0 && errno != ENOENT) {
     perror("bpf_map_lookup_and_delete_batch fhash");
     return -1;
@@ -186,7 +187,7 @@ inline static int lookup_and_delete(int map_fd, datacrumbs::EventProcessor* even
 inline static int lookup(int map_fd, datacrumbs::EventProcessor* event_processor,
                          struct string_t* keys, unsigned int* values, unsigned int batch_size,
                          struct string_t* in_batch) {
-  int ret = bpf_map_lookup_batch(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
+  int ret = bpf_map_lookup_batch_compat(map_fd, in_batch, &in_batch, keys, values, &batch_size, 0);
   if (ret < 0 && errno != ENOENT) {
     perror("bpf_map_lookup_batch  fhash");
     return -1;
@@ -506,7 +507,8 @@ void write_pid_file(const std::string& pidfile, const std::string& user) {
   chmod(pidfile.c_str(), 0640);
 }
 
-int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_processor) {
+int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_processor,
+                 bool notify_parent = false) {
   DC_LOG_TRACE("main: start");
   datacrumbs::utils::Timer timer;
   timer.resumeTime();
@@ -670,7 +672,7 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
   double elapsed = timer.pauseTime();
   DC_LOG_PRINT("Initialization of DataCrumbs elapsed time: %f seconds", elapsed);
   DC_LOG_PRINT("Ready to run the code.");
-  daemon_notify_parent();
+  if (notify_parent) daemon_notify_parent();
   // Main event polling loop
   signal(SIGINT, sig_handler);
 
@@ -886,7 +888,7 @@ int main(int argc, char** argv) {
                  logfile.c_str());
     event_processor.configManager_->print_configurations();
     write_pid_file(pidfile, event_processor.configManager_->user);
-    return main_process(argc, argv, &event_processor);
+    return main_process(argc, argv, &event_processor, false);
   } else if (cmd == "start") {
     daemonize();
     auto event_processor = datacrumbs::EventProcessor(argc, argv);
@@ -897,7 +899,7 @@ int main(int argc, char** argv) {
                  logfile.c_str());
     event_processor.configManager_->print_configurations();
     write_pid_file(pidfile, event_processor.configManager_->user);
-    return main_process(argc, argv, &event_processor);
+    return main_process(argc, argv, &event_processor, true);
   } else if (cmd == "stop") {
     // Find and kill daemon by pid file
     std::ifstream ifs(pidfile);

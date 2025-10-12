@@ -285,7 +285,7 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
 
     // Filter function names by regex if specified
     if (!capture_probe->regex.empty()) {
-      std::regex re(capture_probe->regex);
+      std::regex re(capture_probe->regex, std::regex_constants::icase);
       std::vector<std::string> filteredNames;
       for (const auto& name : functionNames) {
         if (std::regex_match(name, re)) {
