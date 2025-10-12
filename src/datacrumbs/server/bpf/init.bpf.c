@@ -14,14 +14,15 @@ static inline __attribute__((always_inline)) int generic_trace_datacrumbs_start(
   (void)pid;
   DBG_PRINTK("Tracing PID %d", pid);
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
+  u64 event_id = 1;
   struct general_event_t* event;
   DATACRUMBS_RB_RESERVE(output, struct general_event_t, event);
   event->type = 1;
   event->id = id;
-  event->event_id = 1;
+  event->event_id = event_id;
   event->ts = tsp;
   event->dur = 0;
-  DATACRUMBS_EVENT_SUBMIT(event);
+  DATACRUMBS_EVENT_SUBMIT(event, id, event->event_id);
 #endif
   return 0;
 }
@@ -33,14 +34,15 @@ static inline __attribute__((always_inline)) int generic_trace_datacrumbs_stop()
   bpf_map_delete_elem(&pid_map, &pid);
 
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
+  u64 event_id = 2;
   struct general_event_t* event;
   DATACRUMBS_RB_RESERVE(output, struct general_event_t, event);
   event->type = 1;
   event->id = id;
-  event->event_id = 2;
+  event->event_id = event_id;
   event->ts = bpf_ktime_get_ns();
   event->dur = 0;
-  DATACRUMBS_EVENT_SUBMIT(event);
+  DATACRUMBS_EVENT_SUBMIT(event, id, event->event_id);
 #endif
   return 0;
 }
