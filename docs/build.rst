@@ -57,10 +57,10 @@ The following dependencies are required for building `datacrumbs`:
     fi
 
     bpftool=$(find . -name bpftool | head -n 1)
+    bpftool=$(readlink -f $bpftool)
     bpftool_install_dir=$(dirname $(dirname $bpftool))
     if [ "$bpftool_install_dir" != "$PREFIX" ]; then  
-        mv $bpftool_install_dir/sbin $PREFIX
-        mv $bpftool_install_dir/share $PREFIX
+        mv $bpftool_install_dir/* $PREFIX
     fi
     popd
     echo "Checking installed files under \$PREFIX:"
