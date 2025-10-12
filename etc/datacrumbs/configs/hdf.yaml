@@ -1,7 +1,3 @@
-name: lima-ebpfx
-install_dir: /home/cc/datacrumbs/install
-mode: tracer
-trace_file_path: /home/cc/logs/lead2-trace.pfw
 capture_probes:
   - name: vol
     probe: uprobe
@@ -63,4 +59,3 @@ capture_probes:
   #   type: binary
   #   file: /home/cc/apps/h5bench/bin/h5bench_write
   #   regex: ^(?!__).*
-profiling_interval: 0.0001

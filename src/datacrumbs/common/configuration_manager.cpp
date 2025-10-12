@@ -44,10 +44,8 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
 /**
  * YAML keys for configuration
  */
-#define DC_YAML_MODE "mode"
 #define DC_YAML_TRACE_LOG_DIR "trace_log_dir"
 #define DC_YAML_DATA_DIR "data_dir"
-#define DC_YAML_PROFILING_INTERVAL "profiling_interval"
 #define DC_YAML_CAPTURE_PROBES "capture_probes"
 #define DC_YAML_USER "user"
 #define DC_YAML_INCLUSION_PATH "inclusion_path"
@@ -61,18 +59,12 @@ ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
 
   for (int i = start_index + 1; i < argc; ++i) {
     std::string arg = argv[i];
-    if (arg == "--mode" && i + 1 < argc) {
-      mode = argv[++i];
-      DC_LOG_DEBUG("[ArgumentParser] Mode set to: %s", mode->c_str());
-    } else if (arg == "--trace_log_dir" && i + 1 < argc) {
+    if (arg == "--trace_log_dir" && i + 1 < argc) {
       trace_log_dir = argv[++i];
       DC_LOG_DEBUG("[ArgumentParser] Trace log dir set to: %s", trace_log_dir->c_str());
     } else if (arg == "--data_dir" && i + 1 < argc) {
       data_dir = argv[++i];
       DC_LOG_DEBUG("[ArgumentParser] Data directory set to: %s", data_dir->c_str());
-    } else if (arg == "--profiling_interval" && i + 1 < argc) {
-      profiling_interval = std::stof(argv[++i]);
-      DC_LOG_DEBUG("[ArgumentParser] Profiling interval set to: %f", *profiling_interval);
     } else if (arg == "--config_path" && i + 1 < argc) {
       config_path = argv[++i];
       DC_LOG_DEBUG("[ArgumentParser] Config path set to: %s", config_path->c_str());
@@ -87,8 +79,8 @@ ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
       DC_LOG_DEBUG("[ArgumentParser] Log directory set to: %s", log_dir->c_str());
     } else if (arg == "--help" || arg == "-h") {
       DC_LOG_PRINT(
-          "Usage: %s <config_name> [--mode <mode>] [--trace_log_dir <path>] "
-          "[--profiling_interval <seconds>] [--config_path <path>] [--user <user>] [--data_dir "
+          "Usage: %s <config_name> [--trace_log_dir <path>] "
+          "[--config_path <path>] [--user <user>] [--data_dir "
           "<path>] [--inclusion_path <path>] [--log_dir <path>]",
           argv[0]);
       exit(0);
@@ -112,10 +104,8 @@ ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
 ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, int start_index)
     : path(DATACRUMBS_CONFIG_PATH),
       name("default"),
-      mode(Mode::PROFILER),
       trace_log_dir(DATACRUMBS_LOG_DIR),
       capture_probes(),
-      profiling_interval(0.1f),  // Default profiling interval in seconds
       user("datacrumbs") {
   DC_LOG_TRACE("[ConfigurationManager] Initializing with arguments...");
   ArgumentParser parser(argc, argv, start_index);
@@ -146,12 +136,6 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, in
   // Parse YAML configuration if loaded successfully
   if (config) {
     DC_LOG_TRACE("[ConfigurationManager] Parsing configuration YAML...");
-    // Parse mode from YAML
-    if (config[DC_YAML_MODE]) {
-      convert(config[DC_YAML_MODE].as<std::string>(), this->mode);
-      DC_LOG_DEBUG("[ConfigurationManager] Mode set from config: %s",
-                   config[DC_YAML_MODE].as<std::string>().c_str());
-    }
     // Parse trace log directory from YAML
     if (config[DC_YAML_TRACE_LOG_DIR]) {
       this->trace_log_dir = config[DC_YAML_TRACE_LOG_DIR].as<std::string>();
@@ -167,12 +151,6 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, in
       this->data_dir = DATACRUMBS_DATA_DIR;
       DC_LOG_DEBUG("[ConfigurationManager] Data directory not specified, using default: %s",
                    this->data_dir.string().c_str());
-    }
-    // Parse profiling interval from YAML
-    if (config[DC_YAML_PROFILING_INTERVAL]) {
-      this->profiling_interval = config[DC_YAML_PROFILING_INTERVAL].as<float>();
-      DC_LOG_DEBUG("[ConfigurationManager] Profiling interval set from config: %f",
-                   this->profiling_interval);
     }
     // Parse capture probes from YAML
     if (config[DC_YAML_CAPTURE_PROBES]) {
@@ -362,22 +340,11 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, in
       DC_LOG_DEBUG("[ConfigurationManager] Data directory overridden by argument: %s",
                    this->data_dir.string().c_str());
     }
-    // Override mode if provided as argument
-    if (parser.mode) {
-      convert(*parser.mode, this->mode);
-      DC_LOG_DEBUG("[ConfigurationManager] Mode overridden by argument: %s", parser.mode->c_str());
-    }
     // Override trace log dir if provided as argument
     if (parser.trace_log_dir) {
       this->trace_log_dir = *parser.trace_log_dir;
       DC_LOG_DEBUG("[ConfigurationManager] Trace log dir overridden by argument: %s",
                    parser.trace_log_dir->c_str());
-    }
-    // Override profiling interval if provided as argument
-    if (parser.profiling_interval) {
-      this->profiling_interval = *parser.profiling_interval;
-      DC_LOG_DEBUG("[ConfigurationManager] Profiling interval overridden by argument: %f",
-                   *parser.profiling_interval);
     }
     // Override user if provided as argument
     if (parser.user) {
@@ -420,7 +387,6 @@ void ConfigurationManager::print_configurations() {
   DC_LOG_INFO("[ConfigurationManager] Category map loaded with %zu entries.", category_map.size());
   DC_LOG_INFO("  Path: %s", this->path.string().c_str());
   DC_LOG_INFO("  Name: %s", this->name.c_str());
-  DC_LOG_INFO("  Mode: %d", static_cast<int>(this->mode));
   DC_LOG_INFO("  Trace log dir: %s", this->trace_log_dir.string().c_str());
   DC_LOG_INFO("  Trace file path: %s", this->trace_file_path.string().c_str());
   DC_LOG_INFO("  Data dir: %s", this->data_dir.string().c_str());
@@ -429,10 +395,15 @@ void ConfigurationManager::print_configurations() {
   DC_LOG_INFO("  Probe invalid file path: %s", this->probe_invalid_file_path.string().c_str());
   DC_LOG_INFO("  Manual probe path: %s", this->manual_probe_path.string().c_str());
   DC_LOG_INFO("  Category map path: %s", this->category_map_path.string().c_str());
-  DC_LOG_INFO("  Profiling interval: %f", this->profiling_interval);
+  DC_LOG_INFO("  Profiling interval: %f", DATACRUMBS_TIME_INTERVAL_NS / 1e9);
   DC_LOG_INFO("  User: %s", this->user.c_str());
   DC_LOG_INFO("  Hostname: %s", this->hostname.c_str());
   DC_LOG_INFO("  Capture probes: %d", static_cast<int>(this->capture_probes.size()));
+  if (DATACRUMBS_MODE == 1) {
+    DC_LOG_INFO("  Mode: Tracing");
+  } else if (DATACRUMBS_MODE == 2) {
+    DC_LOG_INFO("  Mode: Profiling");
+  }
   if (this->inclusion_path.empty()) {
     DC_LOG_INFO("  Inclusion path: Not set");
   } else {
@@ -574,12 +545,13 @@ void ConfigurationManager::validate_configurations() {
     DC_LOG_ERROR("[ConfigurationManager] No capture probes defined in the configuration.");
     throw std::invalid_argument("At least one capture probe must be defined.");
   }
-  if (!std::filesystem::exists(this->data_dir)) {
+  if (this->data_dir.empty() || !std::filesystem::exists(this->data_dir)) {
     DC_LOG_ERROR("[ConfigurationManager] Data directory does not exist: %s",
                  this->data_dir.string().c_str());
     throw std::runtime_error("Data directory does not exist: " + this->data_dir.string());
   }
-  if (!std::filesystem::exists(std::filesystem::path(this->trace_log_dir))) {
+  if (this->trace_log_dir.empty() ||
+      !std::filesystem::exists(std::filesystem::path(this->trace_log_dir))) {
     DC_LOG_ERROR("[ConfigurationManager] Trace log directory does not exist: %s",
                  this->trace_log_dir.string().c_str());
     throw std::runtime_error("Trace log directory does not exist: " +

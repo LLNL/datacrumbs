@@ -1,7 +1,3 @@
-name: lead2
-install_dir: /home/haridev/datacrumbs/install
-mode: tracer
-trace_file_path: /scratch/haridev/logs/lead2-trace.pfw
 capture_probes:
   - name: custom1
     start_event_id: 100000
@@ -69,4 +65,3 @@ capture_probes:
     probe: uprobe
     type: binary
     file: /home/haridev/spack/opt/spack/linux-haswell/ior-3.3.0-ip47j26fw7xxfftdzjvy2h36phgcuypv/bin/ior
-profiling_interval: 0.0001
