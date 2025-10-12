@@ -183,7 +183,7 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   event->id = key.id;
   event->event_id = event_id;
   DATACRUMBS_COLLECT_TIME(event);
-  DATACRUMBS_EVENT_SUBMIT(event);
+  DATACRUMBS_EVENT_SUBMIT(event, key.id, event_id);
   return 0;
 }
 #else
@@ -287,7 +287,7 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
 
   u32 method_hash = hash_and_store(&local_str, len);
   event->method_hash = method_hash;  // 100
-  DATACRUMBS_EVENT_SUBMIT(event);
+  DATACRUMBS_EVENT_SUBMIT(event, key.id, event_id);
   return 0;
 }
 #else
