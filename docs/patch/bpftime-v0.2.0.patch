@@ -267,9 +267,3 @@ index eb9c5f8..bac265f 100644
  
 -install(TARGETS bpftime-cli-cpp CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ~/.bpftime)
 +install(TARGETS bpftime-cli-cpp CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-diff --git a/vm/llvm-jit b/vm/llvm-jit
---- a/vm/llvm-jit
-+++ b/vm/llvm-jit
-@@ -1 +1 @@
--Subproject commit 43b57a1bed0801666a477d8de30a33b8a3a1a878
-+Subproject commit 43b57a1bed0801666a477d8de30a33b8a3a1a878-dirty

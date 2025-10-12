@@ -47,7 +47,6 @@ inline std::string default_formatter(const std::vector<std::string>& messages) {
 
 // Variadic template to accept any number of messages
 inline void log_message_fmt(const char* level, const char* fmt, ...) {
-  std::lock_guard<std::mutex> lock(get_log_mutex());
   FILE* out = get_log_file();
 
   constexpr size_t buf_size = 1024;
@@ -63,7 +62,6 @@ inline void log_message_fmt(const char* level, const char* fmt, ...) {
 }
 
 inline void log_message_fmt_no_new_line(const char* level, const char* fmt, ...) {
-  std::lock_guard<std::mutex> lock(get_log_mutex());
   FILE* out = get_log_file();
 
   constexpr size_t buf_size = 1024;
@@ -91,7 +89,6 @@ inline void log_message_no_new_line(const char* level, const char* fmt, Args&&..
 // Trace-level logging with file and line info
 #if DATACRUMBS_LOG_LEVEL >= LOG_LEVEL_DEBUG
 inline void log_message_trace(const char* level, const char* file, int line, const char* fmt, ...) {
-  std::lock_guard<std::mutex> lock(get_log_mutex());
   FILE* out = get_log_file();
 
   constexpr size_t buf_size = 1024;
@@ -174,8 +171,6 @@ inline void log_progress(const std::string& message, size_t current) {
   using namespace std::chrono;
   static auto start_time = steady_clock::now();
   static std::mutex mtx;
-  std::lock_guard<std::mutex> lock(mtx);
-
   auto now = steady_clock::now();
   double elapsed = duration_cast<duration<double>>(now - start_time).count();
   double rate = (elapsed > 0.0) ? (current / elapsed) : 0.0;
