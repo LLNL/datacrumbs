@@ -1,0 +1,6 @@
+capture_probes:
+  - name: sys
+    probe: syscalls
+    type: header
+    file: /usr/src/kernels/5.14.0-503.40.1.el9_5.x86_64/include/linux/syscalls.h
+    regex: sys_.*
