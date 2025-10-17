@@ -38,17 +38,17 @@ if(CMAKE_INSTALL_LIBDIR AND NOT DATACRUMBS_LIBDIR_AS_LIB)
     set(DATACRUMBS_INSTALL_DOCDIR
         ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DOCDIR})
     set(DATACRUMBS_INSTALL_SYSCONFDIR
-        ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/modulefiles)
-    set(DATACRUMBS_INSTALL_BINFDIR
+        ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/${PROJECT_NAME})
+    set(DATACRUMBS_INSTALL_BINARYDIR
         ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR})
     set(DATACRUMBS_INSTALL_LIBEXEC
-        ${CMAKE_INSTALL_PREFIX}/libexec/${PROJECT_NAME})
+        ${CMAKE_INSTALL_PREFIX}/libexec/${PROJECT_NAME})    
 else()
     set(DATACRUMBS_LIBDIR lib)
     set(DATACRUMBS_INSTALL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
     set(DATACRUMBS_INSTALL_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include")
     set(DATACRUMBS_INSTALL_DOCDIR "${CMAKE_INSTALL_PREFIX}/doc")
-    set(DATACRUMBS_INSTALL_SYSCONFDIR "${CMAKE_INSTALL_PREFIX}/etc/modulefiles")
+    set(DATACRUMBS_INSTALL_SYSCONFDIR "${CMAKE_INSTALL_PREFIX}/etc/${PROJECT_NAME}")
     set(DATACRUMBS_INSTALL_BINARYDIR "${CMAKE_INSTALL_PREFIX}/bin")
     set(DATACRUMBS_INSTALL_LIBEXEC ${CMAKE_INSTALL_PREFIX}/libexec)
 endif()
@@ -308,7 +308,7 @@ file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/)
 # Find all dependencies
 # ------------------------------------------------------------------------------
 set(DEPENDENCY_LIBRARY_DIRS "")
-set(DEPENDENCY_LIB ${CMAKE_EXE_LINKER_FLAGS} $ENV{LDFLAGS} -lpthread  -static-libstdc++)
+set(DEPENDENCY_LIB ${CMAKE_EXE_LINKER_FLAGS} $ENV{LDFLAGS} -lpthread)
 
 message(STATUS "[${UPPER_PROJECT_NAME}] Detecting dependencies")
 
@@ -640,6 +640,11 @@ add_executable(${PROJECT_NAME} ${DATACRUMBS_PROCESS_EVENTS_SRC} ${DATACRUMBS_COM
 target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel)
 
+# Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION "${DATACRUMBS_INSTALL_BINARYDIR}"
+)
+
 set(DATACRUMBS_VALIDATE_BPF_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/validator/bpf/probe.bpf.c
 )
@@ -693,6 +698,35 @@ set(DATACRUMBS_VALIDATOR_SRC
 add_executable(${PROJECT_NAME}_validator ${DATACRUMBS_VALIDATOR_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(${PROJECT_NAME}_validator ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME}_validator datacrumbs_validator_bpf_skel)
+
+# Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
+install(TARGETS ${PROJECT_NAME}_validator
+    RUNTIME DESTINATION "${DATACRUMBS_INSTALL_BINARYDIR}"
+)
+
+# Install host-specific config YAML
+set(_DATACRUMBS_HOST_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs/${DATACRUMBS_HOST}.yaml")
+if(EXISTS "${_DATACRUMBS_HOST_CONFIG}")
+    install(FILES "${_DATACRUMBS_HOST_CONFIG}"
+        DESTINATION "${DATACRUMBS_INSTALL_SYSCONFDIR}/configs"
+    )
+else()
+    message(WARNING "[${UPPER_PROJECT_NAME}] Host config not found: ${_DATACRUMBS_HOST_CONFIG}; skipping install")
+endif()
+
+# Install host/user specific data JSON files
+file(GLOB _DATACRUMBS_DATA_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data/*${DATACRUMBS_USER}-${DATACRUMBS_HOST}*.json"
+)
+
+if(_DATACRUMBS_DATA_FILES)
+    install(FILES ${_DATACRUMBS_DATA_FILES}
+        DESTINATION "${DATACRUMBS_INSTALL_SYSCONFDIR}/data"
+    )
+else()
+    message(WARNING "[${UPPER_PROJECT_NAME}] No data files matching pattern for user '${DATACRUMBS_USER}' and host '${DATACRUMBS_HOST}' found; skipping install.")
+endif()
+
 
 # ------------------------------------------------------------------------------
 # Custom executables for Datacrumbs
