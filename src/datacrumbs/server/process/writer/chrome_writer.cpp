@@ -23,7 +23,7 @@ ChromeWriter::ChromeWriter() : stop_flag_(false), chunk_size_(16 * 1024 * 1024) 
   // Set file ownership to configManager_->user
   chown(configManager_->trace_file_path.c_str(), uid, gid);
   // Optionally set permissions (e.g., rw-r-----)
-  chmod(configManager_->trace_file_path.c_str(), 0640);
+  chmod(configManager_->trace_file_path.c_str(), 0440);
   compressor_->compress("[\n");
   first_event_ = true;
   worker_ = std::thread([this]() { this->worker_loop(); });
