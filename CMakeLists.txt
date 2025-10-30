@@ -113,6 +113,8 @@ set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval 
 set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPER_PROJECT_NAME}")
 set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEBUG TRACE)
 option(DATACRUMBS_BUILD_ONLY "Build only the datacrumbs library without installation" OFF)
+set(DATACRUMBS_KERNEL_PATH "" CACHE STRING "Path to the kernel source directory")
+
 
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
@@ -288,8 +290,11 @@ else()
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
 endif()
-
-set(DATACRUMBS_UNAME_R ${KERNEL_VERSION_STR})
+if(DATACRUMBS_KERNEL_PATH AND NOT DATACRUMBS_KERNEL_PATH STREQUAL "")
+    set(DATACRUMBS_UNAME_R "${DATACRUMBS_KERNEL_PATH}")
+else()
+    set(DATACRUMBS_UNAME_R ${KERNEL_VERSION_STR})
+endif()
 
 # Normalize architecture names
 if(DATACRUMBS_ARCH STREQUAL "x86_64")
@@ -330,6 +335,7 @@ message(STATUS "             - Kernel Version: ${KERNEL_VERSION_MAJOR}.${KERNEL_
 message(STATUS "             - DATACRUMBS_BUILD_ONLY: ${DATACRUMBS_BUILD_ONLY}")
 message(STATUS "             - DATACRUMBS_INSTALL_USER: ${DATACRUMBS_INSTALL_USER}")
 message(STATUS "             - DATACRUMBS_USER: ${DATACRUMBS_USER}")
+message(STATUS "             - DATACRUMBS_UNAME_R: ${DATACRUMBS_UNAME_R}")  
 
 
 configure_file("${CMAKE_SOURCE_DIR}/cmake/configure_files/datacrumbs_config.h.in"
