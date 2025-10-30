@@ -792,6 +792,17 @@ else()
 endif()
 
 # ------------------------------------------------------------------------------
+# Install Datacrumbs scripts
+# ------------------------------------------------------------------------------
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_setup ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_setup COPYONLY)
+install(
+        FILES
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_setup
+        DESTINATION
+        ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+# ------------------------------------------------------------------------------
 # Run configurations for DataCrumbs executables.
 # ------------------------------------------------------------------------------
 enable_testing()
