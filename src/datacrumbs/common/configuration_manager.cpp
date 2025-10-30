@@ -396,7 +396,8 @@ void ConfigurationManager::print_configurations() {
   DC_LOG_INFO("  Manual probe path: %s", this->manual_probe_path.string().c_str());
   DC_LOG_INFO("  Category map path: %s", this->category_map_path.string().c_str());
   DC_LOG_INFO("  Profiling interval: %f", DATACRUMBS_TIME_INTERVAL_NS / 1e9);
-  DC_LOG_INFO("  User: %s", this->user.c_str());
+  DC_LOG_INFO("  Runtime User: %s", this->user.c_str());
+  DC_LOG_INFO("  Install user: %s", DATACRUMBS_INSTALL_USER);
   DC_LOG_INFO("  Hostname: %s", this->hostname.c_str());
   DC_LOG_INFO("  Capture probes: %d", static_cast<int>(this->capture_probes.size()));
   if (DATACRUMBS_MODE == 1) {
@@ -444,13 +445,8 @@ void ConfigurationManager::derive_configurations() {
       std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
   DC_LOG_DEBUG("[ConfigurationManager] Timestamp: %lld", static_cast<long long>(timestamp));
 
-  // Simple encoding: base64 of hostname + pid + timestamp
-  std::stringstream ss;
-  ss << this->name << "_" << pid << "_" << timestamp;
-  std::string raw = ss.str();
-  auto encoded =
-      datacrumbs::utils::base64_encode(std::vector<unsigned char>(raw.begin(), raw.end()));
-  std::string trace_file_name = "trace_" + user + "_" + encoded + ".pfw.gz";
+  std::string trace_file_name = "trace-" + this->user + "-" + this->name + "-" + this->hostname +
+                                "-" + std::to_string(timestamp) + ".pfw.gz";
   this->trace_file_path = this->trace_log_dir / trace_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Trace file path: %s",
                this->trace_file_path.string().c_str());
@@ -461,32 +457,36 @@ void ConfigurationManager::derive_configurations() {
                      hostname_str.end());
   DC_LOG_DEBUG("[ConfigurationManager] Hostname (digits removed): %s", hostname_str.c_str());
 
-  // Construct probe file name: probes-user-host.json
-  std::string probe_file_name = "probes-" + user + "-" + hostname_str + ".json";
+  // Construct probe file name: probes-DATACRUMBS_INSTALL_USER-host.json
+  std::string probe_file_name =
+      "probes-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
   this->probe_file_path = this->data_dir / probe_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Probe file path: %s",
                this->probe_file_path.string().c_str());
 
-  // Construct probe exclusion file name: probes-exclusion-user-host.json
-  std::string probe_exclusion_file_name = "probes-exclusion-" + user + "-" + hostname_str + ".json";
+  // Construct probe exclusion file name: probes-exclusion-DATACRUMBS_INSTALL_USER-host.json
+  std::string probe_exclusion_file_name =
+      "probes-exclusion-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
   this->probe_exclusion_file_path = this->data_dir / probe_exclusion_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Probe exclusion file path: %s",
                this->probe_exclusion_file_path.string().c_str());
 
-  // Construct probe invalid file name: probes-invalid-user-host.json
-  std::string probe_invalid_file_name = "probes-invalid-" + user + "-" + hostname_str + ".json";
+  // Construct probe invalid file name: probes-invalid-DATACRUMBS_INSTALL_USER-host.json
+  std::string probe_invalid_file_name =
+      "probes-invalid-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
   this->probe_invalid_file_path = this->data_dir / probe_invalid_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Probe invalid path: %s",
                this->probe_invalid_file_path.string().c_str());
 
-  // Construct categories file name: categories-user-host.json
+  // Construct categories file name: categories-DATACRUMBS_INSTALL_USER-host.json
   std::string categories_file_name = "categories-" + user + "-" + hostname_str + ".json";
   this->category_map_path = this->data_dir / categories_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Category map path: %s",
                this->category_map_path.string().c_str());
 
-  // Construct manual probe file name: manual-probes-user-host.json
-  std::string manual_probe_file_name = "manual-probes-" + user + "-" + hostname_str + ".json";
+  // Construct manual probe file name: manual-probes-DATACRUMBS_INSTALL_USER-host.json
+  std::string manual_probe_file_name =
+      "manual-probes-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
   this->manual_probe_path = this->data_dir / manual_probe_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Manual probe path: %s",
                this->manual_probe_path.string().c_str());
