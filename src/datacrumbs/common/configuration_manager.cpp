@@ -24,6 +24,7 @@
  * Internal headers
  */
 #include <datacrumbs/common/configuration_manager.h>
+#include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>  // <-- Added logging header
 #include <datacrumbs/common/singleton.h>
 #include <datacrumbs/common/utils.h>
@@ -50,14 +51,28 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
 #define DC_YAML_USER "user"
 #define DC_YAML_INCLUSION_PATH "inclusion_path"
 
-ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
+ArgumentParser::ArgumentParser(int argc, char** argv, ExecutableType exe_type) {
   DC_LOG_TRACE("[ArgumentParser] Parsing command line arguments...");
-  if (argc < 2) {
+  if (exe_type == ExecutableType::SIMPLE && argc < 2) {
     throw std::invalid_argument("Configuration name is required as the first argument.");
+  } else if (exe_type == ExecutableType::DAEMON && argc < 3) {
+    throw std::invalid_argument(
+        "Executable mode (start, stop, or run) and configuration name are required as the first "
+        "two arguments.");
   }
-  config_name = argv[start_index];
+  int start_index = 1;
+  if (exe_type == ExecutableType::SIMPLE) {
+    config_name = argv[start_index++];
+  } else if (exe_type == ExecutableType::DAEMON) {
+    ExecutableMode exe_mode;
+    convert(argv[start_index++], exe_mode);
+    this->exe_mode = exe_mode;
+    config_name = argv[start_index++];
+  } else {
+    throw std::invalid_argument("Unknown ExecutableType.");
+  }
 
-  for (int i = start_index + 1; i < argc; ++i) {
+  for (int i = start_index; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--trace_log_dir" && i + 1 < argc) {
       trace_log_dir = argv[++i];
@@ -101,14 +116,16 @@ ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
  * @param argc Number of command-line arguments
  * @param argv Array of command-line argument strings
  */
-ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, int start_index)
+ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
+                                           ExecutableType exe_type)
     : path(DATACRUMBS_CONFIG_PATH),
+      exe_mode(ExecutableMode::RUN),
       name("default"),
       trace_log_dir(DATACRUMBS_LOG_DIR),
       capture_probes(),
       user("datacrumbs") {
   DC_LOG_TRACE("[ConfigurationManager] Initializing with arguments...");
-  ArgumentParser parser(argc, argv, start_index);
+  ArgumentParser parser(argc, argv, exe_type);
   this->name = parser.config_name;
   // Override config path if provided as argument
   if (parser.config_path) {
@@ -333,6 +350,11 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, in
       this->inclusion_path = config[DC_YAML_INCLUSION_PATH].as<std::string>();
       DC_LOG_DEBUG("[ConfigurationManager] Inclusion path set from config: %s",
                    this->inclusion_path.c_str());
+    }
+    if (parser.exe_mode) {
+      this->exe_mode = *parser.exe_mode;
+      DC_LOG_DEBUG("[ConfigurationManager] Executable mode set from argument: %d",
+                   static_cast<int>(this->exe_mode));
     }
     // Override config path if provided as argument
     if (parser.data_dir) {

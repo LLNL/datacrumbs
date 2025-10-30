@@ -30,8 +30,8 @@
 namespace datacrumbs {
 
 EventProcessor::EventProcessor(int argc, char** argv) {
-  configManager_ =
-      datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance(argc, argv, false, 2);
+  configManager_ = datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance(
+      argc, argv, false, ExecutableType::DAEMON);
   // Initialize the ChromeWriter singleton instance
   writer_ = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
   if (!writer_) {
@@ -871,17 +871,12 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
 int main(int argc, char** argv);
 
 int main(int argc, char** argv) {
-  if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " start|stop|run [args...]" << std::endl;
-    return 1;
-  }
-  std::string cmd = argv[1];
+  auto event_processor = datacrumbs::EventProcessor(argc, argv);
   std::string hostname = get_hostname();
   std::string timestamp = get_timestamp();
   std::string pidfile = "/tmp/datacrumbs_" + hostname + ".pid";
 
-  if (cmd == "run") {
-    auto event_processor = datacrumbs::EventProcessor(argc, argv);
+  if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::RUN) {
     std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname +
                           "_" + timestamp + ".log";
     DC_LOG_PRINT("Spawned daemon with pid %d, output redirected to %s\n", getpid(),
@@ -889,7 +884,7 @@ int main(int argc, char** argv) {
     event_processor.configManager_->print_configurations();
     write_pid_file(pidfile, event_processor.configManager_->user);
     return main_process(argc, argv, &event_processor, false);
-  } else if (cmd == "start") {
+  } else if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::START) {
     daemonize();
     auto event_processor = datacrumbs::EventProcessor(argc, argv);
     std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname +
@@ -900,7 +895,7 @@ int main(int argc, char** argv) {
     event_processor.configManager_->print_configurations();
     write_pid_file(pidfile, event_processor.configManager_->user);
     return main_process(argc, argv, &event_processor, true);
-  } else if (cmd == "stop") {
+  } else if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::STOP) {
     // Find and kill daemon by pid file
     std::ifstream ifs(pidfile);
     pid_t pid = 0;
@@ -942,9 +937,5 @@ int main(int argc, char** argv) {
     }
 
     exit(return_code);
-  } else {
-    DC_LOG_ERROR("Unknown command: %s\n", cmd.c_str());
-    DC_LOG_ERROR("Usage: %s start|stop|run [args...]\n", argv[0]);
-    exit(1);
   }
 }
