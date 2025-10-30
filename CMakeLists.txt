@@ -112,6 +112,9 @@ set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval 
 # Other options
 set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPER_PROJECT_NAME}")
 set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEBUG TRACE)
+option(DATACRUMBS_BUILD_ONLY "Build only the datacrumbs library without installation" OFF)
+set(DATACRUMBS_KERNEL_PATH "" CACHE STRING "Path to the kernel source directory")
+
 
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
@@ -182,7 +185,12 @@ if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
     set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
 endif()
 
+if(DATACRUMBS_BUILD_ONLY)
 set(DATACRUMBS_BUILD_CLIENT_SO ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so)
+else()
+set(DATACRUMBS_BUILD_CLIENT_SO ${DATACRUMBS_INSTALL_LIB_DIR}/libdatacrumbs_client.so)
+endif()
+
 
 set(DATACRUMBS_CONFIG_PATH ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs)
 set(DATACRUMBS_LOG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
@@ -282,8 +290,11 @@ else()
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
 endif()
-
-set(DATACRUMBS_UNAME_R ${KERNEL_VERSION_STR})
+if(DATACRUMBS_KERNEL_PATH AND NOT DATACRUMBS_KERNEL_PATH STREQUAL "")
+    set(DATACRUMBS_UNAME_R "${DATACRUMBS_KERNEL_PATH}")
+else()
+    set(DATACRUMBS_UNAME_R ${KERNEL_VERSION_STR})
+endif()
 
 # Normalize architecture names
 if(DATACRUMBS_ARCH STREQUAL "x86_64")
@@ -321,6 +332,11 @@ message(STATUS "             - DATACRUMBS_LOG_DIR: ${DATACRUMBS_LOG_DIR}")
 message(STATUS "             - DATACRUMBS_DATA_DIR: ${DATACRUMBS_DATA_DIR}")
 message(STATUS "             - DATACRUMBS_ENABLE_INCLUSION_PATH: ${DATACRUMBS_ENABLE_INCLUSION_PATH}")
 message(STATUS "             - Kernel Version: ${KERNEL_VERSION_MAJOR}.${KERNEL_VERSION_MINOR}.${KERNEL_VERSION_PATCH}")
+message(STATUS "             - DATACRUMBS_BUILD_ONLY: ${DATACRUMBS_BUILD_ONLY}")
+message(STATUS "             - DATACRUMBS_INSTALL_USER: ${DATACRUMBS_INSTALL_USER}")
+message(STATUS "             - DATACRUMBS_USER: ${DATACRUMBS_USER}")
+message(STATUS "             - DATACRUMBS_UNAME_R: ${DATACRUMBS_UNAME_R}")  
+
 
 configure_file("${CMAKE_SOURCE_DIR}/cmake/configure_files/datacrumbs_config.h.in"
     "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/datacrumbs_config.h" @ONLY)
@@ -469,6 +485,9 @@ add_library(${PROJECT_NAME}_client SHARED ${DATACRUMBS_CLIENT_SRC})
 message(STATUS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 set_target_properties(${PROJECT_NAME}_client PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+)
+install(TARGETS ${PROJECT_NAME}_client
+    LIBRARY DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
 )
 
 # Datacrumbs explorer
@@ -794,19 +813,30 @@ install(
 enable_testing()
 add_test(NAME datacrumbs_pretest COMMAND bash -c "ulimit -n 4096")
 
-add_test(NAME datacrumbs_start COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+if (NOT DATACRUMBS_BUILD_ONLY)
+    set(DATACRUMBS_PATH ${DATACRUMBS_INSTALL_BINARYDIR})
+    set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${DATACRUMBS_INSTALL_SYSCONFDIR}/configs --data_dir ${DATACRUMBS_INSTALL_SYSCONFDIR}/data --trace_log_dir $ENV{HOME}/logs)
+
+    if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
+        set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
+    endif()
+else()
+    set(DATACRUMBS_PATH ${CMAKE_BINARY_DIR}/bin)
+endif()
+
+add_test(NAME datacrumbs_start COMMAND ${DATACRUMBS_PATH}/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_run COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs run ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_run COMMAND ${DATACRUMBS_PATH}/datacrumbs run ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_run PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_run PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_stop COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_stop COMMAND ${DATACRUMBS_PATH}/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_validator COMMAND ${CMAKE_BINARY_DIR}/bin/datacrumbs_validator ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_validator COMMAND ${DATACRUMBS_PATH}/datacrumbs_validator ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_validator PROPERTIES DEPENDS ${PROJECT_NAME}_validator)
 
 add_subdirectory(tools)
@@ -815,4 +845,4 @@ add_subdirectory(tests)
 add_test(NAME test_simple_dd
     COMMAND bash -c "dd if=/dev/zero of=/tmp/img_temp.bat bs=1M count=16"
 )
-set_tests_properties(test_simple_dd PROPERTIES ENVIRONMENT "LD_PRELOAD=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libdatacrumbs_client.so")
+set_tests_properties(test_simple_dd PROPERTIES ENVIRONMENT "LD_PRELOAD=${DATACRUMBS_BUILD_CLIENT_SO}")

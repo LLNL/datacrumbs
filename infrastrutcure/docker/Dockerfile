@@ -6,7 +6,7 @@ RUN . /opt/rh/gcc-toolset-11/enable && \
     mkdir -p datacrumbs-build && \
     rm -rf datacrumbs-build/* && \
     cd datacrumbs-build && \
-    cmake -DDATACRUMBS_HOST=docker -DDATACRUMBS_USER=root /opt/datacrumbs/ && \
+    cmake -DDATACRUMBS_HOST=docker -DDATACRUMBS_USER=root -DDATACRUMBS_INSTALL_USER=root -DDATACRUMBS_KERNEL_PATH=4.18.0-348.7.1.el8_5.x86_64 /opt/datacrumbs/ && \
     make -j
 
 ENV PATH=/opt/datacrumbs/datacrumbs-build/bin:${PATH}
