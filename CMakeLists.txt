@@ -97,7 +97,7 @@ set_property(CACHE DATACRUMBS_MODE_STR PROPERTY STRINGS TRACE PROFILE)
 set(BPFTOOL_EXECUTABLE "NONE" CACHE STRING "Path to bpftool executable")
 set(DATACRUMBS_HOST "NONE" CACHE STRING "Host name for datacrumbs (numbers will be stripped if not set)")
 set(DATACRUMBS_USER "$ENV{USER}" CACHE STRING "User name for datacrumbs (default: current environment user)")
-
+set(DATACRUMBS_INSTALL_USER "$ENV{USER}" CACHE STRING "Installation user name for datacrumbs (used in file naming)")
 # Configure Make steps
 option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
 option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" OFF)
@@ -321,6 +321,7 @@ message(STATUS "             - DATACRUMBS_LOG_DIR: ${DATACRUMBS_LOG_DIR}")
 message(STATUS "             - DATACRUMBS_DATA_DIR: ${DATACRUMBS_DATA_DIR}")
 message(STATUS "             - DATACRUMBS_ENABLE_INCLUSION_PATH: ${DATACRUMBS_ENABLE_INCLUSION_PATH}")
 message(STATUS "             - Kernel Version: ${KERNEL_VERSION_MAJOR}.${KERNEL_VERSION_MINOR}.${KERNEL_VERSION_PATCH}")
+
 configure_file("${CMAKE_SOURCE_DIR}/cmake/configure_files/datacrumbs_config.h.in"
     "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/datacrumbs_config.h" @ONLY)
 configure_file("${DATACRUMBS_CONFIG_PATH}/${DATACRUMBS_HOST}.yaml"
