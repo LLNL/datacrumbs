@@ -40,6 +40,9 @@ class ConfigurationManager {
   // Directory for data storage
   std::filesystem::path data_dir;
 
+  // Type of executable (SIMPLE or DAEMON)
+  ExecutableMode exe_mode;
+
   // Name of the configuration file
   std::string name;
 
@@ -90,7 +93,8 @@ class ConfigurationManager {
    * @param argc Number of command-line arguments
    * @param argv Array of command-line argument strings
    */
-  ConfigurationManager(int argc, char** argv, bool print = true, int start_index = 1);
+  ConfigurationManager(int argc, char** argv, bool print = true,
+                       ExecutableType exe_type = ExecutableType::SIMPLE);
 
   ConfigurationManager() {
     // Default constructor for internal use
@@ -129,6 +133,7 @@ class ArgumentParser {
   std::optional<uint64_t> skip_event_threshold_us;  ///< Optional skip event threshold
   std::optional<std::string> inclusion_path;        ///< Optional inclusion path
   std::optional<std::string> log_dir;               ///< Optional log directory
+  std::optional<ExecutableMode> exe_mode;           ///< Optional executable mode
 
   /**
    * @brief Constructor that parses command-line arguments.
@@ -136,7 +141,7 @@ class ArgumentParser {
    * @param argv Array of command-line argument strings
    * @throws std::invalid_argument if required arguments are missing or unknown arguments are found
    */
-  ArgumentParser(int argc, char** argv, int start_index = 1);
+  ArgumentParser(int argc, char** argv, ExecutableType exe_type = ExecutableType::SIMPLE);
 };
 
 }  // namespace datacrumbs
