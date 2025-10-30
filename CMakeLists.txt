@@ -97,7 +97,7 @@ set_property(CACHE DATACRUMBS_MODE_STR PROPERTY STRINGS TRACE PROFILE)
 set(BPFTOOL_EXECUTABLE "NONE" CACHE STRING "Path to bpftool executable")
 set(DATACRUMBS_HOST "NONE" CACHE STRING "Host name for datacrumbs (numbers will be stripped if not set)")
 set(DATACRUMBS_USER "$ENV{USER}" CACHE STRING "User name for datacrumbs (default: current environment user)")
-
+set(DATACRUMBS_INSTALL_USER "$ENV{USER}" CACHE STRING "Installation user name for datacrumbs (used in file naming)")
 # Configure Make steps
 option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
 option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" OFF)
