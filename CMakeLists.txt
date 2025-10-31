@@ -16,21 +16,54 @@ set(DATACRUMBS_PACKAGE_VERSION_MINOR "${DATACRUMBS_VERSION_PATCH}")
 set(DATACRUMBS_PACKAGE_STRING "${DATACRUMBS_PACKAGE_NAME} ${DATACRUMBS_PACKAGE_VERSION}")
 set(DATACRUMBS_PACKAGE_TARNAME "${DATACRUMBS_PACKAGE}")
 
-set(DATACRUMBS_VERSION "(0, 0, 4)")
+set(DATACRUMBS_RELEASE_VERSION_MAJOR "0")
+set(DATACRUMBS_RELEASE_VERSION_MINOR "0")
+set(DATACRUMBS_RELEASE_VERSION_PATCH "4")
+set(DATACRUMBS_VERSION "(${DATACRUMBS_RELEASE_VERSION_MAJOR}, ${DATACRUMBS_RELEASE_VERSION_MINOR}, ${DATACRUMBS_RELEASE_VERSION_PATCH})")
+set(DATACRUMBS_RELEASE_VERSION_STRING "${DATACRUMBS_RELEASE_VERSION_MAJOR}.${DATACRUMBS_RELEASE_VERSION_MINOR}.${DATACRUMBS_RELEASE_VERSION_PATCH}")
 
 # Convenience defines
 string(TOUPPER "${PROJECT_NAME}" UPPER_PROJECT_NAME)
 string(TOLOWER "${PROJECT_NAME}" LOWER_PROJECT_NAME)
 
-# Get installation directories -- these get used in various places;
-# best to just make them available
-option(DATACRUMBS_LIBDIR_AS_LIB OFF)
 
-if(NOT DATACRUMBS_LIBDIR_AS_LIB)
-    include(GNUInstallDirs)
-endif()
+# ------------------------------------------------------------------------------
+# For building only the library without installation
+# ------------------------------------------------------------------------------
+option(DATACRUMBS_BUILD_ONLY "Build only the datacrumbs library without installation" OFF)
 
-if(CMAKE_INSTALL_LIBDIR AND NOT DATACRUMBS_LIBDIR_AS_LIB)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE PATH "Single Directory for all Executables.")
+set(CMAKE_INCLUDE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/include CACHE PATH "Store the headers.")
+set(CMAKE_CONFIG_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/configs CACHE PATH "Store the configuration generated.")
+set(CMAKE_DATA_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/data CACHE PATH "Store the data generated.")
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all Libraries")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
+set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec/${PROJECT_NAME})
+set(CMAKE_ETC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME})
+set(CMAKE_MODULES_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME}/modulefiles)
+if (NOT DATACRUMBS_BUILD_ONLY)
+    # Get installation directories -- these get used in various places;
+    # best to just make them available
+    option(DATACRUMBS_LIBDIR_AS_LIB OFF)
+
+    if(NOT DATACRUMBS_LIBDIR_AS_LIB)
+        include(GNUInstallDirs)
+    endif()
+    if (NOT CMAKE_INSTALL_LIBDIR OR DATACRUMBS_LIBDIR_AS_LIB)
+        set(CMAKE_INSTALL_BINDIR bin)
+        set(CMAKE_INSTALL_SBINDIR sbin)
+        set(CMAKE_INSTALL_LIBDIR lib)
+        set(CMAKE_INSTALL_INCLUDEDIR include)
+        set(CMAKE_INSTALL_DOCDIR doc)
+        set(CMAKE_INSTALL_SYSCONFDIR etc)
+    endif()
+    set(CMAKE_INSTALL_LIBEXEC_DIR libexec)
+
+    set(DATACRUMBS_INSTALL_BINARYDIR
+        ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR})
+    set(DATACRUMBS_INSTALL_SBINARYDIR
+        ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SBINDIR})
     set(DATACRUMBS_LIBDIR ${CMAKE_INSTALL_LIBDIR})
     set(DATACRUMBS_INSTALL_LIB_DIR ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
     set(DATACRUMBS_INSTALL_INCLUDE_DIR
@@ -39,19 +72,29 @@ if(CMAKE_INSTALL_LIBDIR AND NOT DATACRUMBS_LIBDIR_AS_LIB)
         ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DOCDIR})
     set(DATACRUMBS_INSTALL_SYSCONFDIR
         ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/${PROJECT_NAME})
-    set(DATACRUMBS_INSTALL_BINARYDIR
-        ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR})
     set(DATACRUMBS_INSTALL_LIBEXEC
-        ${CMAKE_INSTALL_PREFIX}/libexec/${PROJECT_NAME})    
+        ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXEC_DIR}/${PROJECT_NAME})   
 else()
-    set(DATACRUMBS_LIBDIR lib)
-    set(DATACRUMBS_INSTALL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
-    set(DATACRUMBS_INSTALL_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include")
-    set(DATACRUMBS_INSTALL_DOCDIR "${CMAKE_INSTALL_PREFIX}/doc")
-    set(DATACRUMBS_INSTALL_SYSCONFDIR "${CMAKE_INSTALL_PREFIX}/etc/${PROJECT_NAME}")
-    set(DATACRUMBS_INSTALL_BINARYDIR "${CMAKE_INSTALL_PREFIX}/bin")
-    set(DATACRUMBS_INSTALL_LIBEXEC ${CMAKE_INSTALL_PREFIX}/libexec)
+    set(DATACRUMBS_INSTALL_BINARYDIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    set(DATACRUMBS_INSTALL_SBINARYDIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    set(DATACRUMBS_INSTALL_LIB_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+    set(DATACRUMBS_INSTALL_INCLUDE_DIR "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}")
+    set(DATACRUMBS_INSTALL_DOCDIR "${CMAKE_BINARY_DIR}/doc")
+    set(DATACRUMBS_INSTALL_SYSCONFDIR "${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME}")
+    set(DATACRUMBS_INSTALL_LIBEXEC ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
 endif()
+set(CMAKE_INSTALL_LIBEXEC_DIR libexec)
+set(CMAKE_INSTALL_CONFIGS_DIR configs)
+set(CMAKE_INSTALL_DATA_DIR data)
+set(CMAKE_INSTALL_MODULES_DIR lmod/modulefiles)
+
+set(DATACRUMBS_INSTALL_DATADIR ${DATACRUMBS_INSTALL_SYSCONFDIR}/${CMAKE_INSTALL_DATA_DIR})
+set(DATACRUMBS_INSTALL_ETC_CONFIGSDIR ${DATACRUMBS_INSTALL_SYSCONFDIR}/${CMAKE_INSTALL_CONFIGS_DIR})
+set(DATACRUMBS_INSTALL_ETC_MODULESDIR ${DATACRUMBS_INSTALL_SYSCONFDIR}/${CMAKE_INSTALL_MODULES_DIR})
+set(DATACRUMBS_INSTALL_ETC_DATADIR ${DATACRUMBS_INSTALL_SYSCONFDIR}/${CMAKE_INSTALL_DATA_DIR})
+
+# Set this at the top level of your project, before any install commands
+set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY TRUE)
 
 message(STATUS "[${UPPER_PROJECT_NAME}] DATACRUMBS_LIBDIR set to ${DATACRUMBS_LIBDIR}")
 
@@ -67,20 +110,12 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR}/cmake)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/share/cmake)
 include(datacrumbs-utils)
 
-# ------------------------------------------------------------------------------
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE PATH "Single Directory for all Executables.")
-set(CMAKE_INCLUDE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/include CACHE PATH "Store the headers.")
-set(CMAKE_CONFIG_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/configs CACHE PATH "Store the configuration generated.")
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all Libraries")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR} CACHE PATH "Single Directory for all static libraries.")
-set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_BINARY_DIR}/include)
 include_directories(${DATACRUMBS_INSTALL_LIBEXEC})
-include_directories(${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
+include_directories(${CMAKE_BINARY_DIR}/libexec)
 
 # ------------------------------------------------------------------------------
 # Options for CMake
@@ -181,22 +216,19 @@ else()
 endif()
 
 set(DATACRUMBS_SRC_GEN_PATH ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
-set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CONFIG_OUTPUT_DIRECTORY} --data_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data --trace_log_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
+set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CONFIG_OUTPUT_DIRECTORY} --data_dir ${CMAKE_DATA_OUTPUT_DIRECTORY} --trace_log_dir ${CMAKE_BINARY_DIR}/logs)
 
 if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
     set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
 endif()
 
-if(DATACRUMBS_BUILD_ONLY)
-set(DATACRUMBS_BUILD_CLIENT_SO ${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR}/libdatacrumbs_client.so)
-else()
 set(DATACRUMBS_BUILD_CLIENT_SO ${DATACRUMBS_INSTALL_LIB_DIR}/libdatacrumbs_client.so)
-endif()
 
 
-set(DATACRUMBS_CONFIG_PATH ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs)
-set(DATACRUMBS_LOG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/logs)
-set(DATACRUMBS_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data)
+set(DATACRUMBS_CONFIG_PATH ${CMAKE_CONFIG_OUTPUT_DIRECTORY})
+set(DATACRUMBS_DATA_DIR ${CMAKE_DATA_OUTPUT_DIRECTORY})
+set(DATACRUMBS_LOG_DIR ${CMAKE_BINARY_DIR}/logs)
+file(MAKE_DIRECTORY ${DATACRUMBS_LOG_DIR})
 
 if(DATACRUMBS_ENABLE_OPT AND DATACRUMBS_ENABLE_OPT STREQUAL "ON")
     set(DATACRUMBS_ENABLE 1)
@@ -347,14 +379,30 @@ message(STATUS "             - DATACRUMBS_KERNEL_UNAME_R: ${DATACRUMBS_KERNEL_UN
 
 configure_file("${CMAKE_SOURCE_DIR}/cmake/configure_files/datacrumbs_config.h.in"
     "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/datacrumbs_config.h" @ONLY)
-configure_file("${DATACRUMBS_CONFIG_PATH}/${DATACRUMBS_HOST}.yaml"
+configure_file("${CMAKE_SOURCE_DIR}/etc/datacrumbs/configs/${DATACRUMBS_HOST}.yaml"
     "${CMAKE_CONFIG_OUTPUT_DIRECTORY}/${DATACRUMBS_HOST}.yaml" @ONLY)
+
+file(GLOB _DATACRUMBS_DATA_FILES_COPY
+    "${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data/*${DATACRUMBS_USER}-${DATACRUMBS_HOST}*.json"
+)
+
+if(_DATACRUMBS_DATA_FILES_COPY)
+    file(COPY ${_DATACRUMBS_DATA_FILES_COPY}
+        DESTINATION "${CMAKE_DATA_OUTPUT_DIRECTORY}"
+    )
+else()
+    message(WARNING "[${UPPER_PROJECT_NAME}] No data files to copy for user '${DATACRUMBS_USER}' and host '${DATACRUMBS_HOST}'")
+endif()
 
 # ------------------------------------------------------------------------------
 # Make output directories
 # ------------------------------------------------------------------------------
-file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/process/)
-file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/)
+file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/server/process/)
+file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/server/bpf/objects/)
+file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/server/bpf/src/)
+file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/validator/bpf/objects/)
+file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/validator/bpf/src/)
+file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/objects/)
 
 # ------------------------------------------------------------------------------
 
@@ -374,7 +422,7 @@ find_package(LLVM REQUIRED CONFIG COMPONENTS Clang)
 find_package(json-c REQUIRED)
 find_package(ZLIB REQUIRED)
 
-# all validation
+# all validator
 if(LIBBPF_VERSION VERSION_LESS "1.0.0")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf version 1.0.0 or newer is required, but found ${LIBBPF_VERSION}")
 endif()
@@ -572,7 +620,7 @@ set(DATACRUMBS_BPF_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/init.bpf.c
 )
 set(BPF_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/main.bpf.c)
-set(BPF_OUTPUT ${CMAKE_BINARY_DIR}/bpf/datacrumbs.bpf.o)
+set(BPF_OUTPUT ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/objects/datacrumbs.bpf.o)
 
 set(DATACRUMBS_BPF_INCLUDE_PATHS
     ${CMAKE_BINARY_DIR}/include
@@ -590,7 +638,7 @@ foreach(path IN LISTS DATACRUMBS_BPF_INCLUDE_PATHS)
 endforeach()
 
 # Read the YAML config file and extract the list of probe names under capture_probes
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs/${DATACRUMBS_HOST}.yaml" DATACRUMBS_CONFIG_YAML)
+file(READ "${DATACRUMBS_CONFIG_PATH}/${DATACRUMBS_HOST}.yaml" DATACRUMBS_CONFIG_YAML)
 
 # Extract the capture_probes block and get all names under it
 set(DATACRUMBS_CAPTURE_PROBES_LIST "")
@@ -624,19 +672,16 @@ list(APPEND DATACRUMBS_BPF_EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/datacru
 
 # For each probe in DATACRUMBS_CAPTURE_PROBES_LIST, add probename.bpf.c to DATACRUMBS_BPF_EXTRA_SOURCES
 foreach(_probe_name ${DATACRUMBS_CAPTURE_PROBES_LIST})
-    set(_probe_bpf_c "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/datacrumbs/server/bpf/${_probe_name}.bpf.c")
+    set(_probe_bpf_c "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/server/bpf/src/${_probe_name}.bpf.c")
     list(APPEND DATACRUMBS_BPF_EXTRA_SOURCES "${_probe_bpf_c}")
 endforeach()
 
 # Find all .c source files in ${CMAKE_BINARY_DIR}/libexec/datacrumbs/server/bpf
 set(DATACRUMBS_BPF_OBJECTS "")
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bpf)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bpf/server)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bpf/validator)
 
 foreach(BPF_SRC_FILE ${DATACRUMBS_BPF_EXTRA_SOURCES})
     get_filename_component(BPF_SRC_NAME ${BPF_SRC_FILE} NAME_WE)
-    set(BPF_OBJ_FILE "${CMAKE_BINARY_DIR}/bpf/server/${BPF_SRC_NAME}.o")
+    set(BPF_OBJ_FILE "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/server/bpf/objects/${BPF_SRC_NAME}.o")
 
     add_custom_command(
         OUTPUT ${BPF_OBJ_FILE}
@@ -651,6 +696,9 @@ foreach(BPF_SRC_FILE ${DATACRUMBS_BPF_EXTRA_SOURCES})
         DEPENDS ${BPF_SRC_FILE} vmlinux_header run_generator
         COMMENT "Compiling BPF object: ${BPF_OBJ_FILE} (timed)"
         VERBATIM
+    )
+    install(FILES ${BPF_OBJ_FILE}
+        DESTINATION "${DATACRUMBS_INSTALL_LIBEXEC}/objects"
     )
     list(APPEND DATACRUMBS_BPF_OBJECTS ${BPF_OBJ_FILE})
 endforeach()
@@ -674,10 +722,10 @@ if(NOT DEFINED DATACRUMBS_SKIP_PROBE_GENERATION OR NOT DATACRUMBS_SKIP_PROBE_GEN
 endif()
 
 # Generate Skeleton header for Datacrumbs
-set(BPF_SKEL_OUTPUT ${CMAKE_BINARY_DIR}/include/datacrumbs/bpf/datacrumbs.skel.h)
+set(BPF_SKEL_OUTPUT ${CMAKE_BINARY_DIR}/include/datacrumbs/server/bpf/datacrumbs.skel.h)
 add_custom_command(
     OUTPUT ${BPF_SKEL_OUTPUT}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/include/datacrumbs/bpf
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/include/datacrumbs/server/bpf
     COMMAND ${BPFTOOL_EXECUTABLE} gen skeleton ${BPF_OUTPUT} > ${BPF_SKEL_OUTPUT}
     DEPENDS ${BPF_OUTPUT}
     COMMENT "Generating BPF skeleton: ${BPF_SKEL_OUTPUT}"
@@ -699,13 +747,18 @@ add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel)
 
 # Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
 install(TARGETS ${PROJECT_NAME}
-    RUNTIME DESTINATION "${DATACRUMBS_INSTALL_BINARYDIR}"
+    RUNTIME DESTINATION "${DATACRUMBS_INSTALL_SBINARYDIR}"
+)
+
+# Install the main processing datacrumbs object into DATACRUMBS_INSTALL_LIBEXEC
+install(FILES ${BPF_OUTPUT}
+    DESTINATION "${DATACRUMBS_INSTALL_LIBEXEC}/objects"
 )
 
 set(DATACRUMBS_VALIDATE_BPF_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/validator/bpf/probe.bpf.c
 )
-set(DATACRUMBS_VALIDATE_BPF_OBJ_FILE ${CMAKE_BINARY_DIR}/bpf/validator/probe.bpf.o)
+set(DATACRUMBS_VALIDATE_BPF_OBJ_FILE ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/validator/bpf/objects/probe.bpf.o)
 add_custom_command(
     OUTPUT ${DATACRUMBS_VALIDATE_BPF_OBJ_FILE}
     COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Compiling BPF object: ${DATACRUMBS_VALIDATE_BPF_OBJ_FILE} (timed)"
@@ -721,7 +774,7 @@ add_custom_command(
     VERBATIM
 )
 
-set(DATACRUMBS_VALIDATOR_BPF_OUTPUT ${CMAKE_BINARY_DIR}/bpf/validator/validator.o)
+set(DATACRUMBS_VALIDATOR_BPF_OUTPUT ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/objects/validator.o)
 
 add_custom_command(
     OUTPUT ${DATACRUMBS_VALIDATOR_BPF_OUTPUT}
@@ -735,10 +788,10 @@ add_custom_target(datacrumbs_validator_bpf ALL DEPENDS ${DATACRUMBS_VALIDATOR_BP
 add_dependencies(datacrumbs_validator_bpf vmlinux_header)
 
 # Generate Skeleton header for Datacrumbs
-set(DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT ${CMAKE_BINARY_DIR}/include/datacrumbs/bpf/datacrumbs_validator.skel.h)
+set(DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT ${CMAKE_BINARY_DIR}/include/datacrumbs/validator/bpf/datacrumbs_validator.skel.h)
 add_custom_command(
     OUTPUT ${DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/include/datacrumbs/bpf
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/include/datacrumbs/validator/bpf
     COMMAND ${BPFTOOL_EXECUTABLE} gen skeleton ${DATACRUMBS_VALIDATOR_BPF_OUTPUT} > ${DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT}
     DEPENDS ${DATACRUMBS_VALIDATOR_BPF_OUTPUT}
     COMMENT "Generating BPF skeleton: ${DATACRUMBS_VALIDATOR_BPF_SKEL_OUTPUT}"
@@ -755,35 +808,12 @@ set(DATACRUMBS_VALIDATOR_SRC
 add_executable(${PROJECT_NAME}_validator ${DATACRUMBS_VALIDATOR_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(${PROJECT_NAME}_validator ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME}_validator datacrumbs_validator_bpf_skel)
+add_dependencies(${PROJECT_NAME}_validator datacrumbs_bpf_skel)
 
 # Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
 install(TARGETS ${PROJECT_NAME}_validator
-    RUNTIME DESTINATION "${DATACRUMBS_INSTALL_BINARYDIR}"
+    RUNTIME DESTINATION "${DATACRUMBS_INSTALL_SBINARYDIR}"
 )
-
-# Install host-specific config YAML
-set(_DATACRUMBS_HOST_CONFIG "${CMAKE_CONFIG_OUTPUT_DIRECTORY}/${DATACRUMBS_HOST}.yaml")
-if(EXISTS "${_DATACRUMBS_HOST_CONFIG}")
-    install(FILES "${_DATACRUMBS_HOST_CONFIG}"
-        DESTINATION "${DATACRUMBS_INSTALL_SYSCONFDIR}/configs"
-    )
-else()
-    message(WARNING "[${UPPER_PROJECT_NAME}] Host config not found: ${_DATACRUMBS_HOST_CONFIG}; skipping install")
-endif()
-
-# Install host/user specific data JSON files
-file(GLOB _DATACRUMBS_DATA_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data/*${DATACRUMBS_USER}-${DATACRUMBS_HOST}*.json"
-)
-
-if(_DATACRUMBS_DATA_FILES)
-    install(FILES ${_DATACRUMBS_DATA_FILES}
-        DESTINATION "${DATACRUMBS_INSTALL_SYSCONFDIR}/data"
-    )
-else()
-    message(WARNING "[${UPPER_PROJECT_NAME}] No data files matching pattern for user '${DATACRUMBS_USER}' and host '${DATACRUMBS_HOST}' found; skipping install.")
-endif()
-
 
 # ------------------------------------------------------------------------------
 # Custom executables for Datacrumbs
@@ -804,12 +834,112 @@ else()
 endif()
 
 # ------------------------------------------------------------------------------
-# Install Datacrumbs scripts
+# Install Files
 # ------------------------------------------------------------------------------
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_setup ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_setup COPYONLY)
+
+# Install project configuration file
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs/project.yaml.in ${CMAKE_CONFIG_OUTPUT_DIRECTORY}/project.yaml @ONLY)
 install(
         FILES
+        ${CMAKE_CONFIG_OUTPUT_DIRECTORY}/project.yaml
+        DESTINATION
+        ${DATACRUMBS_INSTALL_ETC_CONFIGSDIR}
+)
+
+# Install host-specific config YAML
+set(_DATACRUMBS_HOST_CONFIG "${CMAKE_CONFIG_OUTPUT_DIRECTORY}/${DATACRUMBS_HOST}.yaml")
+if(EXISTS "${_DATACRUMBS_HOST_CONFIG}")
+    install(FILES "${_DATACRUMBS_HOST_CONFIG}"
+        DESTINATION "${DATACRUMBS_INSTALL_ETC_CONFIGSDIR}"
+    )
+else()
+    message(WARNING "[${UPPER_PROJECT_NAME}] Host config not found: ${_DATACRUMBS_HOST_CONFIG}; skipping install")
+endif()
+
+# Install host/user specific data JSON files
+file(GLOB _DATACRUMBS_DATA_FILES
+    "${CMAKE_DATA_OUTPUT_DIRECTORY}/*${DATACRUMBS_USER}-${DATACRUMBS_HOST}*.json"
+)
+
+if(_DATACRUMBS_DATA_FILES)
+    install(FILES ${_DATACRUMBS_DATA_FILES}
+        DESTINATION "${DATACRUMBS_INSTALL_DATADIR}"
+    )
+else()
+    message(WARNING "[${UPPER_PROJECT_NAME}] No data files matching pattern for user '${DATACRUMBS_USER}' and host '${DATACRUMBS_HOST}' found; skipping install.")
+endif()
+
+# Module file
+configure_file("${CMAKE_SOURCE_DIR}/etc/datacrumbs/modulefiles/module.lua.in"
+    "${CMAKE_MODULES_OUTPUT_DIRECTORY}/${PROJECT_NAME}/${DATACRUMBS_RELEASE_VERSION_STRING}.lua" @ONLY)
+
+install(FILES "${CMAKE_MODULES_OUTPUT_DIRECTORY}/${PROJECT_NAME}/${DATACRUMBS_RELEASE_VERSION_STRING}.lua"
+    DESTINATION "${DATACRUMBS_INSTALL_ETC_MODULESDIR}/${PROJECT_NAME}"
+)
+
+# ------------------------------------------------------------------------------
+# Install Datacrumbs scripts
+# ------------------------------------------------------------------------------
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_setup.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_setup @ONLY)
+install(
+        PROGRAMS
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_setup
+        DESTINATION
+        ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_utility.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_utility @ONLY)
+install(
+        PROGRAMS
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_utility
+        DESTINATION
+        ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_run.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_run @ONLY)
+install(
+        PROGRAMS
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_run
+        DESTINATION
+        ${DATACRUMBS_INSTALL_SBINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_run_validator.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_run_validator @ONLY)
+install(
+        PROGRAMS
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_run_validator
+        DESTINATION
+        ${DATACRUMBS_INSTALL_SBINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_track.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_track @ONLY)
+install(
+        PROGRAMS
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_track
+        DESTINATION
+        ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_untrack.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_untrack @ONLY)
+install(
+        PROGRAMS
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_untrack
+        DESTINATION
+        ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_run_test.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_run_test @ONLY)
+install(
+        PROGRAMS
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_run_test
+        DESTINATION
+        ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_wrap.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_wrap @ONLY)
+install(
+        PROGRAMS
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_wrap
         DESTINATION
         ${DATACRUMBS_INSTALL_BINARYDIR}
 )
@@ -818,17 +948,19 @@ install(
 # Run configurations for DataCrumbs executables.
 # ------------------------------------------------------------------------------
 enable_testing()
+
+# set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CONFIG_OUTPUT_DIRECTORY} --data_dir ${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/data --trace_log_dir $ENV{HOME}/logs)
+
+
+add_test(NAME datacrumbs_validator COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_validator ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+set_tests_properties(datacrumbs_validator PROPERTIES DEPENDS ${PROJECT_NAME}_validator)
+
 add_test(NAME datacrumbs_pretest COMMAND bash -c "ulimit -n 4096")
 
-if (NOT DATACRUMBS_BUILD_ONLY)
-    set(DATACRUMBS_PATH ${DATACRUMBS_INSTALL_BINARYDIR})
-    set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${DATACRUMBS_INSTALL_SYSCONFDIR}/configs --data_dir ${DATACRUMBS_INSTALL_SYSCONFDIR}/data --trace_log_dir $ENV{HOME}/logs)
+set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${DATACRUMBS_INSTALL_SYSCONFDIR}/configs --data_dir ${DATACRUMBS_INSTALL_SYSCONFDIR}/data --trace_log_dir $ENV{HOME}/logs)
 
-    if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
-        set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
-    endif()
-else()
-    set(DATACRUMBS_PATH ${CMAKE_BINARY_DIR}/bin)
+if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
+    set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
 endif()
 
 add_test(NAME datacrumbs_start COMMAND ${DATACRUMBS_PATH}/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
@@ -843,8 +975,6 @@ add_test(NAME datacrumbs_stop COMMAND ${DATACRUMBS_PATH}/datacrumbs stop ${DATAC
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_validator COMMAND ${DATACRUMBS_PATH}/datacrumbs_validator ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
-set_tests_properties(datacrumbs_validator PROPERTIES DEPENDS ${PROJECT_NAME}_validator)
 
 add_subdirectory(tools)
 add_subdirectory(tests)

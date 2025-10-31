@@ -234,11 +234,9 @@ int ProbeGenerator::run() {
     if (!gen_path) {
       DC_LOG_ERROR("DATACRUMBS_SRC_GEN_PATH environment variable not set.");
     } else {
-      std::filesystem::create_directories(std::filesystem::path(gen_path) /
-                                          "datacrumbs/server/bpf");
-      std::string filename =
-          (std::filesystem::path(gen_path) / "datacrumbs/server/bpf" / (probe.name + ".bpf.c"))
-              .string();
+      std::filesystem::path dir = std::filesystem::path(gen_path) / "server/bpf/src";
+      std::filesystem::create_directories(dir);
+      std::string filename = (dir / (probe.name + ".bpf.c")).string();
       std::ofstream out(filename);
       if (!out) {
         DC_LOG_ERROR("Failed to open file for writing: %s", filename.c_str());
@@ -282,11 +280,9 @@ int ProbeGenerator::run() {
   // Append all generated probe files as includes to generated.bpf.c
   const char* gen_path = DATACRUMBS_SRC_GEN_PATH;
   if (gen_path) {
-    std::filesystem::create_directories(std::filesystem::path(gen_path) /
-                                        "datacrumbs/server/process");
+    std::filesystem::create_directories(std::filesystem::path(gen_path) / "server/process");
     std::string generated_process_filename =
-        (std::filesystem::path(gen_path) / "datacrumbs/server/process" / "generated_process.h")
-            .string();
+        (std::filesystem::path(gen_path) / "server/process" / "generated_process.h").string();
     std::ofstream generated_process_out(generated_process_filename);
     if (!generated_process_out) {
       DC_LOG_ERROR("Failed to open file for writing: %s", generated_process_filename.c_str());

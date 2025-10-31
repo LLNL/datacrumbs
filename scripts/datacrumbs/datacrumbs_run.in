@@ -1,0 +1,21 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
+
+source $SCRIPT_DIR/datacrumbs_setup
+
+export DATACRUMBS_USER=$1
+
+shift
+
+echo "Running cmd: $@ as USER = $DATACRUMBS_USER and storing logs in $DATACRUMBS_LOG_PATH"
+
+datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_LOG_PATH
+
+ @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs "start" "$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_INSTALL_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_LOG_PATH"
+
+"$@"
+
+ @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs "stop" "$DATACRUMBS_INSTALL_HOST"
+
+datacrumbs_finalize $DATACRUMBS_USER $DATACRUMBS_LOG_PATH

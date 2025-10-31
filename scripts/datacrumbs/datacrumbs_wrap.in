@@ -1,0 +1,7 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
+
+source $SCRIPT_DIR/datacrumbs_setup
+
+LD_PRELOAD=${DATACRUMBS_CLIENT_LIB} "$@"

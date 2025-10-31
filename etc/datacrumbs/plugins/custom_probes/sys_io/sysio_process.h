@@ -2,11 +2,11 @@
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
-#include <datacrumbs/bpf/datacrumbs.skel.h>
 #include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/typedefs.h>
+#include <datacrumbs/server/bpf/datacrumbs.skel.h>
 #include <datacrumbs/server/process/event_processor.h>
 
 #include <cstdint>
