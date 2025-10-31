@@ -1,0 +1,16 @@
+#!/bin/bash
+
+SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
+CONFIG_FILE=@DATACRUMBS_INSTALL_CONFIGDIR@/project.yaml
+
+source ${SCRIPT_DIR}/datacrumbs_utility
+
+datacrumbs_parse_yaml ${CONFIG_FILE} "DATACRUMBS_"
+
+if [ "$DATACRUMBS_MODULE_AVAILABLE" -eq 1 ]; then
+    module use @DATACRUMBS_INSTALL_ETC_MODULESDIR@
+    module load datacrumbs/@DATACRUMBS_RELEASE_VERSION_STRING@
+fi
+
+ulimit -n $(ulimit -H -n)
+ulimit -l $(ulimit -H -l)
