@@ -1,0 +1,66 @@
+-- @PROJECT_NAME@ module file
+
+whatis("Name: @PROJECT_NAME@")
+whatis("Version:  @DATACRUMBS_RELEASE_VERSION_STRING@")
+whatis("Category: HPC, @PROJECT_NAME@")
+whatis("Description: @PROJECT_NAME@")
+-- whatis("")
+
+help([[
+@PROJECT_NAME@  @DATACRUMBS_RELEASE_VERSION_STRING@ modulefile:
+
+- Sets environment variables for @PROJECT_NAME@ binaries, libraries, man pages.
+
+  module load datacrumbs/@DATACRUMBS_RELEASE_VERSION_STRING@
+]])
+
+-- Set the installation directory
+-- %CMAKE_INSTALL_PREFIX%
+local prefix = "@CMAKE_INSTALL_PREFIX@"
+local user = os.getenv("DATACRUMBS_USER") or os.getenv("USER") or "@DATACRUMBS_INSTALL_USER@"
+local userbin = prefix .. "/@CMAKE_INSTALL_LIBEXEC_DIR@/@CMAKE_INSTALL_SBINDIR@/" .. user
+
+-- Define @PROJECT_NAME@ directories
+local bin_dir = pathJoin(prefix, @CMAKE_INSTALL_BINDIR@)
+local sbin_dir = pathJoin(prefix, @CMAKE_INSTALL_SBINDIR@)
+local etc_dir = pathJoin(prefix, @CMAKE_INSTALL_SYSCONFDIR@)
+
+
+-- Add @PROJECT_NAME@ directories to PATH, LD_LIBRARY_PATH, CPATH, C_INCLUDE_PATH, ETCPATH, and MANPATH
+prepend_path("PATH", bin_dir)
+prepend_path("PATH", sbin_dir)
+prepend_path("PATH", userbin)
+prepend_path("ETCPATH", etc_dir)
+
+-- Set additional flags
+-- local datacrumbs_flags = string.format("-L %s/lib -I %s/include ", prefix, prefix)
+
+
+local log_dirs_dir = os.getenv("DATACRUMBS_USER_LOG_PATH") or ""
+
+local runid = os.time()
+local logdir = string.format("%s/%s/%s/%s/%s/%s",
+log_dirs_dir,
+user,
+os.date("%Y"),
+os.date("%m"),
+os.date("%d"),
+runid
+)
+  
+
+setenv("DATACRUMBS_LOG_PATH", logdir)
+
+-- Inform user
+if mode() == "load" then
+    LmodMessage("@PROJECT_NAME@ loaded; using log directory: " .. logdir)
+elseif mode() == "unload" then
+    LmodMessage("@PROJECT_NAME@ unloaded.")
+end
+
+family("datacrumbs")
+execute{
+  cmd   = "source @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_setup",
+  modeA = {"load"},
+  mode  = "silent",
+}

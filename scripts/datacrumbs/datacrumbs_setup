@@ -1,4 +1,0 @@
-#!/bin/bash
-
-ulimit -n $(ulimit -H -n)
-ulimit -l $(ulimit -H -l)

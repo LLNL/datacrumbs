@@ -1,0 +1,46 @@
+#! /usr/bin/env bash
+
+function datacrumbs_parse_yaml {
+    local prefix=$2
+    local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @ | tr @ '\034')
+    sed -ne "s|^\($s\):|\1|" -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p" $1 |
+        awk -F$fs '{
+    indent = length($1)/2;
+    vname[indent] = toupper($2);
+    for (i in vname) {if (i > indent) {delete vname[i]}}
+    if (length($3) > 0) {
+       vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+       printf("export %s%s%s=\"%s\";", "'$prefix'",vn, toupper($2), $3);
+    }
+  }'
+}
+
+function datacrumbs_finalize() {
+  DATA_USER=$1
+  DATACRUMBS_LOG_PATH=$2
+}
+
+function datacrumbs_init() {
+  DATA_USER=$1
+  DATACRUMBS_LOG_PATH=$2
+  if [ ! -d "$DATACRUMBS_LOG_PATH" ]; then
+    mkdir -p "$DATACRUMBS_LOG_PATH"
+    chown "$DATA_USER":"$DATA_USER" "$DATACRUMBS_LOG_PATH"
+    chmod 400 "$DATACRUMBS_LOG_PATH"
+    chmod u+rx "$DATACRUMBS_LOG_PATH"
+    chmod o-w "$DATACRUMBS_LOG_PATH"
+  fi
+  
+}
+
+function log() {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') $@"
+}
+
+if command -v module &> /dev/null
+then
+   export DATACRUMBS_MODULE_AVAILABLE=1
+else
+   export DATACRUMBS_MODULE_AVAILABLE=0
+fi
