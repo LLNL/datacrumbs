@@ -2,5 +2,5 @@ capture_probes:
   - name: sys
     probe: syscalls
     type: header
-    file: /usr/src/kernels/4.18.0-553.56.1.1toss.t4.x86_64/include/linux/syscalls.h
+    file: /usr/src/kernels/@DATACRUMBS_UNAME_R@/include/linux/syscalls.h
     regex: sys_.*

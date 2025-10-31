@@ -24,6 +24,7 @@
  * Internal headers
  */
 #include <datacrumbs/common/configuration_manager.h>
+#include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>  // <-- Added logging header
 #include <datacrumbs/common/singleton.h>
 #include <datacrumbs/common/utils.h>
@@ -50,14 +51,28 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
 #define DC_YAML_USER "user"
 #define DC_YAML_INCLUSION_PATH "inclusion_path"
 
-ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
+ArgumentParser::ArgumentParser(int argc, char** argv, ExecutableType exe_type) {
   DC_LOG_TRACE("[ArgumentParser] Parsing command line arguments...");
-  if (argc < 2) {
+  if (exe_type == ExecutableType::SIMPLE && argc < 2) {
     throw std::invalid_argument("Configuration name is required as the first argument.");
+  } else if (exe_type == ExecutableType::DAEMON && argc < 3) {
+    throw std::invalid_argument(
+        "Executable mode (start, stop, or run) and configuration name are required as the first "
+        "two arguments.");
   }
-  config_name = argv[start_index];
+  int start_index = 1;
+  if (exe_type == ExecutableType::SIMPLE) {
+    config_name = argv[start_index++];
+  } else if (exe_type == ExecutableType::DAEMON) {
+    ExecutableMode exe_mode;
+    convert(argv[start_index++], exe_mode);
+    this->exe_mode = exe_mode;
+    config_name = argv[start_index++];
+  } else {
+    throw std::invalid_argument("Unknown ExecutableType.");
+  }
 
-  for (int i = start_index + 1; i < argc; ++i) {
+  for (int i = start_index; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--trace_log_dir" && i + 1 < argc) {
       trace_log_dir = argv[++i];
@@ -101,14 +116,16 @@ ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
  * @param argc Number of command-line arguments
  * @param argv Array of command-line argument strings
  */
-ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, int start_index)
+ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
+                                           ExecutableType exe_type)
     : path(DATACRUMBS_CONFIG_PATH),
+      exe_mode(ExecutableMode::RUN),
       name("default"),
       trace_log_dir(DATACRUMBS_LOG_DIR),
       capture_probes(),
       user("datacrumbs") {
   DC_LOG_TRACE("[ConfigurationManager] Initializing with arguments...");
-  ArgumentParser parser(argc, argv, start_index);
+  ArgumentParser parser(argc, argv, exe_type);
   this->name = parser.config_name;
   // Override config path if provided as argument
   if (parser.config_path) {
@@ -334,6 +351,11 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, in
       DC_LOG_DEBUG("[ConfigurationManager] Inclusion path set from config: %s",
                    this->inclusion_path.c_str());
     }
+    if (parser.exe_mode) {
+      this->exe_mode = *parser.exe_mode;
+      DC_LOG_DEBUG("[ConfigurationManager] Executable mode set from argument: %d",
+                   static_cast<int>(this->exe_mode));
+    }
     // Override config path if provided as argument
     if (parser.data_dir) {
       this->data_dir = *parser.data_dir;
@@ -396,7 +418,8 @@ void ConfigurationManager::print_configurations() {
   DC_LOG_INFO("  Manual probe path: %s", this->manual_probe_path.string().c_str());
   DC_LOG_INFO("  Category map path: %s", this->category_map_path.string().c_str());
   DC_LOG_INFO("  Profiling interval: %f", DATACRUMBS_TIME_INTERVAL_NS / 1e9);
-  DC_LOG_INFO("  User: %s", this->user.c_str());
+  DC_LOG_INFO("  Runtime User: %s", this->user.c_str());
+  DC_LOG_INFO("  Install user: %s", DATACRUMBS_INSTALL_USER);
   DC_LOG_INFO("  Hostname: %s", this->hostname.c_str());
   DC_LOG_INFO("  Capture probes: %d", static_cast<int>(this->capture_probes.size()));
   if (DATACRUMBS_MODE == 1) {
@@ -444,13 +467,8 @@ void ConfigurationManager::derive_configurations() {
       std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
   DC_LOG_DEBUG("[ConfigurationManager] Timestamp: %lld", static_cast<long long>(timestamp));
 
-  // Simple encoding: base64 of hostname + pid + timestamp
-  std::stringstream ss;
-  ss << this->name << "_" << pid << "_" << timestamp;
-  std::string raw = ss.str();
-  auto encoded =
-      datacrumbs::utils::base64_encode(std::vector<unsigned char>(raw.begin(), raw.end()));
-  std::string trace_file_name = "trace_" + user + "_" + encoded + ".pfw.gz";
+  std::string trace_file_name = "trace-" + this->user + "-" + this->name + "-" + this->hostname +
+                                "-" + std::to_string(timestamp) + ".pfw.gz";
   this->trace_file_path = this->trace_log_dir / trace_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Trace file path: %s",
                this->trace_file_path.string().c_str());
@@ -461,32 +479,36 @@ void ConfigurationManager::derive_configurations() {
                      hostname_str.end());
   DC_LOG_DEBUG("[ConfigurationManager] Hostname (digits removed): %s", hostname_str.c_str());
 
-  // Construct probe file name: probes-user-host.json
-  std::string probe_file_name = "probes-" + user + "-" + hostname_str + ".json";
+  // Construct probe file name: probes-DATACRUMBS_INSTALL_USER-host.json
+  std::string probe_file_name =
+      "probes-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
   this->probe_file_path = this->data_dir / probe_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Probe file path: %s",
                this->probe_file_path.string().c_str());
 
-  // Construct probe exclusion file name: probes-exclusion-user-host.json
-  std::string probe_exclusion_file_name = "probes-exclusion-" + user + "-" + hostname_str + ".json";
+  // Construct probe exclusion file name: probes-exclusion-DATACRUMBS_INSTALL_USER-host.json
+  std::string probe_exclusion_file_name =
+      "probes-exclusion-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
   this->probe_exclusion_file_path = this->data_dir / probe_exclusion_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Probe exclusion file path: %s",
                this->probe_exclusion_file_path.string().c_str());
 
-  // Construct probe invalid file name: probes-invalid-user-host.json
-  std::string probe_invalid_file_name = "probes-invalid-" + user + "-" + hostname_str + ".json";
+  // Construct probe invalid file name: probes-invalid-DATACRUMBS_INSTALL_USER-host.json
+  std::string probe_invalid_file_name =
+      "probes-invalid-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
   this->probe_invalid_file_path = this->data_dir / probe_invalid_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Probe invalid path: %s",
                this->probe_invalid_file_path.string().c_str());
 
-  // Construct categories file name: categories-user-host.json
+  // Construct categories file name: categories-DATACRUMBS_INSTALL_USER-host.json
   std::string categories_file_name = "categories-" + user + "-" + hostname_str + ".json";
   this->category_map_path = this->data_dir / categories_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Category map path: %s",
                this->category_map_path.string().c_str());
 
-  // Construct manual probe file name: manual-probes-user-host.json
-  std::string manual_probe_file_name = "manual-probes-" + user + "-" + hostname_str + ".json";
+  // Construct manual probe file name: manual-probes-DATACRUMBS_INSTALL_USER-host.json
+  std::string manual_probe_file_name =
+      "manual-probes-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
   this->manual_probe_path = this->data_dir / manual_probe_file_name;
   DC_LOG_DEBUG("[ConfigurationManager] Manual probe path: %s",
                this->manual_probe_path.string().c_str());
