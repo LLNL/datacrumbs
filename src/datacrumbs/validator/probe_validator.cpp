@@ -2,8 +2,9 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 // Generated Headers
-#include <datacrumbs/bpf/datacrumbs_validator.skel.h>
 #include <datacrumbs/datacrumbs_config.h>
+#include <datacrumbs/server/bpf/datacrumbs.skel.h>
+#include <datacrumbs/validator/bpf/datacrumbs_validator.skel.h>
 // other headers
 #include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/logging.h>  // Logging header
