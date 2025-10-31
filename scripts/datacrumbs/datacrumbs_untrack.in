@@ -1,0 +1,33 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
+
+source $SCRIPT_DIR/datacrumbs_setup
+
+EXECUTABLE="$1"
+
+if [[ -z "$EXECUTABLE" ]]; then
+    log "Usage: $0 <executable>"
+    exit 1
+fi
+
+if [[ -x "$EXECUTABLE" ]]; then
+    MAIN_PROGRAM="$EXECUTABLE"
+    log "Found executable: $MAIN_PROGRAM"
+elif MAIN_PROGRAM="$(which "$EXECUTABLE" 2>/dev/null)"; [[ -x "$MAIN_PROGRAM" ]]; then
+    log "Found executable via which: $MAIN_PROGRAM"
+elif MAIN_PROGRAM="$(realpath "$EXECUTABLE" 2>/dev/null)"; [[ -x "$MAIN_PROGRAM" ]]; then
+    log "Found executable via realpath: $MAIN_PROGRAM"
+else
+    log "Error: Executable '$EXECUTABLE' not found."
+    exit 1
+fi
+
+if ! command -v patchelf >/dev/null 2>&1; then
+    log "Error: 'patchelf' not found. Please install it and ensure it is in your PATH."
+    exit 1
+fi
+
+log "Removing dependency '${DATACRUMBS_CLIENT_LIB}' from '$MAIN_PROGRAM'..."
+patchelf --remove-needed ${DATACRUMBS_CLIENT_LIB} "$MAIN_PROGRAM"
+log "Done."

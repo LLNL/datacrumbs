@@ -1,0 +1,33 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
+CONFIG_FILE=@DATACRUMBS_INSTALL_ETC_CONFIGSDIR@/project.yaml
+
+source ${SCRIPT_DIR}/datacrumbs_utility
+
+eval $(datacrumbs_parse_yaml ${CONFIG_FILE} "DATACRUMBS_")
+
+if [ "$DATACRUMBS_MODULE_AVAILABLE" -eq 1 ]; then
+    if ! module is-loaded datacrumbs/@DATACRUMBS_RELEASE_VERSION_STRING@; then
+        module use @DATACRUMBS_INSTALL_ETC_MODULESDIR@
+        module load datacrumbs/@DATACRUMBS_RELEASE_VERSION_STRING@
+    fi
+else
+    export PATH="@DATACRUMBS_INSTALL_BIN_DIR@:@DATACRUMBS_INSTALL_SBIN_DIR@:$PATH"
+    export LD_LIBRARY_PATH="@DATACRUMBS_INSTALL_LIB_DIR@:$LD_LIBRARY_PATH"
+fi
+
+if [ -z "$DATACRUMBS_LOG_PATH" -o "$DATACRUMBS_LOG_PATH" = "" ]; then
+    export DATACRUMBS_LOG_PATH="$PWD"
+fi
+
+ulimit -n $(ulimit -H -n)
+ulimit -l $(ulimit -H -l)
+
+alias datacrumbs_run="sudo  @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs_run $USER"
+
+alias datacrumbs_load="source @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_setup"
+
+alias datacrumbs_track="@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_track"
+
+alias datacrumbs_untrack="@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_untrack"
