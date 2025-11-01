@@ -124,112 +124,110 @@ macro(include_dependencies)
     set(CMAKE_BUILD_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
 endmacro(include_dependencies)
 
-
 macro(derive_configurations)
     if(DATACRUMBS_BPFTIME_COMPATIBLE)
-    set(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG 1)
-else()
-    set(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG 0)
-endif()
-if(DATACRUMBS_LOG_LEVEL_STR STREQUAL "ERROR")
-    set(DATACRUMBS_LOG_LEVEL 1)
-elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "WARN")
-    set(DATACRUMBS_LOG_LEVEL 2)
-elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "INFO")
-    set(DATACRUMBS_LOG_LEVEL 3)
-elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "DEBUG")
-    set(DATACRUMBS_LOG_LEVEL 4)
-elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "TRACE")
-    set(DATACRUMBS_LOG_LEVEL 5)
-endif()
+        set(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG 1)
+    else()
+        set(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG 0)
+    endif()
 
-if(DATACRUMBS_MODE_STR AND DATACRUMBS_MODE_STR STREQUAL "TRACE")
-    set(DATACRUMBS_MODE 1)
-else()
-    set(DATACRUMBS_MODE 2)
-endif()
+    if(DATACRUMBS_LOG_LEVEL_STR STREQUAL "ERROR")
+        set(DATACRUMBS_LOG_LEVEL 1)
+    elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "WARN")
+        set(DATACRUMBS_LOG_LEVEL 2)
+    elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "INFO")
+        set(DATACRUMBS_LOG_LEVEL 3)
+    elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "DEBUG")
+        set(DATACRUMBS_LOG_LEVEL 4)
+    elseif(DATACRUMBS_LOG_LEVEL_STR STREQUAL "TRACE")
+        set(DATACRUMBS_LOG_LEVEL 5)
+    endif()
 
-if(DATACRUMBS_TRACE_ALL_PROCESSES_OPT AND DATACRUMBS_TRACE_ALL_PROCESSES_OPT STREQUAL "ON")
-    set(DATACRUMBS_TRACE_ALL_PROCESSES 1)
-else()
-    set(DATACRUMBS_TRACE_ALL_PROCESSES 0)
-endif()
+    if(DATACRUMBS_MODE_STR AND DATACRUMBS_MODE_STR STREQUAL "TRACE")
+        set(DATACRUMBS_MODE 1)
+    else()
+        set(DATACRUMBS_MODE 2)
+    endif()
 
-option(BPFTOOL_EXECUTABLE "Path to bpftool executable" "")
+    if(DATACRUMBS_TRACE_ALL_PROCESSES_OPT AND DATACRUMBS_TRACE_ALL_PROCESSES_OPT STREQUAL "ON")
+        set(DATACRUMBS_TRACE_ALL_PROCESSES 1)
+    else()
+        set(DATACRUMBS_TRACE_ALL_PROCESSES 0)
+    endif()
 
-if(BPFTOOL_EXECUTABLE STREQUAL "NONE")
-    set(BPFTOOL_EXECUTABLE "")
-endif()
+    option(BPFTOOL_EXECUTABLE "Path to bpftool executable" "")
 
-if(NOT DATACRUMBS_SKIP_PROBE_EXPLORING)
-    set(ENABLE_PROBE_EXPLORER 1)
-else()
-    set(ENABLE_PROBE_EXPLORER 0)
-endif()
+    if(BPFTOOL_EXECUTABLE STREQUAL "NONE")
+        set(BPFTOOL_EXECUTABLE "")
+    endif()
 
-if(NOT DATACRUMBS_SKIP_PROBE_GENERATION)
-    set(ENABLE_PROBE_GENERATOR 1)
-else()
-    set(ENABLE_PROBE_GENERATOR 0)
-endif()
+    if(NOT DATACRUMBS_SKIP_PROBE_EXPLORING)
+        set(ENABLE_PROBE_EXPLORER 1)
+    else()
+        set(ENABLE_PROBE_EXPLORER 0)
+    endif()
 
-if(DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
-    set(DATACRUMBS_ENABLE_INCLUSION_PATH 0)
-else()
-    set(DATACRUMBS_ENABLE_INCLUSION_PATH 1)
-endif()
+    if(NOT DATACRUMBS_SKIP_PROBE_GENERATION)
+        set(ENABLE_PROBE_GENERATOR 1)
+    else()
+        set(ENABLE_PROBE_GENERATOR 0)
+    endif()
 
-if(DATACRUMBS_BPF_PRINT_ENABLE)
-    set(DATACRUMBS_BPF_PRINT_ENABLE_FLAG 1)
-else()
-    set(DATACRUMBS_BPF_PRINT_ENABLE_FLAG 0)
-endif()
+    if(DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
+        set(DATACRUMBS_ENABLE_INCLUSION_PATH 0)
+    else()
+        set(DATACRUMBS_ENABLE_INCLUSION_PATH 1)
+    endif()
 
-set(DATACRUMBS_SRC_GEN_PATH ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
-set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CONFIG_OUTPUT_DIRECTORY} --data_dir ${CMAKE_DATA_OUTPUT_DIRECTORY} --trace_log_dir ${CMAKE_BINARY_DIR}/logs)
+    if(DATACRUMBS_BPF_PRINT_ENABLE)
+        set(DATACRUMBS_BPF_PRINT_ENABLE_FLAG 1)
+    else()
+        set(DATACRUMBS_BPF_PRINT_ENABLE_FLAG 0)
+    endif()
 
-if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
-    set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
-endif()
+    set(DATACRUMBS_SRC_GEN_PATH ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
+    set(DATACRUMBS_VARS --user ${DATACRUMBS_USER} --config_path ${CMAKE_CONFIG_OUTPUT_DIRECTORY} --data_dir ${CMAKE_DATA_OUTPUT_DIRECTORY} --trace_log_dir ${CMAKE_BINARY_DIR}/logs)
 
-set(DATACRUMBS_BUILD_CLIENT_SO ${DATACRUMBS_INSTALL_LIB_DIR}/libdatacrumbs_client.so)
+    if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
+        set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
+    endif()
 
+    set(DATACRUMBS_BUILD_CLIENT_SO ${DATACRUMBS_INSTALL_LIB_DIR}/libdatacrumbs_client.so)
 
-set(DATACRUMBS_CONFIG_PATH ${CMAKE_CONFIG_OUTPUT_DIRECTORY})
-set(DATACRUMBS_DATA_DIR ${CMAKE_DATA_OUTPUT_DIRECTORY})
-set(DATACRUMBS_LOG_DIR ${CMAKE_BINARY_DIR}/logs)
-file(MAKE_DIRECTORY ${DATACRUMBS_LOG_DIR})
+    set(DATACRUMBS_CONFIG_PATH ${CMAKE_CONFIG_OUTPUT_DIRECTORY})
+    set(DATACRUMBS_DATA_DIR ${CMAKE_DATA_OUTPUT_DIRECTORY})
+    set(DATACRUMBS_LOG_DIR ${CMAKE_BINARY_DIR}/logs)
+    file(MAKE_DIRECTORY ${DATACRUMBS_LOG_DIR})
 
-if(DATACRUMBS_ENABLE_OPT AND DATACRUMBS_ENABLE_OPT STREQUAL "ON")
-    set(DATACRUMBS_ENABLE 1)
-else()
-    set(DATACRUMBS_ENABLE 0)
-endif()
+    if(DATACRUMBS_ENABLE_OPT AND DATACRUMBS_ENABLE_OPT STREQUAL "ON")
+        set(DATACRUMBS_ENABLE 1)
+    else()
+        set(DATACRUMBS_ENABLE 0)
+    endif()
 
-set(DATACRUMBS_PROJECT_PATH ${CMAKE_CURRENT_SOURCE_DIR})
+    set(DATACRUMBS_PROJECT_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Detect system kernel version: major, minor, patch
-execute_process(
-    COMMAND uname -r
-    OUTPUT_VARIABLE KERNEL_VERSION_STR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+    # Detect system kernel version: major, minor, patch
+    execute_process(
+        COMMAND uname -r
+        OUTPUT_VARIABLE DATACRUMBS_KERNEL_UNAME_R
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
 
-# Split kernel version string (e.g., "6.5.0-101-generic") into major, minor, patch
-string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" KERNEL_VERSION_MATCH "${KERNEL_VERSION_STR}")
+    # Split kernel version string (e.g., "6.5.0-101-generic") into major, minor, patch
+    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" KERNEL_VERSION_MATCH "${DATACRUMBS_KERNEL_UNAME_R}")
 
-if(KERNEL_VERSION_MATCH)
-    string(REGEX REPLACE "^([0-9]+)\\..*" "\\1" KERNEL_VERSION_MAJOR "${KERNEL_VERSION_STR}")
-    string(REGEX REPLACE "^[0-9]+\\.([0-9]+)\\..*" "\\1" KERNEL_VERSION_MINOR "${KERNEL_VERSION_STR}")
-    string(REGEX REPLACE "^[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" KERNEL_VERSION_PATCH "${KERNEL_VERSION_STR}")
-else()
-    set(KERNEL_VERSION_MAJOR "0")
-    set(KERNEL_VERSION_MINOR "0")
-    set(KERNEL_VERSION_PATCH "0")
-endif()
+    if(KERNEL_VERSION_MATCH)
+        string(REGEX REPLACE "^([0-9]+)\\..*" "\\1" KERNEL_VERSION_MAJOR "${DATACRUMBS_KERNEL_UNAME_R}")
+        string(REGEX REPLACE "^[0-9]+\\.([0-9]+)\\..*" "\\1" KERNEL_VERSION_MINOR "${DATACRUMBS_KERNEL_UNAME_R}")
+        string(REGEX REPLACE "^[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" KERNEL_VERSION_PATCH "${DATACRUMBS_KERNEL_UNAME_R}")
+    else()
+        set(KERNEL_VERSION_MAJOR "0")
+        set(KERNEL_VERSION_MINOR "0")
+        set(KERNEL_VERSION_PATCH "0")
+    endif()
 
-set(KERNEL_VERSION "(${KERNEL_VERSION_MAJOR}, ${KERNEL_VERSION_MINOR}, ${KERNEL_VERSION_PATCH})")
-
+    set(DATACRUMBS_CMAKE_KERNEL_VERSION "(${KERNEL_VERSION_MAJOR}, ${KERNEL_VERSION_MINOR}, ${KERNEL_VERSION_PATCH})")
 endmacro(derive_configurations)
 
 macro(find_system_details)
@@ -292,10 +290,31 @@ macro(find_system_details)
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
     endif()
-    if(DATACRUMBS_KERNEL_PATH AND NOT DATACRUMBS_KERNEL_PATH STREQUAL "")
-        set(DATACRUMBS_UNAME_R "${DATACRUMBS_KERNEL_PATH}")
+
+    if(DATACRUMBS_KERNEL_VERSION AND NOT DATACRUMBS_KERNEL_VERSION STREQUAL "")
+        set(DATACRUMBS_KERNEL_VERSION "${DATACRUMBS_KERNEL_VERSION}")
     else()
-        set(DATACRUMBS_UNAME_R ${KERNEL_VERSION_STR})
+        set(DATACRUMBS_KERNEL_VERSION "${KERNEL_VERSION_MAJOR}.${KERNEL_VERSION_MINOR}.${KERNEL_VERSION_PATCH}")
+    endif()
+
+    # Detect kernel headers path if not set or empty
+    if(NOT DEFINED DATACRUMBS_KERNEL_HEADERS_PATH OR DATACRUMBS_KERNEL_HEADERS_PATH STREQUAL "")
+        set(_kernel_headers_candidates
+            "/usr/src/${DATACRUMBS_KERNEL_UNAME_R}"
+            "/usr/src/kernels/${DATACRUMBS_KERNEL_UNAME_R}"
+        )
+        set(DATACRUMBS_KERNEL_HEADERS_PATH "")
+
+        foreach(_candidate ${_kernel_headers_candidates})
+            if(EXISTS "${_candidate}")
+                set(DATACRUMBS_KERNEL_HEADERS_PATH "${_candidate}")
+                break()
+            endif()
+        endforeach()
+
+        if(DATACRUMBS_KERNEL_HEADERS_PATH STREQUAL "")
+            message(WARNING "[${UPPER_PROJECT_NAME}] Kernel headers not found for ${DATACRUMBS_UNAME_R} in /usr/src or /usr/src/kernels.")
+        endif()
     endif()
 
     # Normalize architecture names
@@ -310,34 +329,35 @@ endmacro(find_system_details)
 
 function(datacrumbs_composable_install_headers public_headers)
     # message("-- [${PROJECT_NAME}] " "installing headers ${public_headers}")
-    foreach (header ${public_headers})
+    foreach(header ${public_headers})
         file(RELATIVE_PATH header_file_path "${PROJECT_SOURCE_DIR}/src" "${header}")
         message("-- [${PROJECT_NAME}] " "installing header ${header_file_path}")
         get_filename_component(header_directory_path "${header_file_path}" DIRECTORY)
+
         # message(STATUS "             - Installing header ${header} to ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/include/${header_directory_path}")
         # file(MAKE_DIRECTORY "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/include/${header_directory_path}")
         configure_file(${header}
-                "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/include/${header_file_path}" @ONLY)
+            "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/include/${header_file_path}" @ONLY)
         install(
-                FILES ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/include/${header_file_path}
-                DESTINATION "${DATACRUMBS_INSTALL_LIBEXEC}/composable/include/${header_directory_path}"
-        )        
-    endforeach ()
+            FILES ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/include/${header_file_path}
+            DESTINATION "${DATACRUMBS_INSTALL_LIBEXEC}/composable/include/${header_directory_path}"
+        )
+    endforeach()
 endfunction()
 
 function(datacrumbs_composable_install_src public_src)
     # message("-- [${PROJECT_NAME}] " "installing src files ${public_src}")
-    foreach (src ${public_src})
+    foreach(src ${public_src})
         file(RELATIVE_PATH src_file_path "${PROJECT_SOURCE_DIR}/src" "${src}")
         message("-- [${PROJECT_NAME}] " "installing src ${src_file_path}")
         get_filename_component(src_directory_path "${src_file_path}" DIRECTORY)
         install(
-                FILES ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/src/${src_file_path}
-                DESTINATION "${DATACRUMBS_INSTALL_LIBEXEC}/composable/src/${src_directory_path}"
+            FILES ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/src/${src_file_path}
+            DESTINATION "${DATACRUMBS_INSTALL_LIBEXEC}/composable/src/${src_directory_path}"
         )
         configure_file(${src}
-                "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/src/${src_file_path}" @ONLY)
-    endforeach ()
+            "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/src/${src_file_path}" @ONLY)
+    endforeach()
 endfunction()
 
 macro(load_build_variables)
@@ -351,7 +371,8 @@ macro(load_build_variables)
     set(CMAKE_LIBEXEC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libexec/${PROJECT_NAME})
     set(CMAKE_ETC_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME})
     set(CMAKE_MODULES_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME}/modulefiles)
-    if (NOT DATACRUMBS_BUILD_ONLY)
+
+    if(NOT DATACRUMBS_BUILD_ONLY)
         # Get installation directories -- these get used in various places;
         # best to just make them available
         option(DATACRUMBS_LIBDIR_AS_LIB OFF)
@@ -359,7 +380,8 @@ macro(load_build_variables)
         if(NOT DATACRUMBS_LIBDIR_AS_LIB)
             include(GNUInstallDirs)
         endif()
-        if (NOT CMAKE_INSTALL_LIBDIR OR DATACRUMBS_LIBDIR_AS_LIB)
+
+        if(NOT CMAKE_INSTALL_LIBDIR OR DATACRUMBS_LIBDIR_AS_LIB)
             set(CMAKE_INSTALL_BINDIR bin)
             set(CMAKE_INSTALL_SBINDIR sbin)
             set(CMAKE_INSTALL_LIBDIR lib)
@@ -367,6 +389,7 @@ macro(load_build_variables)
             set(CMAKE_INSTALL_DOCDIR doc)
             set(CMAKE_INSTALL_SYSCONFDIR etc)
         endif()
+
         set(CMAKE_INSTALL_LIBEXEC_DIR libexec)
 
         set(DATACRUMBS_INSTALL_BINARYDIR
@@ -382,7 +405,7 @@ macro(load_build_variables)
         set(DATACRUMBS_INSTALL_SYSCONFDIR
             ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/${PROJECT_NAME})
         set(DATACRUMBS_INSTALL_LIBEXEC
-            ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXEC_DIR}/${PROJECT_NAME})   
+            ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXEC_DIR}/${PROJECT_NAME})
     else()
         set(DATACRUMBS_INSTALL_BINARYDIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
         set(DATACRUMBS_INSTALL_SBINARYDIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
@@ -392,6 +415,7 @@ macro(load_build_variables)
         set(DATACRUMBS_INSTALL_SYSCONFDIR "${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME}")
         set(DATACRUMBS_INSTALL_LIBEXEC ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
     endif()
+
     set(CMAKE_INSTALL_LIBEXEC_DIR libexec)
     set(CMAKE_INSTALL_CONFIGS_DIR configs)
     set(CMAKE_INSTALL_DATA_DIR data)
