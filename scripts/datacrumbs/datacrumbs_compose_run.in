@@ -88,5 +88,7 @@ log "Finished App: $@"
 
 datacrumbs_stop_server $exec
 
+datacrumbs_print_status
+
 datacrumbs_finalize $DATACRUMBS_USER $DATACRUMBS_LOG_PATH
 debug "Finalized datacrumbs for user $DATACRUMBS_USER"
