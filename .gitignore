@@ -39,6 +39,9 @@ build
 .cache
 .DS_Store
 
+#Emacs
+*~
+
 # Log files
 *.log
 

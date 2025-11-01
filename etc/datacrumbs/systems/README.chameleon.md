@@ -2,7 +2,7 @@
 
 ## Account
 
-Go to [chameleon cloud website](https://chameleoncloud.org) and create an account. 
+Go to [chameleon cloud website](https://chameleoncloud.org) and create an account.
 Once the account is created, get added to project.
 
 ## Creating an instance
@@ -61,7 +61,7 @@ popd
 
 ### Generating Probes
 
-check your `${DATACRUMBS_DIR}/datacrumbs/configs/module/chameleon.yaml` and make neccessary changes.
+check your `${DATACRUMBS_DIR}/datacrumbs/configs/module/chameleon.yaml` and make necessary changes.
 
 ```bash
 sudo su

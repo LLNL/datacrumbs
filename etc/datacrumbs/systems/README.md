@@ -78,7 +78,7 @@ options:
 The initialization where we do not need to generate probes or are using existing probes.
 
 ```bash
-./initialize_tool 
+./initialize_tool
 ```
 
 ## Run the tool
@@ -102,7 +102,7 @@ The profiler tool need to run as root
 sudo su
 ./run_tool
 ```
-Once the profiler is loaded, it will wait for applictaions to connect.
+Once the profiler is loaded, it will wait for applications to connect.
 
 
 ## Running the test
@@ -120,7 +120,7 @@ cd tests/scripts
 The profiler output is created in the directory where the profiler runs.
 
 ```bash
-cc@ebpf:~/datacrumbs$ head -n 5 datacrumbs.pfw 
+cc@ebpf:~/datacrumbs$ head -n 5 datacrumbs.pfw
 [
 {"pid": 30545, "tid": 30545, "name": "__libc_malloc [libc.so.6]", "cat": "[libc.so.6]", "ph": "C", "ts": 0.0, "args": {"count": 21, "time": 0.000198116}}
 {"pid": 30545, "tid": 30545, "name": "cfree [libc.so.6]", "cat": "[libc.so.6]", "ph": "C", "ts": 0.0, "args": {"count": 2, "time": 1.9788e-05}}
