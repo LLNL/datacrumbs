@@ -8,6 +8,7 @@
 #include <datacrumbs/server/process/generated_process.h>
 // std headers
 #include <fcntl.h>
+#include <json-c/json.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -879,6 +880,29 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
   DC_LOG_PRINT(
       "Finalization and cleanup of DataCrumbs elapsed time: %f seconds with error code: %d",
       finalize_elapsed, err);
+
+  // Write status info to JSON file for postprocessing
+
+  std::string status_file =
+      "/tmp/datacrumbs_" + config_manager->user + "_status_" + config_manager->run_id + ".json";
+  struct json_object* status_json = json_object_new_object();
+  json_object_object_add(
+      status_json, "trace_file",
+      json_object_new_string(event_processor->configManager_->trace_file_path.c_str()));
+  json_object_object_add(status_json, "total_events_captured",
+                         json_object_new_int64(event_processor->event_index.load()));
+  json_object_object_add(status_json, "events_failed",
+                         json_object_new_int(event_processor->failed_events));
+
+  if (json_object_to_file_ext(status_file.c_str(), status_json, JSON_C_TO_STRING_PRETTY) != 0) {
+    DC_LOG_ERROR("Failed to write status file: %s", status_file.c_str());
+  }
+  json_object_put(status_json);
+  auto pwd = getpwnam(config_manager->user.c_str());
+  uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+  gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+  chown(status_file.c_str(), uid, gid);
+  chmod(status_file.c_str(), 0660);
 
   DC_LOG_TRACE("main: end");
   return 0;

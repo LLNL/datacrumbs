@@ -65,9 +65,9 @@ class EventProcessor {
   std::shared_ptr<ConfigurationManager> configManager_;
   std::shared_ptr<datacrumbs::ChromeWriter> writer_;
   int failed_events;  // Count of failed events
+  std::atomic<uint64_t> event_index{0};
 
- private:
-  std::atomic<uint64_t> event_index{0};                // Atomic index for event processing
+ private:                                              // Atomic index for event processing
   std::unordered_set<unsigned int> processed_hashes_;  // Set to track processed PIDs
 };
 
