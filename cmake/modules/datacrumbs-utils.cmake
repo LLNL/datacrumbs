@@ -298,6 +298,24 @@ macro(find_system_details)
         set(DATACRUMBS_UNAME_R ${KERNEL_VERSION_STR})
     endif()
 
+    # Detect kernel headers path if not set or empty
+    if(NOT DEFINED DATACRUMBS_KERNEL_HEADERS_PATH OR DATACRUMBS_KERNEL_HEADERS_PATH STREQUAL "")
+        set(_kernel_headers_candidates
+            "/usr/src/${DATACRUMBS_UNAME_R}"
+            "/usr/src/kernels/${DATACRUMBS_UNAME_R}"
+        )
+        set(DATACRUMBS_KERNEL_HEADERS_PATH "")
+        foreach(_candidate ${_kernel_headers_candidates})
+            if(EXISTS "${_candidate}")
+                set(DATACRUMBS_KERNEL_HEADERS_PATH "${_candidate}")
+                break()
+            endif()
+        endforeach()
+        if(DATACRUMBS_KERNEL_HEADERS_PATH STREQUAL "")
+            message(WARNING "[${UPPER_PROJECT_NAME}] Kernel headers not found for ${DATACRUMBS_UNAME_R} in /usr/src or /usr/src/kernels.")
+        endif()
+    endif()
+
     # Normalize architecture names
     if(DATACRUMBS_ARCH STREQUAL "x86_64")
         set(DATACRUMBS_ARCH "x86")
