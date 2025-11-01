@@ -24,18 +24,61 @@ function datacrumbs_finalize() {
 function datacrumbs_init() {
   DATA_USER=$1
   DATACRUMBS_LOG_PATH=$2
-  if [ ! -d "$DATACRUMBS_LOG_PATH" ]; then
-    mkdir -p "$DATACRUMBS_LOG_PATH"
-    chown "$DATA_USER":"$DATA_USER" "$DATACRUMBS_LOG_PATH"
-    chmod 400 "$DATACRUMBS_LOG_PATH"
-    chmod u+rx "$DATACRUMBS_LOG_PATH"
-    chmod o-w "$DATACRUMBS_LOG_PATH"
-  fi
+
+  sudo -u ${DATA_USER} mkdir -p ${DATACRUMBS_LOG_PATH}
   
 }
 
-function log() {
-  echo "$(date '+%Y-%m-%d %H:%M:%S') $@"
+function datacrumbs_start_server() {
+  exec=$1
+  common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_LOG_PATH" --run_id "$RUNID")
+  cmd=("$exec" "run" "${common_cmd[@]}")
+  log "Starting Server: ${cmd[@]}"
+  sudo "${cmd[@]}" > $DATACRUMBS_LOG_FILE 2>&1 &
+
+  READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
+  TIMEOUT=600  # 10 minutes in seconds
+  WAIT_INTERVAL=2
+  ELAPSED=0
+
+  while [ ! -f "$READY_FILE" ]; do
+      sleep $WAIT_INTERVAL
+      log "Waiting for $Server..."
+      ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+      if [ $ELAPSED -ge $TIMEOUT ]; then
+          log "Timeout waiting for $READY_FILE"
+          sudo kill -9 $SERVER_PID
+          exit 1
+      fi
+  done
+
+  log "Started server"
+}
+
+function datacrumbs_stop_server() {
+  exec=$1
+  cmd=("$exec" "stop" "${common_cmd[@]}")
+  log "Stopping Server: ${cmd[@]}"
+  sudo "${cmd[@]}" >> $DATACRUMBS_LOG_FILE 2>&1
+
+
+  SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | awk '{print $2}')
+  if [ -n "$SERVER_PID" ]; then
+      log "Found process(es) with RUNID ${RUNID}: $SERVER_PID. Killing them."
+      sudo kill -9 $SERVER_PID
+  fi
+  sudo rm -f $READY_FILE
+  log "Stopped server"
+}
+
+log() {
+  echo "[INFO $(date '+%Y-%m-%d %H:%M:%S')] $@"
+}
+
+debug() {
+  if [ "${VERBOSE:-0}" -eq 1 ]; then
+    echo "[DEBUG $(date '+%Y-%m-%d %H:%M:%S')] $@"
+  fi
 }
 
 if command -v module &> /dev/null

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DATACRUMBS_COMMON_DATA_STRUCTURES_H__
+#define DATACRUMBS_COMMON_DATA_STRUCTURES_H__
 // include first
 #include <datacrumbs/datacrumbs_config.h>
 // other headers
@@ -450,3 +451,5 @@ class CustomCaptureProbe : public CaptureProbe {
 };
 
 }  // namespace datacrumbs
+
+#endif  // DATACRUMBS_COMMON_DATA_STRUCTURES_H__

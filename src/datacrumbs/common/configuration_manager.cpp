@@ -74,7 +74,10 @@ ArgumentParser::ArgumentParser(int argc, char** argv, ExecutableType exe_type) {
 
   for (int i = start_index; i < argc; ++i) {
     std::string arg = argv[i];
-    if (arg == "--trace_log_dir" && i + 1 < argc) {
+    if (arg == "--run_id" && i + 1 < argc) {
+      run_id = argv[++i];
+      DC_LOG_DEBUG("[ArgumentParser] Run ID set to: %s", run_id->c_str());
+    } else if (arg == "--trace_log_dir" && i + 1 < argc) {
       trace_log_dir = argv[++i];
       DC_LOG_DEBUG("[ArgumentParser] Trace log dir set to: %s", trace_log_dir->c_str());
     } else if (arg == "--data_dir" && i + 1 < argc) {
@@ -94,7 +97,7 @@ ArgumentParser::ArgumentParser(int argc, char** argv, ExecutableType exe_type) {
       DC_LOG_DEBUG("[ArgumentParser] Log directory set to: %s", log_dir->c_str());
     } else if (arg == "--help" || arg == "-h") {
       DC_LOG_PRINT(
-          "Usage: %s <config_name> [--trace_log_dir <path>] "
+          "Usage: %s <config_name> [--run_id <id>] [--trace_log_dir <path>] "
           "[--config_path <path>] [--user <user>] [--data_dir "
           "<path>] [--inclusion_path <path>] [--log_dir <path>]",
           argv[0]);
@@ -123,7 +126,8 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       name("default"),
       trace_log_dir(DATACRUMBS_LOG_DIR),
       capture_probes(),
-      user("datacrumbs") {
+      user("datacrumbs"),
+      run_id("0") {
   DC_LOG_TRACE("[ConfigurationManager] Initializing with arguments...");
   ArgumentParser parser(argc, argv, exe_type);
   this->name = parser.config_name;
@@ -350,6 +354,12 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       this->inclusion_path = config[DC_YAML_INCLUSION_PATH].as<std::string>();
       DC_LOG_DEBUG("[ConfigurationManager] Inclusion path set from config: %s",
                    this->inclusion_path.c_str());
+    }
+    // Override run_id if provided as argument
+    if (parser.run_id) {
+      this->run_id = *parser.run_id;
+      DC_LOG_DEBUG("[ConfigurationManager] Run ID overridden by argument: %s",
+                   this->run_id.c_str());
     }
     if (parser.exe_mode) {
       this->exe_mode = *parser.exe_mode;
