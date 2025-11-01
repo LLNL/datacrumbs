@@ -17,12 +17,6 @@ capture_probes:
     type: binary
     file: @DATACRUMBS_LIBC_SO@
     regex: .*fork.*
-  - name: hdf5
-    probe: uprobe
-    type: binary
-    file: /home/haridev/spack/opt/spack/linux-haswell/hdf5-1.14.5-ul6ejhuh527dwwbgwi3ij6soj2pikw2u/lib/libhdf5.so
-    regex: .*
-    include_offsets: false
   - name: bio
     probe: kprobe
     type: ksym
@@ -56,11 +50,6 @@ capture_probes:
     probe: kprobe
     type: ksym
     regex: ^iomap(?!.*cold).*
-  - name: mpi
-    probe: uprobe
-    type: binary
-    file: /home/haridev/spack/opt/spack/linux-haswell/openmpi-5.0.7-y6xplmqxukxsuvvwnv2jqvztli5rhevm/lib/libmpi.so.40
-    regex: .*
   - name: ior
     probe: uprobe
     type: binary

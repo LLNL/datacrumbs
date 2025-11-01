@@ -1,0 +1,28 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
+
+export DATACRUMBS_USER=$1
+
+if [ -z "$DATACRUMBS_USER" ]; then
+    echo "Error: DATACRUMBS_USER is not set. Please provide a user as the first argument."
+    exit 1
+fi
+
+source $SCRIPT_DIR/datacrumbs_setup $DATACRUMBS_USER
+shift
+export DATACRUMBS_COMPOSABLE_NAME=$1
+shift
+
+echo "Running cmd: $@ as USER = $DATACRUMBS_USER and storing logs in $DATACRUMBS_LOG_PATH using composable $DATACRUMBS_COMPOSABLE_NAME"
+
+if [[ ! -f "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME}" ]]; then
+    echo "Error: Composite:${DATACRUMBS_COMPOSABLE_NAME} was not found."
+    exit 1
+fi
+
+datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_LOG_PATH
+
+${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME} "run" "$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_INSTALL_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" $PWD
+
+datacrumbs_finalize $DATACRUMBS_USER $DATACRUMBS_LOG_PATH

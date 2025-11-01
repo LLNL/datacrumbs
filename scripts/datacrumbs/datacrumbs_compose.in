@@ -1,0 +1,96 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
+
+DATACRUMBS_USER=$1
+
+if [ -z "$DATACRUMBS_USER" ]; then
+    echo "Error: DATACRUMBS_USER is not set. Please provide a user as the first argument."
+    exit 1
+fi
+
+source $SCRIPT_DIR/datacrumbs_setup $DATACRUMBS_USER
+shift
+ACTION="$1"
+if [[ "$ACTION" != "compose" && "$ACTION" != "discover" ]]; then
+    echo "Error: ACTION must be either 'compose' or 'discover'."
+    echo "Usage: $0 user [discover|compose name <probe1,probe2,...>]"
+    exit 1
+fi
+shift
+
+PROBE_OBJECTS_DIR="$DATACRUMBS_INSTALL_PROBE_OBJECTS_DIR"
+
+if [[ "$ACTION" == "discover" ]]; then
+    log "Discovering probe objects in $PROBE_OBJECTS_DIR..."
+    for file in "$PROBE_OBJECTS_DIR"/*.o; do
+        fname=$(basename "$file")
+        if [[ "$fname" != "common.o" && "$fname" != "datacrumbs.bpf.o" && "$fname" != "init.o" ]]; then
+            echo "${fname%.o}"
+        fi
+    done
+elif [[ "$ACTION" == "compose" ]]; then
+    if [[ $# -ne 2 ]]; then
+        log "Error: compose requires 2 arguments: name and probe list"
+        echo "Usage: $0 compose <name> <probe1,probe2,...>"
+        exit 1
+    fi
+    COMPOSABLE_NAME="$1"
+    shift
+    PROBES="$1"
+    IFS=',' read -ra PROBES_ARRAY <<< "$PROBES"
+    for probe in "${PROBES_ARRAY[@]}"; do
+        probe_file="${PROBE_OBJECTS_DIR}/${probe}.o"
+        if [[ ! -f "$probe_file" ]]; then
+            log "Error: Probe object '$probe_file' not found."
+            exit 1
+        fi
+    done
+    log "Composing $COMPOSABLE_NAME for: ${DATACRUMBS_USER}"
+    BUILD_DIR="/tmp/datacrumbs_${DATACRUMBS_USER}_$(date +%s%N)"
+    if [[ -d "${BUILD_DIR}" ]]; then
+        log "Cleaning existing build directory: ${BUILD_DIR}"
+        rm -rf "${BUILD_DIR}"
+    fi
+    log "Creating build directory: ${BUILD_DIR}"
+    mkdir -p "${BUILD_DIR}"
+    chown "${DATACRUMBS_USER}:${DATACRUMBS_USER}" "${BUILD_DIR}"
+    log "Copying composable files to build directory"
+    cp -r ${DATACRUMBS_INSTALL_COMPOSABLE_DIR}/* ${BUILD_DIR}/
+    CMAKE_ARGS=(
+        -DDATACRUMBS_NAME=${COMPOSABLE_NAME}
+        -DDATACRUMBS_PROBES=${PROBES}
+        -DDATACRUMBS_CLIENT_OBJECTS_DIR=${DATACRUMBS_INSTALL_PROBE_OBJECTS_DIR}
+    )
+    log "Running CMake configuration on ${BUILD_DIR}/build"
+    @CMAKE_COMMAND@  -B${BUILD_DIR}/build -DCMAKE_INSTALL_PREFIX=${BUILD_DIR}/install "${CMAKE_ARGS[@]}" ${BUILD_DIR}
+    if [[ $? -ne 0 ]]; then
+        log "Error: CMake configuration failed"
+        rm -rf "${BUILD_DIR}"
+        exit 1
+    fi
+    log "Building project"
+    @CMAKE_COMMAND@ --build ${BUILD_DIR}/build --target all -- -j
+    if [[ $? -ne 0 ]]; then
+        log "Error: Build failed"
+        rm -rf "${BUILD_DIR}"
+        exit 1
+    fi
+    log "Installing build"
+    @CMAKE_COMMAND@ --install ${BUILD_DIR}/build 
+    if [[ $? -ne 0 ]]; then
+        log "Error: Install failed"
+        rm -rf "${BUILD_DIR}"
+        exit 1
+    fi
+    log "Copying final binary to client bin"
+    mkdir -p ${DATACRUMBS_CLIENT_BIN}
+    rm -f ${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}
+    sudo -u ${DATACRUMBS_USER} cp ${BUILD_DIR}/install/sbin/datacrumbs_${COMPOSABLE_NAME} ${DATACRUMBS_CLIENT_BIN}
+    rm -rf "${BUILD_DIR}"
+    log "Compose action completed successfully"
+else
+    log "Invalid usage"
+    echo "Usage: $0 user [discover|compose name <probe1,probe2,...>]"
+    exit 1
+fi
