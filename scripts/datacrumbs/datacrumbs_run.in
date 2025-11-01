@@ -2,20 +2,32 @@
 
 SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
-source $SCRIPT_DIR/datacrumbs_setup
-
 export DATACRUMBS_USER=$1
+
+if [ -z "$DATACRUMBS_USER" ]; then
+    echo "Error: DATACRUMBS_USER is not set. Please provide a user as the first argument."
+    exit 1
+fi
+
+source $SCRIPT_DIR/datacrumbs_setup $DATACRUMBS_USER
+
 
 shift
 
-echo "Running cmd: $@ as USER = $DATACRUMBS_USER and storing logs in $DATACRUMBS_LOG_PATH"
+
+echo "Running cmd: $@ as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_LOG_PATH and log file $DATACRUMBS_LOG_FILE"
 
 datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_LOG_PATH
+RUNID=$(date +"%Y%m%d_%H%M%S")
+DATACRUMBS_LOG_FILE=$PWD/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
 
- @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs "start" "$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_INSTALL_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_LOG_PATH"
+datacrumbs_start_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs
 
+log "Running App: $@"
+log  "$@"
 "$@"
+log "Finished App: $@"
 
- @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs "stop" "$DATACRUMBS_INSTALL_HOST"
+datacrumbs_stop_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs
 
 datacrumbs_finalize $DATACRUMBS_USER $DATACRUMBS_LOG_PATH

@@ -1,5 +1,7 @@
-#include <datacrumbs/server/bpf/compat/map.h>
+
 #include <datacrumbs/server/process/event_processor.h>
+//
+#include <datacrumbs/server/bpf/compat/map.h>
 #include <datacrumbs/server/process/processing/general_event.h>
 #include <datacrumbs/server/process/processing/usdt_event.h>
 // Include generated
@@ -15,11 +17,15 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <fstream>
 #include <iostream>
 #include <string>
+
+#include "datacrumbs/common/logging.h"
+#include "datacrumbs/datacrumbs_config.h"
 
 #define GET_DATA_FUNCTION(INDEX)                                       \
   auto write_event = get_data_##INDEX(data, event_index.fetch_add(1)); \
@@ -32,10 +38,12 @@ namespace datacrumbs {
 EventProcessor::EventProcessor(int argc, char** argv) {
   configManager_ = datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance(
       argc, argv, false, ExecutableType::DAEMON);
-  // Initialize the ChromeWriter singleton instance
-  writer_ = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
-  if (!writer_) {
-    DC_LOG_ERROR("Failed to create ChromeWriter instance");
+  if (configManager_->exe_mode != datacrumbs::ExecutableMode::STOP) {
+    // Initialize the ChromeWriter singleton instance
+    writer_ = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
+    if (!writer_) {
+      DC_LOG_ERROR("Failed to create ChromeWriter instance");
+    }
   }
   failed_events = 0;
 }
@@ -671,10 +679,16 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
   }
   double elapsed = timer.pauseTime();
   DC_LOG_PRINT("Initialization of DataCrumbs elapsed time: %f seconds", elapsed);
-  DC_LOG_PRINT("Ready to run the code.");
+
   if (notify_parent) daemon_notify_parent();
   // Main event polling loop
   signal(SIGINT, sig_handler);
+  std::string ready_file =
+      "/tmp/datacrumbs_" + config_manager->user + "_" + config_manager->run_id + ".ready";
+  std::ofstream ofs_ready(ready_file);
+  ofs_ready << "ready" << std::endl;
+  ofs_ready.close();
+  DC_LOG_PRINT("Server running on %d. Ready to run the code.", getpid());
 
   unsigned int batch_size = 1024;
 #if defined(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG) && (DATACRUMBS_BPFTIME_COMPATIBLE_FLAG == 0)
@@ -862,46 +876,46 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
   datacrumbs_bpf__destroy(skel);
 
   double finalize_elapsed = timer.pauseTime();
-  DC_LOG_PRINT("Finalization and cleanup of DataCrumbs elapsed time: %f seconds", finalize_elapsed);
+  DC_LOG_PRINT(
+      "Finalization and cleanup of DataCrumbs elapsed time: %f seconds with error code: %d",
+      finalize_elapsed, err);
 
   DC_LOG_TRACE("main: end");
-  return -err;
+  return 0;
 }
-
-int main(int argc, char** argv);
 
 int main(int argc, char** argv) {
   auto event_processor = datacrumbs::EventProcessor(argc, argv);
   std::string hostname = get_hostname();
-  std::string timestamp = get_timestamp();
-  std::string pidfile = "/tmp/datacrumbs_" + hostname + ".pid";
+  std::string pidfile =
+      "/tmp/datacrumbs_" + hostname + "_" + event_processor.configManager_->run_id + ".pid";
 
+  int return_code = 0;
   if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::RUN) {
     std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname +
-                          "_" + timestamp + ".log";
+                          "_" + event_processor.configManager_->run_id + ".log";
     DC_LOG_PRINT("Spawned daemon with pid %d, output redirected to %s\n", getpid(),
                  logfile.c_str());
     event_processor.configManager_->print_configurations();
     write_pid_file(pidfile, event_processor.configManager_->user);
-    return main_process(argc, argv, &event_processor, false);
+    return_code = main_process(argc, argv, &event_processor, false);
   } else if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::START) {
     daemonize();
     auto event_processor = datacrumbs::EventProcessor(argc, argv);
     std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname +
-                          "_" + timestamp + ".log";
+                          "_" + event_processor.configManager_->run_id + ".log";
     redirect_output(logfile, event_processor.configManager_->user);
     DC_LOG_PRINT("Spawned daemon with pid %d, output redirected to %s\n", getpid(),
                  logfile.c_str());
     event_processor.configManager_->print_configurations();
     write_pid_file(pidfile, event_processor.configManager_->user);
-    return main_process(argc, argv, &event_processor, true);
+    return_code = main_process(argc, argv, &event_processor, true);
   } else if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::STOP) {
     // Find and kill daemon by pid file
     std::ifstream ifs(pidfile);
     pid_t pid = 0;
     ifs >> pid;
     ifs.close();
-    int return_code = 0;
     if (pid > 0) {
       kill(pid, SIGINT);
       int status = 0;
@@ -910,8 +924,12 @@ int main(int argc, char** argv) {
         // Check if process exists before calling waitpid
         // Poll for process termination using ps
         int max_retries = 600;  // Wait up to ~600 seconds (1s * 600)
-        DC_LOG_PRINT("Sent SIGINT. Waiting for %f minutes for pid:%d to exit", max_retries / 60.0,
-                     pid);
+        const char* user = getenv("USER");
+        if (!user) {
+          user = "unknown";
+        }
+        DC_LOG_PRINT("Sent SIGINT as %s. Waiting for %f minutes for pid:%d to exit", user,
+                     max_retries / 60.0, pid);
         int i;
         for (i = 0; i < max_retries; ++i) {
           std::string ps_cmd = "ps -p " + std::to_string(pid) + " > /dev/null";
@@ -936,6 +954,6 @@ int main(int argc, char** argv) {
       DC_LOG_ERROR("Could not find pid to stop.\n");
     }
 
-    exit(return_code);
+    return (return_code);
   }
 }

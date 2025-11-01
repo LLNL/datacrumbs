@@ -36,16 +36,13 @@ prepend_path("ETCPATH", etc_dir)
 -- local datacrumbs_flags = string.format("-L %s/lib -I %s/include ", prefix, prefix)
 
 
-local log_dirs_dir = os.getenv("DATACRUMBS_USER_LOG_PATH") or ""
+local log_dirs_dir = "@DATACRUMBS_CONFIGURED_LOG_DIR@" or "."
 
-local runid = os.time()
-local logdir = string.format("%s/%s/%s/%s/%s/%s",
+local logdir =  os.getenv("DATACRUMBS_LOG_PATH") or string.format("%s/%s/%s/%s",
 log_dirs_dir,
-user,
 os.date("%Y"),
 os.date("%m"),
-os.date("%d"),
-runid
+os.date("%d")
 )
   
 
@@ -60,7 +57,7 @@ end
 
 family("datacrumbs")
 execute{
-  cmd   = "source @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_setup",
+  cmd   = "source @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_setup " .. user,
   modeA = {"load"},
   mode  = "silent",
 }

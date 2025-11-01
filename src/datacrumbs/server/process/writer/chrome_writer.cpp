@@ -32,6 +32,7 @@ ChromeWriter::ChromeWriter() : stop_flag_(false), chunk_size_(16 * 1024 * 1024) 
 // Destructor flushes and closes the file, and joins the worker thread.
 ChromeWriter::~ChromeWriter() {}
 void ChromeWriter::finalize() {
+  DC_LOG_DEBUG("ChromeWriter worker loop exiting");
   {
     std::lock_guard<std::mutex> lock(queue_mutex_);
     stop_flag_ = true;
@@ -40,6 +41,7 @@ void ChromeWriter::finalize() {
   if (worker_.joinable()) worker_.join();
   compressor_->compress("]");
   compressor_->finalize();
+  DC_LOG_DEBUG("ChromeWriter finalized");
 }
 
 void ChromeWriter::push_event(EventWithId* event) {
@@ -183,6 +185,8 @@ void ChromeWriter::write_event(EventWithId* event_with_id) {
 }
 
 void ChromeWriter::worker_loop() {
+  DC_LOG_DEBUG("ChromeWriter worker loop started");
+  int count = 0;
   while (true) {
     EventWithId* event_with_id = nullptr;
     {
@@ -194,6 +198,8 @@ void ChromeWriter::worker_loop() {
       if (!event_queue_.empty()) {
         event_with_id = event_queue_.front();
         event_queue_.pop_front();
+        DC_LOG_DEBUG("Processing event with ID: %d and %d left", event_with_id->event_id,
+                     event_queue_.size());
       } else {
         continue;
       }
@@ -201,6 +207,8 @@ void ChromeWriter::worker_loop() {
     if (event_with_id != nullptr) {
       write_event(event_with_id);
     }
+    count++;
   }
+  DC_LOG_DEBUG("ChromeWriter worker loop exiting");
 }
 }  // namespace datacrumbs

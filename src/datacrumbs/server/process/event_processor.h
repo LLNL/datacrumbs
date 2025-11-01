@@ -5,7 +5,6 @@
 #include <bpf/libbpf.h>
 // Generated Headers
 #include <datacrumbs/datacrumbs_config.h>
-#include <datacrumbs/server/bpf/datacrumbs.skel.h>
 // other headers
 #include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/constants.h>
@@ -58,6 +57,7 @@ class EventProcessor {
     if (writer_) {
       writer_->finalize();
     }
+    DC_LOG_DEBUG("EventProcessor finalized");
     return 0;
   }
 
