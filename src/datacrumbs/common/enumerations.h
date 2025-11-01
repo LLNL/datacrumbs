@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DATACRUMBS_COMMON_ENUMERATIONS_H__
+#define DATACRUMBS_COMMON_ENUMERATIONS_H__
 
 // include first
 #include <datacrumbs/datacrumbs_config.h>
@@ -131,3 +132,5 @@ inline void convert(const std::string& s, CaptureType& type) {
 }
 
 }  // namespace datacrumbs
+
+#endif  // DATACRUMBS_COMMON_ENUMERATIONS_H__

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DATACRUMBS_COMMON_CONFIGURATION_MANAGER_H__
+#define DATACRUMBS_COMMON_CONFIGURATION_MANAGER_H__
 
 /**
  * @file configuration_manager.h
@@ -83,6 +84,8 @@ class ConfigurationManager {
   // Derived configuration: current hostname
   std::string hostname;
 
+  std::string run_id;  // Unique run identifier
+
   /**
    * @brief Constructor that initializes the ConfigurationManager with command-line arguments.
    *
@@ -134,6 +137,7 @@ class ArgumentParser {
   std::optional<std::string> inclusion_path;        ///< Optional inclusion path
   std::optional<std::string> log_dir;               ///< Optional log directory
   std::optional<ExecutableMode> exe_mode;           ///< Optional executable mode
+  std::optional<std::string> run_id;                ///< Optional run_id
 
   /**
    * @brief Constructor that parses command-line arguments.
@@ -145,3 +149,5 @@ class ArgumentParser {
 };
 
 }  // namespace datacrumbs
+
+#endif  // DATACRUMBS_COMMON_CONFIGURATION_MANAGER_H__

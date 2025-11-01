@@ -5,7 +5,6 @@
 #include <bpf/libbpf.h>
 // Generated Headers
 #include <datacrumbs/datacrumbs_config.h>
-#include <datacrumbs/server/bpf/datacrumbs.skel.h>
 // other headers
 #include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/constants.h>
@@ -58,6 +57,7 @@ class EventProcessor {
     if (writer_) {
       writer_->finalize();
     }
+    DC_LOG_DEBUG("EventProcessor finalized");
     return 0;
   }
 
@@ -65,9 +65,9 @@ class EventProcessor {
   std::shared_ptr<ConfigurationManager> configManager_;
   std::shared_ptr<datacrumbs::ChromeWriter> writer_;
   int failed_events;  // Count of failed events
+  std::atomic<uint64_t> event_index{0};
 
- private:
-  std::atomic<uint64_t> event_index{0};                // Atomic index for event processing
+ private:                                              // Atomic index for event processing
   std::unordered_set<unsigned int> processed_hashes_;  // Set to track processed PIDs
 };
 

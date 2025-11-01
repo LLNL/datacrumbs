@@ -34,14 +34,18 @@ class ZlibCompression {
   ~ZlibCompression() {}
 
   void finalize() {
+    DC_LOG_DEBUG("Finalizing compression");
     flush();
     deflateEnd(&strm_);
     if (file_) {
+      DC_LOG_DEBUG("Closing output file");
       std::fclose(file_);
     }
+    DC_LOG_DEBUG("Compression finalized");
   }
 
   void compress(const std::string& data) {
+    DC_LOG_DEBUG("Compressing data of size: %zu bytes", data.size());
     strm_.avail_in = static_cast<uInt>(data.size());
     strm_.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
 
@@ -63,6 +67,7 @@ class ZlibCompression {
   void flush() {
     int ret;
     do {
+      DC_LOG_DEBUG("Flushing compression buffer");
       strm_.avail_out = static_cast<uInt>(chunk_size_ - buffer_offset_);
       strm_.next_out = reinterpret_cast<Bytef*>(&buffer_[buffer_offset_]);
       ret = deflate(&strm_, Z_FINISH);
@@ -84,6 +89,8 @@ class ZlibCompression {
       if (std::fwrite(buffer_.data(), 1, buffer_offset_, file_) != buffer_offset_) {
         perror("Failed to write compressed chunk to file");
       }
+      fflush(file_);
+      DC_LOG_DEBUG("Wrote compressed chunk of size: %zu bytes", buffer_offset_);
       buffer_offset_ = 0;
     }
   }
