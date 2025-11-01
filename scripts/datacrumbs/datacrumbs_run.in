@@ -30,4 +30,6 @@ log "Finished App: $@"
 
 datacrumbs_stop_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs
 
+datacrumbs_print_status
+
 datacrumbs_finalize $DATACRUMBS_USER $DATACRUMBS_LOG_PATH

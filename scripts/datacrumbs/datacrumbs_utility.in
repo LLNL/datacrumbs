@@ -71,6 +71,24 @@ function datacrumbs_stop_server() {
   log "Stopped server"
 }
 
+function datacrumbs_print_status() {
+  local status_file="/tmp/datacrumbs_${DATACRUMBS_USER}_status_${RUNID}.json"
+  if [ ! -f "$status_file" ]; then
+    log "Status file not found: $status_file"
+    return 1
+  fi
+
+  local trace_file total_events_captured events_failed
+  trace_file=$(jq -r '.trace_file' "$status_file")
+  total_events_captured=$(jq -r '.total_events_captured' "$status_file")
+  events_failed=$(jq -r '.events_failed' "$status_file")
+
+  log "trace_file: $trace_file"
+  log "total_events_captured: $total_events_captured"
+  log "events_failed: $events_failed"
+  rm -f "$status_file"
+}
+
 log() {
   echo "[INFO $(date '+%Y-%m-%d %H:%M:%S')] $@"
 }
