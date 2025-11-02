@@ -6,17 +6,29 @@ CONFIG_FILE=@DATACRUMBS_INSTALL_ETC_CONFIGSDIR@/project.yaml
 
 source ${SCRIPT_DIR}/datacrumbs_utility
 
-DATACRUMBS_USER=$1
+source ${SCRIPT_DIR}/datacrumbs_utility
 
-if [ -z "$DATACRUMBS_USER" ]; then
-    DATACRUMBS_USER=$USER
-    log "DATACRUMBS_USER is not set. Defaulting to current user: $DATACRUMBS_USER"
-else
-    log "Using provided DATACRUMBS_USER: $DATACRUMBS_USER"
+if [ "${DATACRUMBS_ENV_LOADED:-0}" -eq 0 ]; then
+    if [ "$EUID" -ne 0 ]; then
+        export DATACRUMBS_IS_ROOT=0
+        export DATACRUMBS_USER=$USER
+    else
+        export DATACRUMBS_IS_ROOT=1
+        export DATACRUMBS_USER=$SUDO_USER
+    fi
+    readonly DATACRUMBS_IS_ROOT
+    readonly DATACRUMBS_USER
+    if [ -z "$DATACRUMBS_USER" ]; then
+        DATACRUMBS_USER=$USER
+        log "DATACRUMBS_USER is not set. Defaulting to current user: $DATACRUMBS_USER"
+    else
+        log "Using provided DATACRUMBS_USER: $DATACRUMBS_USER"
+    fi
+    eval $(datacrumbs_parse_yaml ${CONFIG_FILE} "DATACRUMBS_")
+    log "After loading yaml for $DATACRUMBS_USER"
+    export DATACRUMBS_ENV_LOADED=1
+    readonly DATACRUMBS_ENV_LOADED
 fi
-
-eval $(datacrumbs_parse_yaml ${CONFIG_FILE} "DATACRUMBS_")
-log "After loading yaml for $DATACRUMBS_USER"
 
 if [ "$DATACRUMBS_MODULE_AVAILABLE" -eq 1 ]; then
     if ! module is-loaded datacrumbs/@DATACRUMBS_RELEASE_VERSION_STRING@; then
@@ -24,8 +36,8 @@ if [ "$DATACRUMBS_MODULE_AVAILABLE" -eq 1 ]; then
         module load datacrumbs/@DATACRUMBS_RELEASE_VERSION_STRING@
     fi
 else
-    export PATH="@DATACRUMBS_INSTALL_BIN_DIR@:@DATACRUMBS_INSTALL_SBIN_DIR@:$PATH"
-    export LD_LIBRARY_PATH="@DATACRUMBS_INSTALL_LIB_DIR@:$LD_LIBRARY_PATH"
+    export PATH="$DATACRUMBS_INSTALL_BIN_DIR:$DATACRUMBS_INSTALL_SBIN_DIR:$PATH"
+    export LD_LIBRARY_PATH="$DATACRUMBS_INSTALL_LIB_DIR:$LD_LIBRARY_PATH"
 fi
 
 if [ -z "$DATACRUMBS_LOG_PATH" -o "$DATACRUMBS_LOG_PATH" = "" ]; then

@@ -2,93 +2,80 @@
 
 SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
-# Argument parsing
-DATACRUMBS_USER=""
-DATACRUMBS_COMPOSABLE_NAME=""
-VERBOSE=0
+# Check if datacrumbs_args exists in scripts directory
+if [[ ! -f "$SCRIPT_DIR/datacrumbs_args" ]]; then
+    echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
+    exit 1
+fi
 
-show_help() {
-    echo "Usage: $0 USER [COMPOSITE_NAME] [--verbose] [APP_CMD] [APP_ARGS...]"
-    echo "  USER                  User to run as (required)"
-    echo "  COMPOSITE_NAME        Composable name (optional, defaults to 'default')"
-    echo "  --verbose             Enable verbose output"
-    echo "  APP_CMD [APP_ARGS...] Command and arguments to run after server starts"
-    echo "  -h, --help            Show this help message"
-}
+# Source argument parser
+source "$SCRIPT_DIR/datacrumbs_args"
 
-# Parse positional arguments
-if [[ $# -lt 1 ]]; then
-    log "Error: No user specified."
+# Initialize argument parser for this script
+dc_args_init "DATACRUMBS_COMPOSE_RUN"
+dc_args_add_option "DATACRUMBS_COMPOSE_RUN" "composite_name" "MANDATORY" "Composable name" "string"
+dc_args_add_option "DATACRUMBS_COMPOSE_RUN" "app" "MANDATORY" "App command" "string"
+# The rest of the arguments are arbitrary and will be captured as APP_ARGS
+
+# Parse arguments
+dc_args_parse "DATACRUMBS_COMPOSE_RUN" "$0" "$@"
+if [[ $? -ne 0 ]]; then
+    echo "Error: Argument parsing failed."
     show_help
     exit 1
 fi
 
-DATACRUMBS_USER="$1"
-shift
+DATACRUMBS_COMPOSABLE_NAME="${DATACRUMBS_COMPOSE_RUN_COMPOSITE_NAME:-}"
+APP_CMD=("${DATACRUMBS_COMPOSE_RUN_APP}")
 
-# Check if next arg is composite name (not an option)
-if [[ $# -gt 0 && "$1" != --* && "$1" != "-h" ]]; then
-    DATACRUMBS_COMPOSABLE_NAME="$1"
-    shift
-else
-    DATACRUMBS_COMPOSABLE_NAME="unknown"
-fi
-
-# Parse options
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --verbose)
-            VERBOSE=1
-            shift
-            ;;
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        --*)
-            log "Unknown option: $1"
-            show_help
-            exit 1
-            ;;
-        *)
-            # First non-option is APP_CMD, break to leave $@ as app command
-            break
-            ;;
-    esac
-done
-
-if [ -z "$DATACRUMBS_USER" ]; then
-    log "Error: No user specified."
+if [[ -z "$DATACRUMBS_COMPOSABLE_NAME" ]]; then
+    echo "Error: COMPOSITE_NAME argument is required."
     show_help
     exit 1
 fi
 
+if [[ ${APP_CMD} -eq 0 ]]; then
+    echo "Error: APP command is required."
+    show_help
+    exit 1
+fi
 
-export DATACRUMBS_USER="$DATACRUMBS_USER"
+# Convert APP_CMD string into array, splitting on spaces
+read -ra APP_CMD <<< "${DATACRUMBS_COMPOSE_RUN_APP}"
 
-source $SCRIPT_DIR/datacrumbs_setup $DATACRUMBS_USER
+# Load environment
+source "$SCRIPT_DIR/datacrumbs_setup"
 
-log "Running cmd: $@ as USER = $DATACRUMBS_USER and storing logs in $DATACRUMBS_LOG_PATH using composable $DATACRUMBS_COMPOSABLE_NAME"
-debug "Script dir: $SCRIPT_DIR"
-debug "User: $DATACRUMBS_USER"
-debug "Composable name: $DATACRUMBS_COMPOSABLE_NAME"
-debug "Dry run: $DRY_RUN"
-debug "Verbose: $VERBOSE"
+log "Running cmd: ${APP_CMD[*]} as USER = $DATACRUMBS_USER using composable $DATACRUMBS_COMPOSABLE_NAME"
 
-datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_LOG_PATH
+if [[ -z "$DRY_RUN" ]]; then
+    datacrumbs_init "$DATACRUMBS_USER" "$DATACRUMBS_LOG_PATH"
+fi
+
 RUNID=$(date +"%Y%m%d_%H%M%S")
+exec="${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME}"
 DATACRUMBS_LOG_FILE=$PWD/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
-exec=${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME}
 
-datacrumbs_start_server $exec
+debug "Starting datacrumbs server with exec: $exec"
+datacrumbs_start_server "$exec" "$DRY_RUN"
 
-log "Running App: $@"
-"$@"
-log "Finished App: $@"
+if [[ "$DRY_RUN" == "1" ]]; then
+    log "[DRY_RUN] Would run App: ${APP_CMD[*]}"
+else
+    log "Running App: ${APP_CMD[*]}"
+    "${APP_CMD[@]}"
+    log "Finished App: ${APP_CMD[*]}"
+fi
 
-datacrumbs_stop_server $exec
+debug "Stopping datacrumbs server with exec: $exec"
+datacrumbs_stop_server "$exec" "$DRY_RUN"
 
-datacrumbs_print_status
-
-datacrumbs_finalize $DATACRUMBS_USER $DATACRUMBS_LOG_PATH
-debug "Finalized datacrumbs for user $DATACRUMBS_USER"
+if [[ "$DRY_RUN" == "1" ]]; then
+    debug "[DRY_RUN] Would print datacrumbs status"
+    debug "[DRY_RUN] Would finalize datacrumbs for user: $DATACRUMBS_USER"
+else
+    debug "Printing datacrumbs status"
+    datacrumbs_print_status
+    debug "Finalizing datacrumbs for user: $DATACRUMBS_USER"
+    datacrumbs_finalize "$DATACRUMBS_USER"
+fi
