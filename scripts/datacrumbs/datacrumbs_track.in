@@ -22,6 +22,10 @@ if [[ -z "$EXECUTABLE" ]]; then
     exit 1
 fi
 
+source $SCRIPT_DIR/datacrumbs_setup
+
+check_regular_user
+
 log "Checking executable: $EXECUTABLE"
 if [[ "$DRY_RUN" == "1" ]]; then
     log "[DRY RUN] Check if executable is valid: $EXECUTABLE"
@@ -39,8 +43,6 @@ else
         exit 1
     fi
 fi
-
-source $SCRIPT_DIR/datacrumbs_setup
 
 
 if [[ "$DRY_RUN" == "1" ]]; then

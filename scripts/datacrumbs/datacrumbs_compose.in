@@ -42,6 +42,8 @@ dc_args_pretty_print "$APP" "datacrumbs_compose"
 # Load environment after we know the user
 source "$SCRIPT_DIR/datacrumbs_setup"
 
+check_root_user
+
 # Dry run support
 DRY_RUN_MODE=0
 if [[ -n "${DRY_RUN}" && "${DRY_RUN}" != "0" ]]; then
@@ -134,11 +136,13 @@ elif [[ "$ACTION" == "compose" ]]; then
     fi
 
     log "Copying final binary to client bin"
-    run mkdir -p "${DATACRUMBS_CLIENT_BIN}"
+    run sudo -u ${DATACRUMBS_INSTALL_USER} mkdir -p "${DATACRUMBS_CLIENT_BIN}"
     run rm -f "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
     run cp "${BUILD_DIR}/install/sbin/datacrumbs_${COMPOSABLE_NAME}" "${DATACRUMBS_CLIENT_BIN}"
-
+    run sudo chown ${DATACRUMBS_USER}:${DATACRUMBS_USER} "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
+    run sudo chmod u+xr,o-rwx,g-rwx "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
     run rm -rf "${BUILD_DIR}"
+    debug "Created composable binary at ${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
     log "Compose action completed successfully"
 else
     error "Invalid usage"

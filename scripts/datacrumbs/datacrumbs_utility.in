@@ -47,49 +47,53 @@ function datacrumbs_run_command() {
 
 function datacrumbs_finalize() {
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
-    log "[DRY RUN] Would finalize for user: $DATACRUMBS_USER, log path: $DATACRUMBS_LOG_PATH"
+    log "[DRY RUN] Would finalize for user: $DATACRUMBS_USER, log path: $DATACRUMBS_TRACE_DIR"
     return 0
   fi
 }
 
 function datacrumbs_init() {
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
-    log "[DRY RUN] Would create log directory: ${DATACRUMBS_LOG_PATH}"
+    log "[DRY RUN] Would create log directory: ${DATACRUMBS_TRACE_DIR}"
     return 0
   fi
-
-  datacrumbs_run_command "Failed to create log directory ${DATACRUMBS_LOG_PATH}" mkdir -p "${DATACRUMBS_LOG_PATH}"
+  if [ ! -w "${DATACRUMBS_TRACE_DIR}" ]; then
+    warn "User does not have write access to ${DATACRUMBS_TRACE_DIR}. Ensure the directory exists."
+  else
+    datacrumbs_run_command "Failed to create log directory ${DATACRUMBS_TRACE_DIR}" mkdir -p "${DATACRUMBS_TRACE_DIR}"
+  fi
   
 }
 
 function datacrumbs_start_server() {
   exec=$1
-  common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_LOG_PATH" --run_id "$RUNID")
-  cmd=("$exec" "run" "${common_cmd[@]}")
-  READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
-  TIMEOUT=600  # 10 minutes in seconds
+  exec=($exec)
+  if [ -z "$DATACRUMBS_TRACE_DIR" ]; then
+    error "DATACRUMBS_TRACE_DIR is empty. Please set the trace directory."
+    exit 1
+  fi
+  common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_TRACE_DIR" --run_id "$RUNID")
+  cmd=("${exec[@]}" "run" "${common_cmd[@]}")
   WAIT_INTERVAL=2
   ELAPSED=0
 
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
     log "[DRY RUN] Would start server: ${cmd[@]}"
-    log "[DRY RUN] Would wait for ready file: $READY_FILE (timeout: $TIMEOUT seconds)"
+    log "[DRY RUN] Would wait for ready file: $READY_FILE (DATACRUMBS_SERVER_LOAD_TIMEOUT: $DATACRUMBS_SERVER_LOAD_TIMEOUT seconds)"
     return 0
   fi
 
-  log "Starting Server: ${cmd[@]}"
+  log "Starting Server: ${cmd[*]}"
   sudo "${cmd[@]}" > $DATACRUMBS_LOG_FILE 2>&1 &
 
   while [ ! -f "$READY_FILE" ]; do
       sleep $WAIT_INTERVAL
-      log "Waiting for $Server..."
+      log "Waiting for ${ELAPSED} seconds $Server..."
       ELAPSED=$((ELAPSED + WAIT_INTERVAL))
-      if [ $ELAPSED -ge $TIMEOUT ]; then
-          log "Timeout waiting for $READY_FILE"
-          SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | awk '{print $2}')
-          if [ -n "$SERVER_PID" ]; then
-              sudo kill -9 $SERVER_PID
-          fi
+      if [ $ELAPSED -ge $DATACRUMBS_SERVER_LOAD_TIMEOUT ]; then
+          log "DATACRUMBS_SERVER_LOAD_TIMEOUT waiting for $READY_FILE"
+          sudo $DATACRUMBS_INSTALL_BIN_DIR/datacrumbs_stop
+          cat $DATACRUMBS_LOG_FILE
           exit 1
       fi
   done
@@ -99,23 +103,27 @@ function datacrumbs_start_server() {
 
 function datacrumbs_stop_server() {
   exec=$1
-  cmd=("$exec" "stop" "${common_cmd[@]}")
+  prog_name=$2
+  exec=($exec)
+  common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_TRACE_DIR" --run_id "$RUNID")
+  cmd=("${exec[@]}" "stop" "${common_cmd[@]}")
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
-    log "[DRY RUN] Would stop server: ${cmd[@]}"
+    log "[DRY RUN] Would stop server: ${cmd[*]}"
     log "[DRY RUN] Would find and kill process(es) with RUNID ${RUNID}"
     log "[DRY RUN] Would remove ready file: $READY_FILE"
     return 0
   fi
 
-  log "Stopping Server: ${cmd[@]}"
-  sudo "${cmd[@]}" >> $DATACRUMBS_LOG_FILE 2>&1
+  log "Stopping Server: ${cmd[*]}"
+  sudo "${cmd[@]}" >> "${DATACRUMBS_LOG_FILE}" 2>&1
 
-  SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | awk '{print $2}')
+  SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | grep -v "${prog_name}" | awk '{print $2}')
   if [ -n "$SERVER_PID" ]; then
       log "Found process(es) with RUNID ${RUNID}: $SERVER_PID. Killing them."
-      sudo kill -9 $SERVER_PID
+      sudo ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
+      cat "${DATACRUMBS_LOG_FILE}"
   fi
-  sudo rm -f $READY_FILE
+  rm -f "${READY_FILE}"
   log "Stopped server"
 }
 
@@ -143,7 +151,26 @@ function datacrumbs_print_status() {
   rm -f "$status_file"
 }
 
+function check_regular_user() {
+  if [[ "$DATACRUMBS_IS_ROOT" == "1" || "$DATACRUMBS_USER" == "root" ]]; then
+    error "This script should be run as a regular user, not as root."
+    exit 1
+  fi
+}
 
+function check_sudo_user() {
+  if [[ "$DATACRUMBS_IS_ROOT" != "1" || "$DATACRUMBS_USER" == "root" ]]; then
+    error "This script should be run as root."
+    exit 1
+fi
+}
+
+function check_install_user() {
+  if [[ "${DATACRUMBS_USER}" != "${DATACRUMBS_INSTALL_USER}" ]]; then
+    error "DATACRUMBS_USER does not match DATACRUMBS_INSTALL_USER: ${DATACRUMBS_USER}"
+    exit 1
+  fi
+}
 
 if command -v module &> /dev/null
 then

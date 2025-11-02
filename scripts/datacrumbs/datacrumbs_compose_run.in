@@ -17,8 +17,10 @@ dc_args_add_option "DATACRUMBS_COMPOSE_RUN" "composite_name" "MANDATORY" "Compos
 dc_args_add_option "DATACRUMBS_COMPOSE_RUN" "app" "MANDATORY" "App command" "string"
 # The rest of the arguments are arbitrary and will be captured as APP_ARGS
 
+
 # Parse arguments
 dc_args_parse "DATACRUMBS_COMPOSE_RUN" "$0" "$@"
+
 if [[ $? -ne 0 ]]; then
     echo "Error: Argument parsing failed."
     show_help
@@ -27,6 +29,7 @@ fi
 
 DATACRUMBS_COMPOSABLE_NAME="${DATACRUMBS_COMPOSE_RUN_COMPOSITE_NAME:-}"
 APP_CMD=("${DATACRUMBS_COMPOSE_RUN_APP}")
+PROG_NAME=$(basename "$0")
 
 if [[ -z "$DATACRUMBS_COMPOSABLE_NAME" ]]; then
     echo "Error: COMPOSITE_NAME argument is required."
@@ -34,7 +37,7 @@ if [[ -z "$DATACRUMBS_COMPOSABLE_NAME" ]]; then
     exit 1
 fi
 
-if [[ ${APP_CMD} -eq 0 ]]; then
+if [[ -z "${DATACRUMBS_COMPOSE_RUN_APP}" ]]; then
     echo "Error: APP command is required."
     show_help
     exit 1
@@ -46,18 +49,21 @@ read -ra APP_CMD <<< "${DATACRUMBS_COMPOSE_RUN_APP}"
 # Load environment
 source "$SCRIPT_DIR/datacrumbs_setup"
 
+check_regular_user
+
 log "Running cmd: ${APP_CMD[*]} as USER = $DATACRUMBS_USER using composable $DATACRUMBS_COMPOSABLE_NAME"
 
 if [[ -z "$DRY_RUN" ]]; then
-    datacrumbs_init "$DATACRUMBS_USER" "$DATACRUMBS_LOG_PATH"
+    datacrumbs_init "$DATACRUMBS_USER" "$DATACRUMBS_TRACE_DIR"
 fi
 
 RUNID=$(date +"%Y%m%d_%H%M%S")
-exec="${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME}"
+exec=("${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_compose_wrapper" "${DATACRUMBS_COMPOSABLE_NAME}")
 DATACRUMBS_LOG_FILE=$PWD/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
+READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
 
-debug "Starting datacrumbs server with exec: $exec"
-datacrumbs_start_server "$exec" "$DRY_RUN"
+debug "Starting datacrumbs server with exec: ${exec[*]}"
+datacrumbs_start_server "${exec[*]}"
 
 if [[ "$DRY_RUN" == "1" ]]; then
     log "[DRY_RUN] Would run App: ${APP_CMD[*]}"
@@ -67,9 +73,8 @@ else
     log "Finished App: ${APP_CMD[*]}"
 fi
 
-debug "Stopping datacrumbs server with exec: $exec"
-datacrumbs_stop_server "$exec" "$DRY_RUN"
-
+debug "Stopping datacrumbs server with exec: ${exec[*]}"
+datacrumbs_stop_server "${exec[*]}" $PROG_NAME
 if [[ "$DRY_RUN" == "1" ]]; then
     debug "[DRY_RUN] Would print datacrumbs status"
     debug "[DRY_RUN] Would finalize datacrumbs for user: $DATACRUMBS_USER"

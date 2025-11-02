@@ -15,10 +15,8 @@ debug() {
 }
 
 error() {
-  if [ "${QUIET:-1}" != "" ] && [ "${QUIET:-1}" -eq 0 ]; then
-    printf "[ERROR $(date '+%Y-%m-%d %H:%M:%S')] $@" >&2
-    printf "\n" >&2
-  fi
+  printf "[ERROR $(date '+%Y-%m-%d %H:%M:%S')] $@" >&2
+  printf "\n" >&2
 }
 
 warn() {
