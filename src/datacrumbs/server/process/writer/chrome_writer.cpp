@@ -1,6 +1,12 @@
-
-
 #include <datacrumbs/server/process/writer/chrome_writer.h>
+// internal headers
+#include <datacrumbs/common/configuration_manager.h>
+#include <datacrumbs/common/constants.h>
+#include <datacrumbs/common/logging.h>
+#include <datacrumbs/common/singleton.h>
+#include <datacrumbs/common/typedefs.h>
+#include <datacrumbs/server/bpf/shared.h>
+#include <datacrumbs/server/process/compress/zlib_compressor.h>
 
 // Specialization of the Singleton instance for KSymCapture.
 // This holds the shared pointer to the singleton instance.

@@ -2,13 +2,7 @@
 // Generated Headers
 #include <datacrumbs/datacrumbs_config.h>
 // Other headers
-#include <datacrumbs/common/configuration_manager.h>
-#include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/data_structures.h>
-#include <datacrumbs/common/logging.h>
-#include <datacrumbs/common/singleton.h>
-#include <datacrumbs/common/typedefs.h>
-#include <datacrumbs/server/bpf/shared.h>
 #include <datacrumbs/server/process/compress/zlib_compressor.h>
 // std headers
 #include <pwd.h>
@@ -27,24 +21,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-/*
-Example usage:
-
-#include "chrome_writer.h"
-
-int main() {
-        ChromeWriter writer("trace.json");
-
-        generic_event_t evt = {"my_event", "category", 'B', 123456, 1, 2};
-        writer.push_event(evt, "foo", 42, "bar", 3.14, "desc", "hello");
-
-        // ... do more work ...
-
-        // Writer will flush and close on destruction
-        return 0;
-}
-*/
 
 namespace datacrumbs {
 
