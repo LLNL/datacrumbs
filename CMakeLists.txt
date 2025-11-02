@@ -86,7 +86,7 @@ set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval 
 # Other options
 set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPER_PROJECT_NAME}")
 set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEBUG TRACE)
-set(DATACRUMBS_KERNEL_PATH "" CACHE STRING "Path to the kernel source directory")
+set(DATACRUMBS_KERNEL_VERSION "" CACHE STRING "Kernel version")
 set(DATACRUMBS_KERNEL_HEADERS_PATH "" CACHE STRING "Path to the kernel headers directory")
 
 # ------------------------------------------------------------------------------
@@ -131,8 +131,9 @@ message(STATUS "             - Kernel Version: ${KERNEL_VERSION_MAJOR}.${KERNEL_
 message(STATUS "             - DATACRUMBS_BUILD_ONLY: ${DATACRUMBS_BUILD_ONLY}")
 message(STATUS "             - DATACRUMBS_INSTALL_USER: ${DATACRUMBS_INSTALL_USER}")
 message(STATUS "             - DATACRUMBS_USER: ${DATACRUMBS_USER}")
-message(STATUS "             - DATACRUMBS_UNAME_R: ${DATACRUMBS_UNAME_R}")
+message(STATUS "             - DATACRUMBS_KERNEL_VERSION: ${DATACRUMBS_KERNEL_VERSION}")
 message(STATUS "             - Found kernel headers at: ${DATACRUMBS_KERNEL_HEADERS_PATH}")
+message(STATUS "             - DATACRUMBS_KERNEL_UNAME_R: ${DATACRUMBS_KERNEL_UNAME_R}")
 
 # ------------------------------------------------------------------------------
 # Configure output files for build
