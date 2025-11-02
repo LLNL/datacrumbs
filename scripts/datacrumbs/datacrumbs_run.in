@@ -12,29 +12,50 @@ fi
 source "$SCRIPT_DIR/datacrumbs_args"
 
 dc_args_init "DATACRUMBS"
+dc_args_add_option "DATACRUMBS" "app" "MANDATORY" "App command" "string"
 dc_args_parse "DATACRUMBS" "datacrumbs_run" "$@"
+
+if [[ $? -ne 0 ]]; then
+    echo "Error: Argument parsing failed."
+    show_help
+    exit 1
+fi
+
+if [[ -z "${DATACRUMBS_APP}" ]]; then
+    echo "Error: APP command is required."
+    show_help
+    exit 1
+fi
+
+# Convert APP_CMD string into array, splitting on spaces
+read -ra APP_CMD <<< "${DATACRUMBS_COMPOSE_RUN_APP}"
+
+PROG_NAME=$(basename "$0")
 
 source $SCRIPT_DIR/datacrumbs_setup
 
-echo "Running cmd: $@ as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_LOG_PATH and log file $DATACRUMBS_LOG_FILE"
+check_regular_user
 
-datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_LOG_PATH
+echo "Running cmd: ${APP_CMD[*]} as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_TRACE_DIR and log file $DATACRUMBS_LOG_FILE"
+
+datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_TRACE_DIR
 
 RUNID=$(date +"%Y%m%d_%H%M%S")
 DATACRUMBS_LOG_FILE=$PWD/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
+READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
 datacrumbs_start_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs
 
-log "Running App: $@"
-log  "$@"
+log "Running App: ${APP_CMD[*]}"
+log  "${APP_CMD[*]}"
 if [[ "$DRY_RUN" == "1" ]]; then
-    log "[DRY RUN] $@"
+    log "[DRY RUN] ${APP_CMD[*]}"
 else
-    "$@"
+    "${APP_CMD[@]}"
 fi
-log "Finished App: $@"
+log "Finished App"
 
-datacrumbs_stop_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs
+datacrumbs_stop_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs $PROG_NAME
 
 datacrumbs_print_status
 
-datacrumbs_finalize $DATACRUMBS_USER $DATACRUMBS_LOG_PATH
+datacrumbs_finalize $DATACRUMBS_USER $DATACRUMBS_TRACE_DIR

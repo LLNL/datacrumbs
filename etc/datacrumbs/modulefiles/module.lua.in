@@ -47,7 +47,7 @@ end
 
 family("datacrumbs")
 execute{
-  cmd   = "source @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_setup " .. user,
+  cmd   = "source @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_setup",
   modeA = {"load"},
   mode  = "silent",
 }

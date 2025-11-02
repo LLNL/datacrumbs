@@ -4,6 +4,8 @@ SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
 source $SCRIPT_DIR/datacrumbs_setup
 
+check_root_user
+
 log "Running datacrumbs_validator..."
 
 sudo @CMAKE_RUNTIME_OUTPUT_DIRECTORY@/datacrumbs_validator "@DATACRUMBS_HOST@" "--user" "@DATACRUMBS_INSTALL_USER@" "--config_path" "@CMAKE_CONFIG_OUTPUT_DIRECTORY@" "--data_dir" "@CMAKE_DATA_OUTPUT_DIRECTORY@" "--trace_log_dir" $PWD
