@@ -124,17 +124,9 @@ add_dependencies(datacrumbs_bpf_skel datacrumbs_bpf)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
-set(DATACRUMBS_COMPOSABLE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/writer/chrome_writer.cpp
-                               ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/composable/process/server.cpp)
-set(DATACRUMBS_COMMON_SRC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/datacrumbs/common/configuration_manager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/datacrumbs/common/data_structures.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/datacrumbs/common/enumerations.h
-)
-add_executable(@PROJECT_NAME@_${DATACRUMBS_NAME} ${DATACRUMBS_COMPOSABLE_SRC}  ${BPF_SKEL_OUTPUT} ${DATACRUMBS_COMMON_SRC})
-target_link_libraries(@PROJECT_NAME@_${DATACRUMBS_NAME} ${DEPENDENCY_LIB})
+set(DATACRUMBS_COMPOSABLE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/composable/process/server.cpp)
+add_executable(@PROJECT_NAME@_${DATACRUMBS_NAME} ${DATACRUMBS_COMPOSABLE_SRC}  ${BPF_SKEL_OUTPUT})
+target_link_libraries(@PROJECT_NAME@_${DATACRUMBS_NAME} ${DEPENDENCY_LIB} @DATACRUMBS_INSTALL_LIB_DIR@/libdatacrumbs_obj.so)
 add_dependencies(@PROJECT_NAME@_${DATACRUMBS_NAME} datacrumbs_bpf_skel)
 # Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
 install(TARGETS @PROJECT_NAME@_${DATACRUMBS_NAME}

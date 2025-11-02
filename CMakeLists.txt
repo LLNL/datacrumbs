@@ -189,7 +189,6 @@ include_dependencies()
 set(DATACRUMBS_COMMON_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/data_structures.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/enumerations.h
 )
@@ -394,18 +393,28 @@ add_custom_command(
 add_custom_target(datacrumbs_bpf_skel ALL DEPENDS ${BPF_SKEL_OUTPUT})
 add_dependencies(datacrumbs_bpf_skel datacrumbs_bpf)
 
-# Processing Executable
-set(DATACRUMBS_PROCESS_EVENTS_COMMON_SRC
+# Build object file with everything except server.cpp
+set(DATACRUMBS_PROCESS_EVENTS_OBJ_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/writer/chrome_writer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/event_processor.cpp
+    ${DATACRUMBS_COMMON_SRC}
+)
+set(DATACRUMBS_SERVER_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/server.cpp
 )
-set(DATACRUMBS_PROCESS_EVENTS_SRC ${DATACRUMBS_PROCESS_EVENTS_COMMON_SRC}
-    ${BPF_SKEL_OUTPUT}
-)
+
 include_directories(${CMAKE_INCLUDE_OUTPUT_DIRECTORY})
-add_executable(${PROJECT_NAME} ${DATACRUMBS_PROCESS_EVENTS_SRC} ${DATACRUMBS_COMMON_SRC})
-target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB})
-add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel)
+
+add_library(datacrumbs_obj SHARED ${DATACRUMBS_PROCESS_EVENTS_OBJ_SRC})
+install(TARGETS datacrumbs_obj
+    LIBRARY DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
+)
+add_dependencies(datacrumbs_obj datacrumbs_bpf_skel)
+
+# Build the final executable by linking server.cpp and the object library
+add_executable(${PROJECT_NAME} ${DATACRUMBS_SERVER_SRC})
+target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB} datacrumbs_obj)
+add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel datacrumbs_obj)
 
 # Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
 install(TARGETS ${PROJECT_NAME}
@@ -524,25 +533,19 @@ install(FILES "${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/server/process/generated_proces
 set(DATACRUMBS_PUBLIC_HEADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/event_processor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/writer/chrome_writer.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/processing/usdt_event.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/processing/general_event.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/compress/zlib_compressor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/data_structures.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/enumerations.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/constants.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/logging.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/typedefs.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/singleton.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/utils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/constants.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/typedefs.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/shared.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/compat/map.h
 )
 set(DATACRUMBS_PUBLIC_SRC_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/writer/chrome_writer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/event_processor.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/process/server.impl.cpp
 )
 
 datacrumbs_composable_install_headers("${DATACRUMBS_PUBLIC_HEADER_FILES}")

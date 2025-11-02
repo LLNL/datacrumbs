@@ -109,6 +109,7 @@ macro(include_dependencies)
         message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] zlib is needed for ${PROJECT_NAME} build")
     endif()
 
+    list(APPEND DEPENDENCY_LIBRARY_DIRS ${DATACRUMBS_INSTALL_LIB_DIR})
     list(REMOVE_DUPLICATES DEPENDENCY_LIBRARY_DIRS)
 
     # print found packages
