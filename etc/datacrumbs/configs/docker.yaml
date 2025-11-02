@@ -24,8 +24,8 @@ capture_probes:
   - name: os_page_cache
     probe: kprobe
     type: header
-    file: /usr/src/kernels/@DATACRUMBS_UNAME_R@/include/linux/pagemap.h
+    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/pagemap.h
   - name: shm
     probe: kprobe
     type: header
-    file: /usr/src/kernels/@DATACRUMBS_UNAME_R@/include/linux/shmem_fs.h
+    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/shmem_fs.h
