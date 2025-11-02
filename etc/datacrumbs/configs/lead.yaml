@@ -10,7 +10,7 @@ capture_probes:
   - name: sys
     probe: syscalls
     type: header
-    file: /usr/src/kernels/@DATACRUMBS_UNAME_R@/include/linux/syscalls.h
+    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/syscalls.h
     regex: sys_.*
   - name: libc
     probe: uprobe
@@ -29,15 +29,15 @@ capture_probes:
   - name: os_page_cache
     probe: kprobe
     type: header
-    file: /usr/src/kernels/@DATACRUMBS_UNAME_R@/include/linux/pagemap.h
+    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/pagemap.h
   - name: shm
     probe: kprobe
     type: header
-    file: /usr/src/kernels/@DATACRUMBS_UNAME_R@/include/linux/shmem_fs.h
+    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/shmem_fs.h
   - name: fscache
     probe: kprobe
     type: header
-    file: /usr/src/kernels/@DATACRUMBS_UNAME_R@/include/linux/fscache.h
+    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/fscache.h
   - name: xfs
     probe: kprobe
     type: ksym

@@ -1,7 +1,0 @@
-#! /usr/bin/env bash
-
-SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
-
-source $SCRIPT_DIR/datacrumbs_setup
-
-@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs "run" "$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_INSTALL_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" $PWD

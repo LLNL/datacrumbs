@@ -17,15 +17,7 @@ capture_probes:
     type: usdt
     binary_path: /lib64/libpython3.6m.so.1.0
     provider: python
-  - name: iomap
-    probe: kprobe
-    type: ksym
-    regex: ^iomap(?!.*cold).*
   - name: os_page_cache
     probe: kprobe
     type: header
-    file: /usr/src/kernels/@DATACRUMBS_UNAME_R@/include/linux/pagemap.h
-  - name: shm
-    probe: kprobe
-    type: header
-    file: /usr/src/kernels/@DATACRUMBS_UNAME_R@/include/linux/shmem_fs.h
+    file: @DATACRUMBS_KERNEL_HEADERS_PATH@/include/linux/pagemap.h
