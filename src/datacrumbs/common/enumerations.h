@@ -19,6 +19,19 @@ enum class ExecutableType : uint8_t {
 
 enum class ExecutableMode : uint8_t { RUN = 0, START = 1, STOP = 2 };
 
+static std::string to_string(ExecutableMode mode) {
+  switch (mode) {
+    case ExecutableMode::RUN:
+      return "run";
+    case ExecutableMode::START:
+      return "start";
+    case ExecutableMode::STOP:
+      return "stop";
+    default:
+      return "unknown";
+  }
+}
+
 // Enum for different operating modes
 enum class Mode : uint8_t {
   PROFILER = 0,

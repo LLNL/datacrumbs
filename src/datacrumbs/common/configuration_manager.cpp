@@ -150,6 +150,17 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
   } else {
     DC_LOG_WARN("[ConfigurationManager] Failed to get current ulimit -l.");
   }
+  // Set ulimit -c (core file size) to its hard limit
+  if (getrlimit(RLIMIT_CORE, &rl) == 0) {
+    rl.rlim_cur = rl.rlim_max;  // Set soft limit to hard limit
+    if (setrlimit(RLIMIT_CORE, &rl) != 0) {
+      DC_LOG_WARN("[ConfigurationManager] Failed to set ulimit -c to hard limit.");
+    } else {
+      DC_LOG_DEBUG("[ConfigurationManager] Set ulimit -c to hard limit: %lu", rl.rlim_max);
+    }
+  } else {
+    DC_LOG_WARN("[ConfigurationManager] Failed to get current ulimit -c.");
+  }
   DC_LOG_TRACE("[ConfigurationManager] Initializing with arguments...");
   ArgumentParser parser(argc, argv, exe_type);
   this->name = parser.config_name;
