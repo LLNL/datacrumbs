@@ -28,7 +28,7 @@ if [[ -z "${DATACRUMBS_APP}" ]]; then
 fi
 
 # Convert APP_CMD string into array, splitting on spaces
-read -ra APP_CMD <<< "${DATACRUMBS_COMPOSE_RUN_APP}"
+read -ra APP_CMD <<< "${DATACRUMBS_APP}"
 
 PROG_NAME=$(basename "$0")
 
