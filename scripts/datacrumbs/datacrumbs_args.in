@@ -277,7 +277,7 @@ dc_args_usage() {
 
 dc_args_show_help() {
     local prefix="$1" prog="$2"
-    [[ -z "$prefix" ]] && { log "dc_args_show_help: missing prefix"; return 64; }
+    [[ -z "$prefix" ]] && { log "dc_args_show_help: missing prefix"; exit 1; }
     [[ -z "$prog" ]] && prog="$0"
     dc_args_usage "$prefix" "$prog"
 }
@@ -443,28 +443,28 @@ dc_args_pretty_print() {
     local prefix="$1" prog="$2"; [[ -z "$prefix" ]] && { error "dc_args_pretty_print: missing prefix"; return 64; }
     [[ -z "$prog" ]] && prog="$0"
     dc__bind_spec "$prefix"
-    log "$prog arguments:"; log ""
+    debug "$prog arguments:"; debug ""
     local i max=0; for ((i=0; i<${#N[@]}; ++i)); do (( ${#N[i]}>max )) && max=${#N[i]}; done
     local print_group
     print_group() {
         local want="$1" header="$2" any=0
         for ((i=0; i<${#N[@]}; ++i)); do
             if [[ "${R[i]}" == "$want" ]]; then
-                (( any==0 )) && { log "$header"; any=1; }
+                (( any==0 )) && { debug "$header"; any=1; }
                 local var val; var="${V[i]}"; val="${!var}"
                 if [[ "${T[i]}" == "bool" ]]; then
                     if [[ "$val" == "1" ]]; then val="true"; else val="false"; fi
-                    log "  --%-*s : %s" "$max" "${N[i]}" "$val"
+                    debug "  --%-*s : %s" "$max" "${N[i]}" "$val"
                 else
-                    if [[ -z "$val" ]]; then log "  --%-*s : %s" "$max" "${N[i]}" "";
-                    else local qv; printf -v qv "%q" "$val"; log "  --%-*s : %s" "$max" "${N[i]}" "$qv"; fi
+                    if [[ -z "$val" ]]; then debug "  --%-*s : %s" "$max" "${N[i]}" "";
+                    else local qv; debug -v qv "%q" "$val"; debug "  --%-*s : %s" "$max" "${N[i]}" "$qv"; fi
                 fi
             fi
-        done; (( any==1 )) && log ""
+        done; (( any==1 )) && debug ""
     }
     print_group "MANDATORY" "Mandatory options:"; print_group "OPTIONAL"  "Optional options:"
     local argsvar; argsvar="$(echo -n "${prefix}_ARGS" | dc__upper)"; local -n __dc_args_ref="$argsvar"
-    if (( ${#__dc_args_ref[@]} > 0 )); then log "Positional arguments:"; for ((i=0; i<${#__dc_args_ref[@]}; ++i)); do local q; printf -v q "%q" "${__dc_args_ref[i]}"; log "  [%d] %s" "$i" "$q"; done; log ""; fi
+    if (( ${#__dc_args_ref[@]} > 0 )); then debug "Positional arguments:"; for ((i=0; i<${#__dc_args_ref[@]}; ++i)); do local q; debug -v q "%q" "${__dc_args_ref[i]}"; debug "  [%d] %s" "$i" "$q"; done; debug ""; fi
 }
 
 # Example:

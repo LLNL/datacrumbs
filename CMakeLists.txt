@@ -667,13 +667,37 @@ install(
     PROGRAMS
     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_compose
     DESTINATION
-    ${DATACRUMBS_INSTALL_BINARYDIR}
+    ${DATACRUMBS_INSTALL_SBINARYDIR}
 )
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_compose_run.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_compose_run @ONLY)
 install(
     PROGRAMS
     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_compose_run
+    DESTINATION
+    ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_stop.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_stop @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_stop
+    DESTINATION
+    ${DATACRUMBS_INSTALL_SBINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_compose_wrapper.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_compose_wrapper @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_compose_wrapper
+    DESTINATION
+    ${DATACRUMBS_INSTALL_SBINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_create_log_dir.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_create_log_dir @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_create_log_dir
     DESTINATION
     ${DATACRUMBS_INSTALL_BINARYDIR}
 )
