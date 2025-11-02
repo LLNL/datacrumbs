@@ -1,5 +1,15 @@
 #! /usr/bin/env bash
 
+SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
+
+# Load logging script
+if [[ -f "$SCRIPT_DIR/datacrumbs_logging" ]]; then
+    source "$SCRIPT_DIR/datacrumbs_logging"
+else
+    echo "Error: datacrumbs_logging not found in $SCRIPT_DIR"
+    exit 1
+fi
+
 function datacrumbs_parse_yaml {
     local prefix=$2
     local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @ | tr @ '\034')
@@ -12,20 +22,43 @@ function datacrumbs_parse_yaml {
     if (length($3) > 0) {
        vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
        printf("export %s%s%s=\"%s\";", "'$prefix'",vn, toupper($2), $3);
+       printf("readonly %s%s%s;", "'$prefix'",vn, toupper($2));
     }
   }'
 }
 
+function datacrumbs_run_command() {
+  local err_msg="$1"
+  shift
+  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+    log "[DRY RUN] Would run: $*"
+    return 0
+  fi
+  "$@"
+  local status=$?
+  if [ $status -ne 0 ]; then
+    log "Error: $err_msg"
+    exit $status
+  fi
+}
+
+# Usage example:
+# datacrumbs_run_command "Failed to list directory" ls /nonexistent/path
+
 function datacrumbs_finalize() {
-  DATA_USER=$1
-  DATACRUMBS_LOG_PATH=$2
+  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+    log "[DRY RUN] Would finalize for user: $DATACRUMBS_USER, log path: $DATACRUMBS_LOG_PATH"
+    return 0
+  fi
 }
 
 function datacrumbs_init() {
-  DATA_USER=$1
-  DATACRUMBS_LOG_PATH=$2
+  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+    log "[DRY RUN] Would create log directory: ${DATACRUMBS_LOG_PATH}"
+    return 0
+  fi
 
-  sudo -u ${DATA_INSTALL_USER} mkdir -p ${DATACRUMBS_LOG_PATH}
+  datacrumbs_run_command "Failed to create log directory ${DATACRUMBS_LOG_PATH}" mkdir -p "${DATACRUMBS_LOG_PATH}"
   
 }
 
@@ -33,13 +66,19 @@ function datacrumbs_start_server() {
   exec=$1
   common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_LOG_PATH" --run_id "$RUNID")
   cmd=("$exec" "run" "${common_cmd[@]}")
-  log "Starting Server: ${cmd[@]}"
-  sudo "${cmd[@]}" > $DATACRUMBS_LOG_FILE 2>&1 &
-
   READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
   TIMEOUT=600  # 10 minutes in seconds
   WAIT_INTERVAL=2
   ELAPSED=0
+
+  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+    log "[DRY RUN] Would start server: ${cmd[@]}"
+    log "[DRY RUN] Would wait for ready file: $READY_FILE (timeout: $TIMEOUT seconds)"
+    return 0
+  fi
+
+  log "Starting Server: ${cmd[@]}"
+  sudo "${cmd[@]}" > $DATACRUMBS_LOG_FILE 2>&1 &
 
   while [ ! -f "$READY_FILE" ]; do
       sleep $WAIT_INTERVAL
@@ -47,7 +86,10 @@ function datacrumbs_start_server() {
       ELAPSED=$((ELAPSED + WAIT_INTERVAL))
       if [ $ELAPSED -ge $TIMEOUT ]; then
           log "Timeout waiting for $READY_FILE"
-          sudo kill -9 $SERVER_PID
+          SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | awk '{print $2}')
+          if [ -n "$SERVER_PID" ]; then
+              sudo kill -9 $SERVER_PID
+          fi
           exit 1
       fi
   done
@@ -58,9 +100,15 @@ function datacrumbs_start_server() {
 function datacrumbs_stop_server() {
   exec=$1
   cmd=("$exec" "stop" "${common_cmd[@]}")
+  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+    log "[DRY RUN] Would stop server: ${cmd[@]}"
+    log "[DRY RUN] Would find and kill process(es) with RUNID ${RUNID}"
+    log "[DRY RUN] Would remove ready file: $READY_FILE"
+    return 0
+  fi
+
   log "Stopping Server: ${cmd[@]}"
   sudo "${cmd[@]}" >> $DATACRUMBS_LOG_FILE 2>&1
-
 
   SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | awk '{print $2}')
   if [ -n "$SERVER_PID" ]; then
@@ -73,6 +121,12 @@ function datacrumbs_stop_server() {
 
 function datacrumbs_print_status() {
   local status_file="/tmp/datacrumbs_${DATACRUMBS_USER}_status_${RUNID}.json"
+  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+    log "[DRY RUN] Would print status from: $status_file"
+    log "[DRY RUN] Would remove status file: $status_file"
+    return 0
+  fi
+
   if [ ! -f "$status_file" ]; then
     log "Status file not found: $status_file"
     return 1
@@ -89,15 +143,7 @@ function datacrumbs_print_status() {
   rm -f "$status_file"
 }
 
-log() {
-  echo "[INFO $(date '+%Y-%m-%d %H:%M:%S')] $@"
-}
 
-debug() {
-  if [ "${VERBOSE:-0}" -eq 1 ]; then
-    echo "[DEBUG $(date '+%Y-%m-%d %H:%M:%S')] $@"
-  fi
-}
 
 if command -v module &> /dev/null
 then

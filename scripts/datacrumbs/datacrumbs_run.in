@@ -2,30 +2,35 @@
 
 SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
-export DATACRUMBS_USER=$1
-
-if [ -z "$DATACRUMBS_USER" ]; then
-    echo "Error: DATACRUMBS_USER is not set. Please provide a user as the first argument."
+# Check if datacrumbs_args exists in scripts directory
+if [[ ! -f "$SCRIPT_DIR/datacrumbs_args" ]]; then
+    echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
     exit 1
 fi
 
-source $SCRIPT_DIR/datacrumbs_setup $DATACRUMBS_USER
+# Source argument parser
+source "$SCRIPT_DIR/datacrumbs_args"
 
+dc_args_init "DATACRUMBS"
+dc_args_parse "DATACRUMBS" "datacrumbs_run" "$@"
 
-shift
-
+source $SCRIPT_DIR/datacrumbs_setup
 
 echo "Running cmd: $@ as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_LOG_PATH and log file $DATACRUMBS_LOG_FILE"
 
 datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_LOG_PATH
+
 RUNID=$(date +"%Y%m%d_%H%M%S")
 DATACRUMBS_LOG_FILE=$PWD/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
-
 datacrumbs_start_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs
 
 log "Running App: $@"
 log  "$@"
-"$@"
+if [[ "$DRY_RUN" == "1" ]]; then
+    log "[DRY RUN] $@"
+else
+    "$@"
+fi
 log "Finished App: $@"
 
 datacrumbs_stop_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs
