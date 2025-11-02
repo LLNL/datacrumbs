@@ -13,6 +13,8 @@ RUN yum install -y \
     gcc \
     clang \
     llvm \
+    patchelf \
+    sudo \
     elfutils-libelf-devel \
     kernel-devel \
     kernel-headers \

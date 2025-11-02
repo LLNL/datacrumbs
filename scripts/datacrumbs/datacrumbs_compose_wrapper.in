@@ -1,0 +1,13 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
+
+# Load environment
+source "$SCRIPT_DIR/datacrumbs_setup"
+
+check_root_user
+
+DATACRUMBS_COMPOSABLE_NAME=$1
+shift
+
+${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME} $@

@@ -689,6 +689,11 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
   std::ofstream ofs_ready(ready_file);
   ofs_ready << "ready" << std::endl;
   ofs_ready.close();
+  auto pwd = getpwnam(config_manager->user.c_str());
+  uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+  gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+  chown(ready_file.c_str(), uid, gid);
+  chmod(ready_file.c_str(), 0660);
   DC_LOG_PRINT("Server running on %d. Ready to run the code.", getpid());
 
   unsigned int batch_size = 1024;
@@ -898,9 +903,9 @@ int main_process(int argc, char** argv, datacrumbs::EventProcessor* event_proces
     DC_LOG_ERROR("Failed to write status file: %s", status_file.c_str());
   }
   json_object_put(status_json);
-  auto pwd = getpwnam(config_manager->user.c_str());
-  uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
-  gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+  pwd = getpwnam(config_manager->user.c_str());
+  uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+  gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
   chown(status_file.c_str(), uid, gid);
   chmod(status_file.c_str(), 0660);
 

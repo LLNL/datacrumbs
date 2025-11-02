@@ -12,6 +12,7 @@
 /**
  * std headers
  */
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -128,6 +129,27 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       capture_probes(),
       user("datacrumbs"),
       run_id("0") {
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
+    rl.rlim_cur = rl.rlim_max;  // Set soft limit to hard limit
+    if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
+      DC_LOG_WARN("[ConfigurationManager] Failed to set ulimit -n to hard limit.");
+    } else {
+      DC_LOG_DEBUG("[ConfigurationManager] Set ulimit -n to hard limit: %lu", rl.rlim_max);
+    }
+  } else {
+    DC_LOG_WARN("[ConfigurationManager] Failed to get current ulimit -n.");
+  }
+  if (getrlimit(RLIMIT_MEMLOCK, &rl) == 0) {
+    rl.rlim_cur = rl.rlim_max;  // Set soft limit to hard limit
+    if (setrlimit(RLIMIT_MEMLOCK, &rl) != 0) {
+      DC_LOG_WARN("[ConfigurationManager] Failed to set ulimit -l to hard limit.");
+    } else {
+      DC_LOG_DEBUG("[ConfigurationManager] Set ulimit -l to hard limit: %lu", rl.rlim_max);
+    }
+  } else {
+    DC_LOG_WARN("[ConfigurationManager] Failed to get current ulimit -l.");
+  }
   DC_LOG_TRACE("[ConfigurationManager] Initializing with arguments...");
   ArgumentParser parser(argc, argv, exe_type);
   this->name = parser.config_name;

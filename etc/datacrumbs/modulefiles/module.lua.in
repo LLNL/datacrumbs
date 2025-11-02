@@ -18,46 +18,36 @@ help([[
 -- %CMAKE_INSTALL_PREFIX%
 local prefix = "@CMAKE_INSTALL_PREFIX@"
 local user = os.getenv("DATACRUMBS_USER") or os.getenv("USER") or "@DATACRUMBS_INSTALL_USER@"
-local userbin = prefix .. "/@CMAKE_INSTALL_LIBEXEC_DIR@/@CMAKE_INSTALL_SBINDIR@/" .. user
 
 -- Define @PROJECT_NAME@ directories
-local bin_dir = pathJoin(prefix, @CMAKE_INSTALL_BINDIR@)
-local sbin_dir = pathJoin(prefix, @CMAKE_INSTALL_SBINDIR@)
-local etc_dir = pathJoin(prefix, @CMAKE_INSTALL_SYSCONFDIR@)
+local bin_dir = pathJoin(prefix, "@CMAKE_INSTALL_BINDIR@")
+local sbin_dir = pathJoin(prefix, "@CMAKE_INSTALL_SBINDIR@")
+local etc_dir = pathJoin(prefix, "@CMAKE_INSTALL_SYSCONFDIR@")
+local userbin = prefix .. "/@CMAKE_INSTALL_LIBEXEC_DIR@/@CMAKE_INSTALL_SBINDIR@/" .. user
+local libexec_dir = pathJoin(prefix, userbin)
+local lib_dir = pathJoin(prefix, "@DATACRUMBS_INSTALL_LIB_DIR@")
 
 
 -- Add @PROJECT_NAME@ directories to PATH, LD_LIBRARY_PATH, CPATH, C_INCLUDE_PATH, ETCPATH, and MANPATH
 prepend_path("PATH", bin_dir)
 prepend_path("PATH", sbin_dir)
-prepend_path("PATH", userbin)
+prepend_path("PATH", libexec_dir)
+prepend_path("LD_LIBRARY_PATH", lib_dir)
 prepend_path("ETCPATH", etc_dir)
 
 -- Set additional flags
 -- local datacrumbs_flags = string.format("-L %s/lib -I %s/include ", prefix, prefix)
 
 
-local log_dirs_dir = "@DATACRUMBS_CONFIGURED_LOG_DIR@" or "."
-
-local logdir =  os.getenv("DATACRUMBS_LOG_PATH") or string.format("%s/%s/%s/%s",
-log_dirs_dir,
-os.date("%Y"),
-os.date("%m"),
-os.date("%d")
-)
-  
-
-setenv("DATACRUMBS_LOG_PATH", logdir)
-
 -- Inform user
 if mode() == "load" then
-    LmodMessage("@PROJECT_NAME@ loaded; using log directory: " .. logdir)
 elseif mode() == "unload" then
     LmodMessage("@PROJECT_NAME@ unloaded.")
 end
 
 family("datacrumbs")
 execute{
-  cmd   = "source @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_setup " .. user,
+  cmd   = "source @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/datacrumbs_setup",
   modeA = {"load"},
   mode  = "silent",
 }
