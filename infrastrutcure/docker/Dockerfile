@@ -2,6 +2,19 @@ FROM hdevarajan92/datacrumbs:latest
 
 RUN mkdir -p /opt/datacrumbs
 COPY . /opt/datacrumbs/
+
+# Create a non-root user 'docker' with passwordless sudo access and install tools
+RUN (dnf -y install epel-release || yum -y install epel-release) && \
+    (dnf -y install sudo || yum -y install sudo) && \
+    (dnf -y install patchelf || yum -y install patchelf) && \
+    (dnf -y install openmpi-devel || yum -y install openmpi-devel) && \
+    (dnf clean all || yum clean all) && \
+    groupadd -f wheel && \
+    useradd -m -s /bin/bash docker && \
+    usermod -aG wheel docker && \
+    echo 'docker ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/docker && \
+    chmod 0440 /etc/sudoers.d/docker
+
 RUN . /opt/rh/gcc-toolset-11/enable && \
     mkdir -p datacrumbs-build && \
     rm -rf datacrumbs-build/* && \
@@ -10,24 +23,14 @@ RUN . /opt/rh/gcc-toolset-11/enable && \
           -DDATACRUMBS_USER=root \
           -DDATACRUMBS_INSTALL_USER=docker \
           -DDATACRUMBS_KERNEL_HEADERS_PATH=/usr/src/kernels/4.18.0-348.7.1.el8_5.x86_64 \
+          -DCMAKE_PREFIX_PATH=/usr/lib64/openmpi \
           -DCMAKE_INSTALL_PREFIX=/opt/datacrumbs-install \
           /opt/datacrumbs/ && \
     make -j $(nproc) && \
     make install
 
-ENV PATH=/opt/datacrumbs/datacrumbs-build/bin:${PATH}
-ENV LD_LIBRARY_PATH="/opt/datacrumbs/datacrumbs-build/lib:${LD_LIBRARY_PATH}":${LD_LIBRARY_PATH}
-
-# Create a non-root user 'docker' with passwordless sudo access and install tools
-RUN (dnf -y install epel-release || yum -y install epel-release) && \
-    (dnf -y install sudo || yum -y install sudo) && \
-    (dnf -y install patchelf || yum -y install patchelf) && \
-    (dnf clean all || yum clean all) && \
-    groupadd -f wheel && \
-    useradd -m -s /bin/bash docker && \
-    usermod -aG wheel docker && \
-    echo 'docker ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/docker && \
-    chmod 0440 /etc/sudoers.d/docker
+ENV PATH=/usr/lib64/openmpi/bin:/opt/datacrumbs/datacrumbs-build/bin:${PATH}
+ENV LD_LIBRARY_PATH=/usr/lib64/openmpi/lib:/opt/datacrumbs/datacrumbs-build/lib:${LD_LIBRARY_PATH}
 
 # Ensure docker user can access relevant directories under /opt
 RUN mkdir -p /opt/datacrumbs /opt/datacrumbs-install && \

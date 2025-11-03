@@ -4,7 +4,7 @@
 #include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/data_structures.h>
-#include <datacrumbs/common/logging.h>  // Logging header
+#include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/singleton.h>
 #include <datacrumbs/common/typedefs.h>
 #include <datacrumbs/common/utils.h>
@@ -14,10 +14,14 @@
 #include <datacrumbs/server/process/processing/general_event.h>
 #include <datacrumbs/server/process/processing/usdt_event.h>
 // Include generated
+#include <datacrumbs/datacrumbs_config.h>
 #include <datacrumbs/server/process/generated_process.h>
+// dependency headers
+#include <json-c/json.h>
+#include <mpi.h>
+
 // std headers
 #include <fcntl.h>
-#include <json-c/json.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -33,9 +37,6 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-
-#include "datacrumbs/common/logging.h"
-#include "datacrumbs/datacrumbs_config.h"
 
 #define GET_DATA_FUNCTION(INDEX)                                       \
   auto write_event = get_data_##INDEX(data, event_index.fetch_add(1)); \
@@ -149,7 +150,7 @@ int EventProcessor::handle_event(void* data, size_t data_sz) {
   DC_LOG_TRACE("handle_event: end");
   std::string progress_msg =
       "Processed events failed: " + std::to_string(failed_events) + " current:";
-  DC_LOG_PROGRESS_SINGLE(progress_msg.c_str(), event_index);
+  if (configManager_->mpi_rank == 0) DC_LOG_PROGRESS_SINGLE(progress_msg.c_str(), event_index);
   return 0;
 }
 int EventProcessor::update_filename(const char* filename, unsigned int hash) {
