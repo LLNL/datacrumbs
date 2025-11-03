@@ -321,7 +321,7 @@ foreach(_line ${_CAPTURE_PROBES_NAME_LINES})
     list(APPEND DATACRUMBS_CAPTURE_PROBES_LIST "${_probe_name}")
 endforeach()
 
-message(STATUS "[${UPPER_PROJECT_NAME}]  Capture probes: ${DATACRUMBS_CAPTURE_PROBES_LIST}")
+message(STATUS "[${UPPER_PROJECT_NAME}] Capture probes: ${DATACRUMBS_CAPTURE_PROBES_LIST}")
 
 list(APPEND DATACRUMBS_BPF_EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/common.c)
 list(APPEND DATACRUMBS_BPF_EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/init.bpf.c)

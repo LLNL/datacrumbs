@@ -84,7 +84,14 @@ class ConfigurationManager {
   // Derived configuration: current hostname
   std::string hostname;
 
-  std::string run_id;  // Unique run identifier
+  // Unique run identifier
+  std::string run_id;
+
+  // MPI rank of the current process
+  int mpi_rank{0};
+
+  // MPI size (total number of processes)
+  int mpi_size{1};
 
   /**
    * @brief Constructor that initializes the ConfigurationManager with command-line arguments.

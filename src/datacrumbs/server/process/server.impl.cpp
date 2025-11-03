@@ -1,9 +1,11 @@
+// Internal headers
+#include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/server/process/event_processor.h>
-
+// dependent headers
+#include <mpi.h>
+// std headers
 #include <algorithm>
 #include <string>
-
-#include "datacrumbs/common/enumerations.h"
 
 // Custom libbpf print function for debugging
 static int libbpf_print_fn(enum libbpf_print_level level, const char* format, va_list args) {
@@ -508,22 +510,29 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
     return 1;
   }
   double elapsed = timer.pauseTime();
-  DC_LOG_PRINT("Initialization of DataCrumbs elapsed time: %f seconds", elapsed);
+
+  if (event_processor->configManager_->mpi_rank == 0) {
+    DC_LOG_PRINT("Initialization of DataCrumbs elapsed time: %f seconds", elapsed);
+  }
 
   if (notify_parent) daemon_notify_parent();
   // Main event polling loop
   signal(SIGINT, sig_handler);
-  std::string ready_file = "/tmp/datacrumbs_" + event_processor->configManager_->user + "_" +
-                           event_processor->configManager_->run_id + ".ready";
-  std::ofstream ofs_ready(ready_file);
-  ofs_ready << "ready" << std::endl;
-  ofs_ready.close();
-  auto pwd = getpwnam(event_processor->configManager_->user.c_str());
-  uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
-  gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
-  chown(ready_file.c_str(), uid, gid);
-  chmod(ready_file.c_str(), 0660);
-  DC_LOG_PRINT("Server running on %d. Ready to run the code.", getpid());
+  if (event_processor->configManager_->mpi_rank == 0) {
+    std::string ready_file = "/tmp/datacrumbs_" + event_processor->configManager_->user + "_" +
+                             event_processor->configManager_->run_id + ".ready";
+    std::ofstream ofs_ready(ready_file);
+    ofs_ready << "ready" << std::endl;
+    ofs_ready.close();
+    auto pwd = getpwnam(event_processor->configManager_->user.c_str());
+    uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+    gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+    chown(ready_file.c_str(), uid, gid);
+    chmod(ready_file.c_str(), 0660);
+    DC_LOG_PRINT("Server running on %d nodes. Ready to run the code.",
+                 event_processor->configManager_->mpi_size);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
 
   unsigned int batch_size = 1024;
 #if defined(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG) && (DATACRUMBS_BPFTIME_COMPATIBLE_FLAG == 0)
@@ -676,13 +685,15 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
   int failed_events = 0;
   err = bpf_map_lookup_elem(failed_events_fd, &DATACRUMBS_FAILED_EVENTS_KEY, &failed_events);
-  if (err == 0) {
+  if (err == 0 && event_processor->configManager_->mpi_rank == 0) {
     DC_LOG_PRINT("Total %d events failed", failed_events);
   }
 #endif
 
 #if defined(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG) && (DATACRUMBS_BPFTIME_COMPATIBLE_FLAG == 0)
-  DC_LOG_PRINT("Collecting string metadata from file_map...");
+  if (event_processor->configManager_->mpi_rank == 0) {
+    DC_LOG_PRINT("Collecting string metadata from file_map...");
+  }
   while (lookup_and_delete(file_hash_fd, event_processor, keys, values, batch_size, in_batch) ==
          1) {
     // Continue until no more keys are found
@@ -694,7 +705,9 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
     free(values);
   }
 #endif
-  DC_LOG_PRINT("Finalizing DataCrumbs...");
+  if (event_processor->configManager_->mpi_rank == 0) {
+    DC_LOG_PRINT("Finalizing DataCrumbs...");
+  }
   if (stop) {
     DC_LOG_INFO("Received SIGINT (Ctrl-C), exiting gracefully");
   }
@@ -711,57 +724,86 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
   datacrumbs_bpf__destroy(skel);
 
   double finalize_elapsed = timer.pauseTime();
-  DC_LOG_PRINT(
-      "Finalization and cleanup of DataCrumbs elapsed time: %f seconds with error code: %d",
-      finalize_elapsed, err);
-
-  // Write status info to JSON file for postprocessing
-
-  std::string status_file = "/tmp/datacrumbs_" + event_processor->configManager_->user +
-                            "_status_" + event_processor->configManager_->run_id + ".json";
-  struct json_object* status_json = json_object_new_object();
-  json_object_object_add(
-      status_json, "trace_file",
-      json_object_new_string(event_processor->configManager_->trace_file_path.c_str()));
-  json_object_object_add(status_json, "total_events_captured",
-                         json_object_new_int64(event_processor->event_index.load()));
-  json_object_object_add(status_json, "events_failed",
-                         json_object_new_int(event_processor->failed_events));
-
-  if (json_object_to_file_ext(status_file.c_str(), status_json, JSON_C_TO_STRING_PRETTY) != 0) {
-    DC_LOG_ERROR("Failed to write status file: %s", status_file.c_str());
+  double sum_elapsed = 0.0, min_elapsed = 0.0, max_elapsed = 0.0;
+  MPI_Reduce(&finalize_elapsed, &sum_elapsed, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&finalize_elapsed, &min_elapsed, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&finalize_elapsed, &max_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (event_processor->configManager_->mpi_rank == 0) {
+    DC_LOG_PRINT("Finalization and cleanup of DataCrumbs: average=%f, min=%f, max=%f over %d ranks",
+                 sum_elapsed / event_processor->configManager_->mpi_size, min_elapsed, max_elapsed,
+                 event_processor->configManager_->mpi_size);
   }
-  json_object_put(status_json);
-  pwd = getpwnam(event_processor->configManager_->user.c_str());
-  uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
-  gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
-  chown(status_file.c_str(), uid, gid);
-  chmod(status_file.c_str(), 0660);
+
+  // Gather failed_events and total_events across all ranks
+  int local_failed_events = event_processor->failed_events;
+  int global_failed_events_sum = 0, global_failed_events_min = 0, global_failed_events_max = 0;
+  MPI_Reduce(&local_failed_events, &global_failed_events_sum, 1, MPI_INT, MPI_SUM, 0,
+             MPI_COMM_WORLD);
+  MPI_Reduce(&local_failed_events, &global_failed_events_min, 1, MPI_INT, MPI_MIN, 0,
+             MPI_COMM_WORLD);
+  MPI_Reduce(&local_failed_events, &global_failed_events_max, 1, MPI_INT, MPI_MAX, 0,
+             MPI_COMM_WORLD);
+
+  int local_total_events = static_cast<int>(event_processor->event_index.load());
+  int global_total_events_sum = 0, global_total_events_min = 0, global_total_events_max = 0;
+  MPI_Reduce(&local_total_events, &global_total_events_sum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&local_total_events, &global_total_events_min, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&local_total_events, &global_total_events_max, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+
+  if (event_processor->configManager_->mpi_rank == 0) {
+    DC_LOG_PRINT("Failed events: sum=%d, min=%d, max=%d", global_failed_events_sum,
+                 global_failed_events_min, global_failed_events_max);
+    DC_LOG_PRINT("Total events: sum=%d, min=%d, max=%d", global_total_events_sum,
+                 global_total_events_min, global_total_events_max);
+    // Write status info to JSON file for postprocessing
+    std::string status_file = "/tmp/datacrumbs_" + event_processor->configManager_->user +
+                              "_status_" + event_processor->configManager_->run_id + ".json";
+    struct json_object* status_json = json_object_new_object();
+    json_object_object_add(
+        status_json, "trace_file",
+        json_object_new_string(event_processor->configManager_->trace_file_path.c_str()));
+    json_object_object_add(status_json, "total_events_captured",
+                           json_object_new_int64(event_processor->event_index.load()));
+    json_object_object_add(status_json, "events_failed",
+                           json_object_new_int(event_processor->failed_events));
+
+    if (json_object_to_file_ext(status_file.c_str(), status_json, JSON_C_TO_STRING_PRETTY) != 0) {
+      DC_LOG_ERROR("Failed to write status file: %s", status_file.c_str());
+    }
+    json_object_put(status_json);
+    auto pwd = getpwnam(event_processor->configManager_->user.c_str());
+    auto uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+    auto gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+    chown(status_file.c_str(), uid, gid);
+    chmod(status_file.c_str(), 0660);
+  }
 
   DC_LOG_TRACE("main: end");
   return 0;
 }
 
 static int main_call(int argc, char** argv) {
+  MPI_Init(&argc, &argv);
   auto event_processor = datacrumbs::EventProcessor(argc, argv);
   std::string hostname = get_hostname();
   std::string pidfile =
       "/tmp/datacrumbs_" + hostname + "_" + event_processor.configManager_->run_id + ".pid";
 
   int return_code = 0;
-  if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::RUN) {
+  if (event_processor.configManager_->mpi_rank == 0 &&
+      event_processor.configManager_->exe_mode != datacrumbs::ExecutableMode::STOP) {
     event_processor.configManager_->print_configurations();
+  }
+  if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::RUN) {
     write_pid_file(pidfile, event_processor.configManager_->user);
     return_code = main_process(argc, argv, &event_processor, false);
   } else if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::START) {
     daemonize();
-    auto event_processor = datacrumbs::EventProcessor(argc, argv);
     std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname +
                           "_" + event_processor.configManager_->run_id + ".log";
     redirect_output(logfile, event_processor.configManager_->user);
     DC_LOG_PRINT("Spawned daemon with pid %d, output redirected to %s\n", getpid(),
                  logfile.c_str());
-    event_processor.configManager_->print_configurations();
     write_pid_file(pidfile, event_processor.configManager_->user);
     return_code = main_process(argc, argv, &event_processor, true);
   } else if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::STOP) {
@@ -782,8 +824,10 @@ static int main_call(int argc, char** argv) {
         if (!user) {
           user = "unknown";
         }
-        DC_LOG_PRINT("Sent SIGINT as %s. Waiting for %f minutes for pid:%d to exit", user,
-                     max_retries / 60.0, pid);
+        if (event_processor.configManager_->mpi_rank == 0) {
+          DC_LOG_PRINT("Sent SIGINT as %s. Waiting for %f minutes for pid:%d to exit", user,
+                       max_retries / 60.0, pid);
+        }
         int i;
         for (i = 0; i < max_retries; ++i) {
           std::string ps_cmd = "ps -p " + std::to_string(pid) + " > /dev/null";
@@ -794,19 +838,25 @@ static int main_call(int argc, char** argv) {
           }
           usleep(1000000);  // Sleep 1s
         }
-        if (access(pidfile.c_str(), F_OK) == 0) {
-          remove(pidfile.c_str());
-        }
         if (i == max_retries) {
-          DC_LOG_PRINT("Process %d did not terminate within the expected time.", pid);
+          DC_LOG_PRINT("Process %d did not terminate within the expected time for rank %d.", pid,
+                       event_processor.configManager_->mpi_rank);
           return_code = 1;
         } else {
-          DC_LOG_PRINT("Process %d has terminated.", pid);
+          if (event_processor.configManager_->mpi_rank == 0) {
+            DC_LOG_PRINT("Process %d has terminated.", pid);
+          }
         }
       }
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (access(pidfile.c_str(), F_OK) == 0) {
+        remove(pidfile.c_str());
+      }
     } else {
-      DC_LOG_ERROR("Could not find pid to stop.\n");
+      DC_LOG_ERROR("Could not find pid to stop on rank %d.\n",
+                   event_processor.configManager_->mpi_rank);
     }
   }
+  MPI_Finalize();
   return (return_code);
 }

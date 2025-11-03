@@ -74,6 +74,7 @@ dc__bind_spec() {
     declare -gn T="__dc_${prefix}_types"
     declare -gn D="__dc_${prefix}_descs"
     declare -gn V="__dc_${prefix}_varnames"
+    declare -gn DF="__dc_${prefix}_defs"
     declare -gn IDX="__dc_${prefix}_index_by_name"
     declare -gn PN="__dc_${prefix}_pos_names"
     declare -gn PR="__dc_${prefix}_pos_reqs"
@@ -95,6 +96,7 @@ dc_args_init() {
     declare -ga "__dc_${prefix}_types=()"
     declare -ga "__dc_${prefix}_descs=()"
     declare -ga "__dc_${prefix}_varnames=()"
+    declare -ga "__dc_${prefix}_defs=()"
     declare -gA "__dc_${prefix}_index_by_name=()"
 
     # Positional arguments spec (names, req flags, descriptions, varnames)
@@ -114,40 +116,33 @@ dc_args_init() {
 
 # Core adder (nameref-based, reliable)
 dc__add_option_core() {
-    local prefix="$1" opt="$2" req="$3" desc="$4" type="$5" varname="$6"
+    local prefix="$1" opt="$2" req="$3" desc="$4" type="$5" varname="$6" default="${7-}"
     dc__bind_spec "$prefix"
-    # debug
-    # debug "[dc__add_option_core] prefix=$prefix opt=$opt var=$varname"
+    # Avoid duplicate option registration
     if [[ -n "${IDX[$opt]+_}" ]]; then
         return 0
     fi
     local i; i="${#N[@]}"
-    N[i]="$opt"; R[i]="$req"; T[i]="$type"; D[i]="$desc"; V[i]="$varname"
+    N[i]="$opt"; R[i]="$req"; T[i]="$type"; D[i]="$desc"; V[i]="$varname"; DF[i]="$default"
     IDX["$opt"]="$i"
-    # debug
-    # debug "[dc__add_option_core] N_len=${#N[@]} after adding $opt"
-    if [[ "$type" == "bool" ]]; then
-        dc__declvar_preserve "$varname" "0"
-    else
-        dc__declvar_preserve "$varname" ""
-    fi
+    # Do not force initial value; allow parse to set defaults and normalize
+    dc__declvar_preserve "$varname" ""
 }
-
 # Add an option to the spec: NAME MANDATORY|OPTIONAL DESCRIPTION [TYPE]
 # TYPE defaults to "string". Supported: string, int, bool
 dc_args_add_option() {
-    local prefix="$1" opt="$2" req="$3" desc="$4" type="${5:-string}"
-    [[ -z "$prefix" || -z "$opt" || -z "$req" ]] && { error "dc_args_add_option: missing args"; return 64; }
+    local prefix="$1" opt="$2" req="$3" desc="$4" type="${5:-string}" default="${6-}"
+    [[ -z "$prefix" || -z "$opt" || -z "$req" ]] && { error "dc_args_add_option: missing args"; exit 1; }
     case "$req" in
         MANDATORY|OPTIONAL) ;;
-        *) error "dc_args_add_option: req must be MANDATORY or OPTIONAL"; return 64;;
+        *) error "dc_args_add_option: req must be MANDATORY or OPTIONAL"; exit 1;;
     esac
     case "$type" in
         string|int|bool) ;;
-        *) error "dc_args_add_option: unsupported type '$type'"; return 64;;
+        *) error "dc_args_add_option: unsupported type '$type'"; exit 1;;
     esac
     local var; var="$(dc__make_var_name "$prefix" "$opt")"
-    dc__add_option_core "$prefix" "$opt" "$req" "$desc" "$type" "$var"
+    dc__add_option_core "$prefix" "$opt" "$req" "$desc" "$type" "$var" "$default"
 }
 
 # Add a positional argument to the spec: NAME MANDATORY|OPTIONAL DESCRIPTION
@@ -172,7 +167,7 @@ dc__add_global_bool() {
     dc__bind_spec "$prefix"
     if [[ -n "${IDX[$opt]+_}" ]]; then return 0; fi
     local var; var="$(dc__make_global_var_name "$opt")"
-    dc__add_option_core "$prefix" "$opt" "OPTIONAL" "$desc" "bool" "$var"
+    dc__add_option_core "$prefix" "$opt" "OPTIONAL" "$desc" "bool" "$var" ""
 }
 
 # Ensure the common inherited options exist for this prefix
@@ -254,10 +249,32 @@ dc_args_usage() {
         for ((i=0; i<${#N[@]}; ++i)); do
             if [[ "${R[i]}" == "$want" ]]; then
                 (( any==0 )) && { log "$header"; any=1; }
+                # Determine conditional requirement note based on subcommands
+                local note=""
+                if [[ -n "$SUBCMD_OPT" ]]; then
+                    local __vals=()
+                    local __k
+                    for __k in "${!SUBCMDS[@]}"; do
+                        local __opts_str="${SUBCMDS[$__k]}"
+                        IFS=',' read -ra __opts <<< "$__opts_str"
+                        local __o
+                        for __o in "${__opts[@]}"; do
+                            if [[ "$__o" == "${N[i]}" ]]; then
+                                __vals+=("$__k")
+                                break
+                            fi
+                        done
+                    done
+                    if (( ${#__vals[@]} > 0 )); then
+                        local __vals_joined
+                        IFS='|' read -r __vals_joined <<< "${__vals[*]}"
+                        note=" (required when --$SUBCMD_OPT=$__vals_joined)"
+                    fi
+                fi
                 if [[ "${T[i]}" == "bool" ]]; then
-                    log "  --%-18s %s\n" "${N[i]}" "${D[i]}"
+                    log "  --%-18s %s%s\n" "${N[i]}" "${D[i]}" "$note"
                 else
-                    log "  --%-18s %s\n" "${N[i]} <${T[i]}>" "${D[i]}"
+                    log "  --%-18s %s%s\n" "${N[i]} <${T[i]}>" "${D[i]}" "$note"
                 fi
             fi
         done
@@ -323,13 +340,25 @@ dc_args_parse() {
     for ((i=0; i<${#N[@]}; ++i)); do
         var="${V[i]}"
         if [[ "${T[i]}" == "bool" ]]; then
-            if [[ "${!var+x}" == x ]]; then
+            # If a non-empty value already exists (e.g., from environment), normalize it.
+            if [[ -n "${!var-}" ]]; then
                 dc__normalize_bool_var "$var"
             else
-                dc__setvar "$var" "0"
+                # Otherwise, initialize from default if provided; fallback to 0.
+                if [[ -n "${DF[i]-}" ]]; then
+                    dc__setvar "$var" "${DF[i]}"
+                    dc__normalize_bool_var "$var"
+                else
+                    dc__setvar "$var" "0"
+                fi
             fi
         else
-            dc__setvar "$var" ""
+            # Initialize non-bool to default if provided; else empty
+            if [[ -n "${DF[i]-}" ]]; then
+                dc__setvar "$var" "${DF[i]}"
+            else
+                dc__setvar "$var" ""
+            fi
         fi
     done
 
@@ -384,6 +413,8 @@ dc_args_parse() {
         exit 1
     fi
 
+    # Defaults were initialized prior to parsing; no further action needed here.
+
     if [[ "${HELP:-0}" == "1" ]]; then dc_args_show_help "$prefix" "$prog"; exit 0; fi
 
     if [[ "${QUIET:-0}" == "1" ]]; then dc__setvar "VERBOSE" "0"; fi
@@ -437,6 +468,10 @@ dc_args_parse() {
             fi
         fi
     fi
+
+    if [[ "${VERBOSE:-0}" == "1" ]]; then
+        dc_args_pretty_print "$prefix" "$prog"
+    fi
 }
 
 dc_args_pretty_print() {
@@ -451,20 +486,66 @@ dc_args_pretty_print() {
         for ((i=0; i<${#N[@]}; ++i)); do
             if [[ "${R[i]}" == "$want" ]]; then
                 (( any==0 )) && { debug "$header"; any=1; }
-                local var val; var="${V[i]}"; val="${!var}"
+                local var val disp; var="${V[i]}"; val="${!var}"; disp=""
+                # Compute conditional requirement note for this option (if any)
+                local note=""
+                if [[ -n "$SUBCMD_OPT" ]]; then
+                    local __vals=() __k
+                    for __k in "${!SUBCMDS[@]}"; do
+                        local __opts_str="${SUBCMDS[$__k]}"
+                        IFS=',' read -ra __opts <<< "$__opts_str"
+                        local __o
+                        for __o in "${__opts[@]}"; do
+                            if [[ "$__o" == "${N[i]}" ]]; then
+                                __vals+=("$__k")
+                                break
+                            fi
+                        done
+                    done
+                    if (( ${#__vals[@]} > 0 )); then
+                        local __joined=""; local __idx
+                        for __idx in "${!__vals[@]}"; do
+                            [[ "$__idx" -gt 0 ]] && __joined+="|"
+                            __joined+="${__vals[$__idx]}"
+                        done
+                        note=" (required when --$SUBCMD_OPT=$__joined)"
+                    fi
+                fi
+
                 if [[ "${T[i]}" == "bool" ]]; then
                     if [[ "$val" == "1" ]]; then val="true"; else val="false"; fi
-                    debug "  --%-*s : %s" "$max" "${N[i]}" "$val"
+                    debug "  --%-*s : %s%s" "$max" "${N[i]}" "$val" "$note"
                 else
-                    if [[ -z "$val" ]]; then debug "  --%-*s : %s" "$max" "${N[i]}" "";
-                    else local qv; debug -v qv "%q" "$val"; debug "  --%-*s : %s" "$max" "${N[i]}" "$qv"; fi
+                    # Prefer actual value; if empty, fall back to default (if any) for display
+                    if [[ -n "$val" ]]; then
+                        disp="$val"
+                    elif [[ -n "${DF[i]-}" ]]; then
+                        disp="${DF[i]}"
+                    else
+                        disp=""
+                    fi
+                    if [[ -z "$disp" ]]; then
+                        debug "  --%-*s : %s%s" "$max" "${N[i]}" "" "$note"
+                    else
+                        local qv
+                        printf -v qv "%q" "$disp"
+                        debug "  --%-*s : %s%s" "$max" "${N[i]}" "$qv" "$note"
+                    fi
                 fi
             fi
         done; (( any==1 )) && debug ""
     }
     print_group "MANDATORY" "Mandatory options:"; print_group "OPTIONAL"  "Optional options:"
     local argsvar; argsvar="$(echo -n "${prefix}_ARGS" | dc__upper)"; local -n __dc_args_ref="$argsvar"
-    if (( ${#__dc_args_ref[@]} > 0 )); then debug "Positional arguments:"; for ((i=0; i<${#__dc_args_ref[@]}; ++i)); do local q; debug -v q "%q" "${__dc_args_ref[i]}"; debug "  [%d] %s" "$i" "$q"; done; debug ""; fi
+    if (( ${#__dc_args_ref[@]} > 0 )); then
+        debug "Positional arguments:"
+        for ((i=0; i<${#__dc_args_ref[@]}; ++i)); do
+            local q
+            printf -v q "%q" "${__dc_args_ref[i]}"
+            debug "  [%d] %s" "$i" "$q"
+        done
+        debug ""
+    fi
 }
 
 # Example:
@@ -475,7 +556,7 @@ dc_args_pretty_print() {
 # dc_args_pretty_print "MYAPP" "myprog"
 # dc_args_usage "MYAPP" "myprog"
 # echo "$MYAPP_INPUT" "$MYAPP_COUNT" "$VERBOSE" "$QUIET" "$DRY_RUN"
-#
+#   
 # Example with subcommands:
 # dc_args_init "MYAPP"
 # dc_args_add_option "MYAPP" "user"   "MANDATORY" "User name" "string"
