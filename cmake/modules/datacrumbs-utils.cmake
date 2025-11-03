@@ -24,6 +24,7 @@ macro(include_dependencies)
     find_package(LLVM REQUIRED CONFIG COMPONENTS Clang)
     find_package(json-c REQUIRED)
     find_package(ZLIB REQUIRED)
+    find_package(MPI REQUIRED COMPONENTS CXX QUIET)
 
     # all validator
     if(LIBBPF_VERSION VERSION_LESS "1.0.0")
@@ -109,6 +110,33 @@ macro(include_dependencies)
         message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] zlib is needed for ${PROJECT_NAME} build")
     endif()
 
+    if(${MPI_CXX_FOUND})
+        # MPI_CXX_FOUND MPI_CXX_VERSION MPI_CXX_INCLUDE_DIRS MPI_CXX_LIBRARIES
+        get_filename_component(MPI_CXX_INCLUDE_DIRS "${MPI_CXX_INCLUDE_DIRS}" ABSOLUTE)
+        include_directories(${MPI_CXX_INCLUDE_DIRS})
+
+        if(NOT DEFINED MPI_CXX_LIBRARY_DIR)
+            if(MPI_CXX_LIBRARIES)
+                # If MPI_CXX_LIBRARIES is a list, get parent dir of each library
+                set(MPI_CXX_LIBRARY_DIR "")
+                foreach(_lib ${MPI_CXX_LIBRARIES})
+                    get_filename_component(_lib_dir "${_lib}" DIRECTORY)
+                    get_filename_component(_lib_dir "${_lib_dir}" ABSOLUTE)
+                    list(APPEND MPI_CXX_LIBRARY_DIR "${_lib_dir}")
+                endforeach()
+                list(REMOVE_DUPLICATES MPI_CXX_LIBRARY_DIR)
+            else()
+                get_filename_component(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARIES}" DIRECTORY)
+                set(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARY_DIR}")
+            endif()
+        endif()
+
+        list(APPEND DEPENDENCY_LIBRARY_DIRS ${MPI_CXX_LIBRARY_DIR})
+        set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${MPI_CXX_LIBRARY_DIR} ${MPI_CXX_LIBRARIES})
+    else()
+        message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] mpi is needed for ${PROJECT_NAME} build")
+    endif()
+
     list(APPEND DEPENDENCY_LIBRARY_DIRS ${DATACRUMBS_INSTALL_LIB_DIR})
     list(REMOVE_DUPLICATES DEPENDENCY_LIBRARY_DIRS)
 
@@ -118,11 +146,13 @@ macro(include_dependencies)
     message(STATUS "             - Found llvm:${LLVM_VERSION} at include:${LLVM_INCLUDE_DIRS} lib:${LLVM_LIBRARY_DIRS} clang:${CLANG_EXECUTABLE}")
     message(STATUS "             - Found json-c:${json-c_CONSIDERED_VERSIONS} at include:${json-c_INCLUDE_DIR} lib:${json-c_LIBRARY_DIR}")
     message(STATUS "             - Found zlib:${ZLIB_VERSION} at include:${ZLIB_INCLUDE_DIRS} lib:${ZLIB_LIBRARY_DIRS}")
+    message(STATUS "             - Found mpi:${MPI_CXX_VERSION} at include:${MPI_CXX_INCLUDE_DIRS} lib:${MPI_CXX_LIBRARY_DIR}")
     message(STATUS "             - DEPENDENCY_LIBRARY_DIRS for RPATH:${DEPENDENCY_LIBRARY_DIRS}")
     message(STATUS "             - DEPENDENCY_LIB for linking :${DEPENDENCY_LIB}")
 
     set(CMAKE_INSTALL_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
     set(CMAKE_BUILD_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
+    # print_all_variables()
 endmacro(include_dependencies)
 
 macro(derive_configurations)
@@ -332,7 +362,6 @@ function(datacrumbs_composable_install_headers public_headers)
     # message("-- [${PROJECT_NAME}] " "installing headers ${public_headers}")
     foreach(header ${public_headers})
         file(RELATIVE_PATH header_file_path "${PROJECT_SOURCE_DIR}/src" "${header}")
-        message("-- [${PROJECT_NAME}] " "installing header ${header_file_path}")
         get_filename_component(header_directory_path "${header_file_path}" DIRECTORY)
 
         # message(STATUS "             - Installing header ${header} to ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/include/${header_directory_path}")
@@ -350,7 +379,6 @@ function(datacrumbs_composable_install_src public_src)
     # message("-- [${PROJECT_NAME}] " "installing src files ${public_src}")
     foreach(src ${public_src})
         file(RELATIVE_PATH src_file_path "${PROJECT_SOURCE_DIR}/src" "${src}")
-        message("-- [${PROJECT_NAME}] " "installing src ${src_file_path}")
         get_filename_component(src_directory_path "${src_file_path}" DIRECTORY)
         install(
             FILES ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/composable/src/${src_file_path}
