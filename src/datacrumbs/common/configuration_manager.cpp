@@ -32,6 +32,7 @@
 /**
  * External headers
  */
+#include <mpi.h>
 #include <yaml-cpp/yaml.h>
 
 namespace datacrumbs {
@@ -129,6 +130,12 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       capture_probes(),
       user("datacrumbs"),
       run_id("0") {
+  int initialized;
+  int status = MPI_Initialized(&initialized);
+  if (status == MPI_SUCCESS && initialized == true) {
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  }
   struct rlimit rl;
   if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
     rl.rlim_cur = rl.rlim_max;  // Set soft limit to hard limit
@@ -491,8 +498,7 @@ void ConfigurationManager::print_configurations() {
 void ConfigurationManager::derive_configurations() {
   DC_LOG_TRACE("[ConfigurationManager] Deriving configurations...");
 
-  pid_t pid = getpid();
-  DC_LOG_DEBUG("[ConfigurationManager] Process ID: %d", pid);
+  DC_LOG_DEBUG("[ConfigurationManager] Process ID: %d for rank: %d", getpid(), this->mpi_rank);
 
   // Use this->hostname (std::string) instead of local char array
   std::string hostname;
@@ -503,18 +509,17 @@ void ConfigurationManager::derive_configurations() {
   }
   hostname = hostname_buf;
   this->hostname = hostname;
-  DC_LOG_DEBUG("[ConfigurationManager] Hostname: %s", this->hostname.c_str());
+  DC_LOG_DEBUG("[ConfigurationManager] Hostname: %s for rank: %d", this->hostname.c_str(),
+               this->mpi_rank);
 
-  auto now = std::chrono::system_clock::now();
-  auto timestamp =
-      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-  DC_LOG_DEBUG("[ConfigurationManager] Timestamp: %lld", static_cast<long long>(timestamp));
+  std::string generated_file_suffix = this->user + "-" + this->name + "-" +
+                                      std::to_string(this->mpi_rank) + "-" +
+                                      std::to_string(this->mpi_size) + "-" + this->run_id;
 
-  std::string trace_file_name = "trace-" + this->user + "-" + this->name + "-" + this->hostname +
-                                "-" + std::to_string(timestamp) + ".pfw.gz";
+  std::string trace_file_name = "trace-" + generated_file_suffix + ".pfw.gz";
   this->trace_file_path = this->trace_log_dir / trace_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Trace file path: %s",
-               this->trace_file_path.string().c_str());
+  DC_LOG_DEBUG("[ConfigurationManager] Trace file path: %s for rank: %d",
+               this->trace_file_path.string().c_str(), this->mpi_rank);
 
   std::string hostname_str(this->name);
   // Remove digits from hostname for file naming
@@ -522,39 +527,42 @@ void ConfigurationManager::derive_configurations() {
                      hostname_str.end());
   DC_LOG_DEBUG("[ConfigurationManager] Hostname (digits removed): %s", hostname_str.c_str());
 
+  std::string lookup_file_suffix = std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str;
+
   // Construct probe file name: probes-DATACRUMBS_INSTALL_USER-host.json
-  std::string probe_file_name =
-      "probes-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
+  std::string probe_file_name = "probes-" + lookup_file_suffix + ".json";
   this->probe_file_path = this->data_dir / probe_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Probe file path: %s",
-               this->probe_file_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Probe file path: %s",
+                 this->probe_file_path.string().c_str());
 
   // Construct probe exclusion file name: probes-exclusion-DATACRUMBS_INSTALL_USER-host.json
-  std::string probe_exclusion_file_name =
-      "probes-exclusion-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
+  std::string probe_exclusion_file_name = "probes-exclusion-" + lookup_file_suffix + ".json";
   this->probe_exclusion_file_path = this->data_dir / probe_exclusion_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Probe exclusion file path: %s",
-               this->probe_exclusion_file_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Probe exclusion file path: %s",
+                 this->probe_exclusion_file_path.string().c_str());
 
   // Construct probe invalid file name: probes-invalid-DATACRUMBS_INSTALL_USER-host.json
-  std::string probe_invalid_file_name =
-      "probes-invalid-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
+  std::string probe_invalid_file_name = "probes-invalid-" + lookup_file_suffix + ".json";
   this->probe_invalid_file_path = this->data_dir / probe_invalid_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Probe invalid path: %s",
-               this->probe_invalid_file_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Probe invalid path: %s",
+                 this->probe_invalid_file_path.string().c_str());
 
   // Construct categories file name: categories-DATACRUMBS_INSTALL_USER-host.json
-  std::string categories_file_name = "categories-" + user + "-" + hostname_str + ".json";
+  std::string categories_file_name = "categories-" + lookup_file_suffix + ".json";
   this->category_map_path = this->data_dir / categories_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Category map path: %s",
-               this->category_map_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Category map path: %s",
+                 this->category_map_path.string().c_str());
 
   // Construct manual probe file name: manual-probes-DATACRUMBS_INSTALL_USER-host.json
-  std::string manual_probe_file_name =
-      "manual-probes-" + std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str + ".json";
+  std::string manual_probe_file_name = "manual-probes-" + lookup_file_suffix + ".json";
   this->manual_probe_path = this->data_dir / manual_probe_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Manual probe path: %s",
-               this->manual_probe_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Manual probe path: %s",
+                 this->manual_probe_path.string().c_str());
 
   // Load category_map from JSON file using json-c
   std::string category_json_path = category_map_path.string();
@@ -562,7 +570,8 @@ void ConfigurationManager::derive_configurations() {
     // Read file into string
     std::ifstream file(category_json_path);
     if (!file) {
-      DC_LOG_ERROR("Failed to open category map file: %s", category_json_path.c_str());
+      DC_LOG_ERROR("Failed to open category map file: %s for rank: %d", category_json_path.c_str(),
+                   this->mpi_rank);
       throw std::invalid_argument("Failed to open category map file: " + category_json_path);
     }
     std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -571,7 +580,8 @@ void ConfigurationManager::derive_configurations() {
     // Parse JSON
     struct json_object* root = json_tokener_parse(json_str.c_str());
     if (!root) {
-      DC_LOG_ERROR("Failed to parse JSON from %s", category_json_path.c_str());
+      DC_LOG_ERROR("Failed to parse JSON from %s for rank: %d", category_json_path.c_str(),
+                   this->mpi_rank);
       throw std::invalid_argument("Failed to parse JSON from: " + category_json_path);
     }
 
@@ -594,8 +604,8 @@ void ConfigurationManager::derive_configurations() {
     }
     json_object_put(root);
   } else {
-    DC_LOG_WARN("[ConfigurationManager] Category map file does not exist: %s",
-                category_json_path.c_str());
+    DC_LOG_WARN("[ConfigurationManager] Category map file does not exist: %s for rank: %d",
+                category_json_path.c_str(), this->mpi_rank);
   }
 }
 
@@ -607,18 +617,20 @@ void ConfigurationManager::derive_configurations() {
  */
 void ConfigurationManager::validate_configurations() {
   if (this->capture_probes.empty()) {
-    DC_LOG_ERROR("[ConfigurationManager] No capture probes defined in the configuration.");
+    DC_LOG_ERROR(
+        "[ConfigurationManager] No capture probes defined in the configuration for rank: %d.",
+        this->mpi_rank);
     throw std::invalid_argument("At least one capture probe must be defined.");
   }
   if (this->data_dir.empty() || !std::filesystem::exists(this->data_dir)) {
-    DC_LOG_ERROR("[ConfigurationManager] Data directory does not exist: %s",
-                 this->data_dir.string().c_str());
+    DC_LOG_ERROR("[ConfigurationManager] Data directory does not exist: %s for rank: %d.",
+                 this->data_dir.string().c_str(), this->mpi_rank);
     throw std::runtime_error("Data directory does not exist: " + this->data_dir.string());
   }
   if (this->trace_log_dir.empty() ||
       !std::filesystem::exists(std::filesystem::path(this->trace_log_dir))) {
-    DC_LOG_ERROR("[ConfigurationManager] Trace log directory does not exist: %s",
-                 this->trace_log_dir.string().c_str());
+    DC_LOG_ERROR("[ConfigurationManager] Trace log directory does not exist: %s for rank: %d.",
+                 this->trace_log_dir.string().c_str(), this->mpi_rank);
     throw std::runtime_error("Trace log directory does not exist: " +
                              std::filesystem::path(this->trace_log_dir).string());
   }
