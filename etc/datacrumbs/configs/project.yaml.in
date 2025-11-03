@@ -21,3 +21,8 @@ log:
   dir_pattern: @DATACRUMBS_CONFIGURED_LOG_DIR@/%YY%/%MM%/%DD%
 server:
   load_timeout: ${DATACRUMBS_SERVER_TIMEOUT_USER:-10}
+job:
+  run: flux run
+  node_flag: -N
+  ppn_flag: --tasks-per-node
+  other_flags:
