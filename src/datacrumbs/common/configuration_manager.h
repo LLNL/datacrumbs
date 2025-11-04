@@ -87,6 +87,9 @@ class ConfigurationManager {
   // Unique run identifier
   std::string run_id;
 
+  // Flag to disable MPI usage
+  bool disable_mpi;
+
   // MPI rank of the current process
   int mpi_rank{0};
 
@@ -112,6 +115,9 @@ class ConfigurationManager {
 
   // For debugging: prints all configuration values to the log
   void print_configurations();
+
+  // Loads MPI-related configurations
+  void load_mpi_configurations();
 
  private:
   /**
@@ -145,6 +151,7 @@ class ArgumentParser {
   std::optional<std::string> log_dir;               ///< Optional log directory
   std::optional<ExecutableMode> exe_mode;           ///< Optional executable mode
   std::optional<std::string> run_id;                ///< Optional run_id
+  std::optional<bool> disable_mpi;                  ///< Optional disable_mpi flag
 
   /**
    * @brief Constructor that parses command-line arguments.

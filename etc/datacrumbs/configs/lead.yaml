@@ -38,19 +38,7 @@ capture_probes:
     probe: kprobe
     type: header
     file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/fscache.h
-  - name: xfs
-    probe: kprobe
-    type: ksym
-    regex: ^xfs(?!.*cold).*
-  - name: ext4
-    probe: kprobe
-    type: ksym
-    regex: ^ext4(?!.*cold).*
   - name: iomap
     probe: kprobe
     type: ksym
     regex: ^iomap(?!.*cold).*
-  - name: ior
-    probe: uprobe
-    type: binary
-    file: /home/haridev/spack/opt/spack/linux-haswell/ior-3.3.0-ip47j26fw7xxfftdzjvy2h36phgcuypv/bin/ior

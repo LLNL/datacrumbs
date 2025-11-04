@@ -42,7 +42,7 @@ dc_args_pretty_print "$APP" "datacrumbs_compose"
 # Load environment after we know the user
 source "$SCRIPT_DIR/datacrumbs_setup"
 
-check_root_user
+check_sudo_user
 
 # Dry run support
 DRY_RUN_MODE=0
