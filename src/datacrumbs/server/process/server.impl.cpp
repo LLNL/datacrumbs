@@ -532,8 +532,9 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
     DC_LOG_PRINT("Server running on %d nodes. Ready to run the code.",
                  event_processor->configManager_->mpi_size);
   }
-  MPI_Barrier(MPI_COMM_WORLD);
-
+  if (!event_processor->configManager_->disable_mpi) {
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
   unsigned int batch_size = 1024;
 #if defined(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG) && (DATACRUMBS_BPFTIME_COMPATIBLE_FLAG == 0)
 
@@ -725,9 +726,15 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
 
   double finalize_elapsed = timer.pauseTime();
   double sum_elapsed = 0.0, min_elapsed = 0.0, max_elapsed = 0.0;
-  MPI_Reduce(&finalize_elapsed, &sum_elapsed, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-  MPI_Reduce(&finalize_elapsed, &min_elapsed, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
-  MPI_Reduce(&finalize_elapsed, &max_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (!event_processor->configManager_->disable_mpi) {
+    MPI_Reduce(&finalize_elapsed, &sum_elapsed, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&finalize_elapsed, &min_elapsed, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&finalize_elapsed, &max_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  } else {
+    sum_elapsed = finalize_elapsed;
+    min_elapsed = finalize_elapsed;
+    max_elapsed = finalize_elapsed;
+  }
   if (event_processor->configManager_->mpi_rank == 0) {
     DC_LOG_PRINT("Finalization and cleanup of DataCrumbs: average=%f, min=%f, max=%f over %d ranks",
                  sum_elapsed / event_processor->configManager_->mpi_size, min_elapsed, max_elapsed,
@@ -737,19 +744,32 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
   // Gather failed_events and total_events across all ranks
   int local_failed_events = event_processor->failed_events;
   int global_failed_events_sum = 0, global_failed_events_min = 0, global_failed_events_max = 0;
-  MPI_Reduce(&local_failed_events, &global_failed_events_sum, 1, MPI_INT, MPI_SUM, 0,
-             MPI_COMM_WORLD);
-  MPI_Reduce(&local_failed_events, &global_failed_events_min, 1, MPI_INT, MPI_MIN, 0,
-             MPI_COMM_WORLD);
-  MPI_Reduce(&local_failed_events, &global_failed_events_max, 1, MPI_INT, MPI_MAX, 0,
-             MPI_COMM_WORLD);
-
+  if (!event_processor->configManager_->disable_mpi) {
+    MPI_Reduce(&local_failed_events, &global_failed_events_sum, 1, MPI_INT, MPI_SUM, 0,
+               MPI_COMM_WORLD);
+    MPI_Reduce(&local_failed_events, &global_failed_events_min, 1, MPI_INT, MPI_MIN, 0,
+               MPI_COMM_WORLD);
+    MPI_Reduce(&local_failed_events, &global_failed_events_max, 1, MPI_INT, MPI_MAX, 0,
+               MPI_COMM_WORLD);
+  } else {
+    global_failed_events_sum = local_failed_events;
+    global_failed_events_min = local_failed_events;
+    global_failed_events_max = local_failed_events;
+  }
   int local_total_events = static_cast<int>(event_processor->event_index.load());
   int global_total_events_sum = 0, global_total_events_min = 0, global_total_events_max = 0;
-  MPI_Reduce(&local_total_events, &global_total_events_sum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-  MPI_Reduce(&local_total_events, &global_total_events_min, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
-  MPI_Reduce(&local_total_events, &global_total_events_max, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
-
+  if (!event_processor->configManager_->disable_mpi) {
+    MPI_Reduce(&local_total_events, &global_total_events_sum, 1, MPI_INT, MPI_SUM, 0,
+               MPI_COMM_WORLD);
+    MPI_Reduce(&local_total_events, &global_total_events_min, 1, MPI_INT, MPI_MIN, 0,
+               MPI_COMM_WORLD);
+    MPI_Reduce(&local_total_events, &global_total_events_max, 1, MPI_INT, MPI_MAX, 0,
+               MPI_COMM_WORLD);
+  } else {
+    global_total_events_sum = local_total_events;
+    global_total_events_min = local_total_events;
+    global_total_events_max = local_total_events;
+  }
   if (event_processor->configManager_->mpi_rank == 0) {
     DC_LOG_PRINT("Failed events: sum=%d, min=%d, max=%d", global_failed_events_sum,
                  global_failed_events_min, global_failed_events_max);
@@ -783,11 +803,15 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
 }
 
 static int main_call(int argc, char** argv) {
-  MPI_Init(&argc, &argv);
   auto event_processor = datacrumbs::EventProcessor(argc, argv);
+  if (!event_processor.configManager_->disable_mpi) {
+    MPI_Init(&argc, &argv);
+    event_processor.configManager_->load_mpi_configurations();
+  }
+
   std::string hostname = get_hostname();
-  std::string pidfile =
-      "/tmp/datacrumbs_" + hostname + "_" + event_processor.configManager_->run_id + ".pid";
+  std::string pidfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname + "_" +
+                        event_processor.configManager_->run_id + ".pid";
 
   int return_code = 0;
   if (event_processor.configManager_->mpi_rank == 0 &&
@@ -799,8 +823,9 @@ static int main_call(int argc, char** argv) {
     return_code = main_process(argc, argv, &event_processor, false);
   } else if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::START) {
     daemonize();
-    std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname +
-                          "_" + event_processor.configManager_->run_id + ".log";
+    std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" +
+                          event_processor.configManager_->user + "_" + hostname + "_" +
+                          event_processor.configManager_->run_id + ".log";
     redirect_output(logfile, event_processor.configManager_->user);
     DC_LOG_PRINT("Spawned daemon with pid %d, output redirected to %s\n", getpid(),
                  logfile.c_str());
@@ -848,7 +873,9 @@ static int main_call(int argc, char** argv) {
           }
         }
       }
-      MPI_Barrier(MPI_COMM_WORLD);
+      if (!event_processor.configManager_->disable_mpi) {
+        MPI_Barrier(MPI_COMM_WORLD);
+      }
       if (access(pidfile.c_str(), F_OK) == 0) {
         remove(pidfile.c_str());
       }
@@ -857,6 +884,8 @@ static int main_call(int argc, char** argv) {
                    event_processor.configManager_->mpi_rank);
     }
   }
-  MPI_Finalize();
+  if (!event_processor.configManager_->disable_mpi) {
+    MPI_Finalize();
+  }
   return (return_code);
 }
