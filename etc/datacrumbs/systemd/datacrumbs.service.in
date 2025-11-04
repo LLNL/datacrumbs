@@ -1,0 +1,18 @@
+[Unit]
+Description=Datacrumbs Service
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=@DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_server_run.sh
+ExecStop=@DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_server_stop.sh
+User=root
+# Optional:
+RemainAfterExit=no
+PIDFile=/run/datacrumbs.pid
+TimeoutStartSec=5min 
+TimeoutStopSec=1min 
+EnvironmentFile=/run/datacrumbs.env
+
+[Install]
+WantedBy=multi-user.target

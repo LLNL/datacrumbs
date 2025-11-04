@@ -12,7 +12,6 @@ fi
 source "$SCRIPT_DIR/datacrumbs_args"
 
 dc_args_init "DATACRUMBS"
-dc_args_add_option "DATACRUMBS" "app" "MANDATORY" "App command" "string"
 dc_args_add_option "DATACRUMBS" "enable_mpi" "OPTIONAL" "switch to enable MPI" "bool" "0"
 dc_args_add_option "DATACRUMBS" "nodes" "OPTIONAL" "Set number of nodes" "int" "1"
 dc_args_add_option "DATACRUMBS" "ppn" "OPTIONAL" "Set processes per node" "int" "1"
@@ -22,12 +21,6 @@ dc_args_parse "DATACRUMBS" "datacrumbs_run" "$@"
 
 if [[ $? -ne 0 ]]; then
     echo "Error: Argument parsing failed."
-    show_help
-    exit 1
-fi
-
-if [[ -z "${DATACRUMBS_APP}" ]]; then
-    echo "Error: APP command is required."
     show_help
     exit 1
 fi
@@ -43,24 +36,14 @@ PROG_NAME=$(basename "$0")
 
 source $SCRIPT_DIR/datacrumbs_setup
 
-check_regular_user
-
+check_sudo_user
 
 
 RUNID=${!DATACRUMBS_JOB_ID_VAR}
 RUNID=${RUNID:-1000}
-DATACRUMBS_LOG_FILE=${DATACRUMBS_LOG_DIR}/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
+DATACRUMBS_LOG_FILE=${DATACRUMBS_LOG_DIR:-/tmp}/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
 READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
-
-datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_TRACE_DIR
-
-
 echo "Running cmd: ${APP_CMD[*]} as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_TRACE_DIR and log file $DATACRUMBS_LOG_FILE"
-datacrumbs_start_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs
-
-log "Running App: ${APP_CMD[*]}"
-job_launch "${APP_CMD[@]}"
-log "Finished App"
 
 datacrumbs_stop_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs $PROG_NAME
 

@@ -26,7 +26,7 @@ if [ "${DATACRUMBS_ENV_LOADED:-0}" -eq 0 ]; then
     YEAR=$(date +%y)
     MONTH=$(date +%m)
     DAY=$(date +%d)
-    export DATACRUMBS_TRACE_DIR=$(echo "$DATACRUMBS_LOG_DIR_PATTERN" | sed "s|%YY%|$YEAR|g; s|%MM%|$MONTH|g; s|%DD%|$DAY|g")
+    export DATACRUMBS_TRACE_DIR=$(echo "$DATACRUMBS_TRACE_DIR_PATTERN" | sed "s|%YY%|$YEAR|g; s|%MM%|$MONTH|g; s|%DD%|$DAY|g")
     readonly DATACRUMBS_TRACE_DIR
     debug "Log directory set to $DATACRUMBS_TRACE_DIR"
     export DATACRUMBS_ENV_LOADED=1
