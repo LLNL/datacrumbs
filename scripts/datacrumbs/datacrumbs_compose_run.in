@@ -64,11 +64,16 @@ if [[ -z "$DRY_RUN" ]]; then
     datacrumbs_init "$DATACRUMBS_USER" "$DATACRUMBS_TRACE_DIR"
 fi
 
-RUNID=$(date +"%Y%m%d_%H%M%S")
-exec=("${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_compose_wrapper" "${DATACRUMBS_COMPOSABLE_NAME}")
-DATACRUMBS_LOG_FILE=$PWD/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
+RUNID=${!DATACRUMBS_JOB_ID_VAR}
+RUNID=${RUNID:-1000}
+DATACRUMBS_LOG_FILE=${DATACRUMBS_LOG_DIR}/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
 READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
-
+debug "RUNID: $RUNID"
+debug "DATACRUMBS_JOB_ID_VAR: $DATACRUMBS_JOB_ID_VAR"
+debug "value DATACRUMBS_JOB_ID_VAR: ${!DATACRUMBS_JOB_ID_VAR}"
+debug "DATACRUMBS_LOG_FILE: $DATACRUMBS_LOG_FILE"
+debug "READY_FILE: $READY_FILE"
+exec=("${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_compose_wrapper" "${DATACRUMBS_COMPOSABLE_NAME}")
 debug "Starting datacrumbs server with exec: ${exec[*]}"
 datacrumbs_start_server "${exec[*]}"
 

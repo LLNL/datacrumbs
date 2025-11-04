@@ -60,7 +60,8 @@ option(DATACRUMBS_BPFTIME_COMPATIBLE "Enable compatibility with bpftime" OFF)
 option(DATACRUMBS_ENABLE_OPT "Enable tracing" ON)
 option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
 set(DATACRUMBS_INCLUSION_PATH "NONE" CACHE STRING "Inclusion path for datacrumbs")
-set(DATACRUMBS_CONFIGURED_LOG_DIR "." CACHE STRING "Log directory for datacrumbs")
+set(DATACRUMBS_CONFIGURED_TRACE_DIR "/tmp" CACHE STRING "Trace directory for datacrumbs")
+set(DATACRUMBS_CONFIGURED_LOG_DIR "/tmp" CACHE STRING "Log directory for datacrumbs")
 
 option(DATACRUMBS_BPF_PRINT_ENABLE "Enable BPF print" OFF)
 set(DATACRUMBS_MODE_STR "TRACE" CACHE STRING "Mode for datacrumbs (TRACE or PROFILE)")
@@ -137,6 +138,15 @@ message(STATUS "             - DATACRUMBS_USER: ${DATACRUMBS_USER}")
 message(STATUS "             - DATACRUMBS_KERNEL_VERSION: ${DATACRUMBS_KERNEL_VERSION}")
 message(STATUS "             - Found kernel headers at: ${DATACRUMBS_KERNEL_HEADERS_PATH}")
 message(STATUS "             - DATACRUMBS_KERNEL_UNAME_R: ${DATACRUMBS_KERNEL_UNAME_R}")
+message(STATUS "             - DATACRUMBS_CONFIGURED_TRACE_DIR: ${DATACRUMBS_CONFIGURED_TRACE_DIR}")
+message(STATUS "             - DATACRUMBS_CONFIGURED_LOG_DIR: ${DATACRUMBS_CONFIGURED_LOG_DIR}")
+
+if(NOT EXISTS "${DATACRUMBS_CONFIGURED_TRACE_DIR}")
+    message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] DATACRUMBS_CONFIGURED_TRACE_DIR does not exist: ${DATACRUMBS_CONFIGURED_TRACE_DIR}")
+endif()
+if(NOT EXISTS "${DATACRUMBS_CONFIGURED_LOG_DIR}")
+    message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] DATACRUMBS_CONFIGURED_LOG_DIR does not exist: ${DATACRUMBS_CONFIGURED_LOG_DIR}")
+endif()
 
 # ------------------------------------------------------------------------------
 # Configure output files for build
@@ -406,6 +416,7 @@ set(DATACRUMBS_SERVER_SRC
 include_directories(${CMAKE_INCLUDE_OUTPUT_DIRECTORY})
 
 add_library(datacrumbs_obj SHARED ${DATACRUMBS_PROCESS_EVENTS_OBJ_SRC})
+target_link_libraries(datacrumbs_obj ${DEPENDENCY_LIB})
 install(TARGETS datacrumbs_obj
     LIBRARY DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
 )
@@ -593,6 +604,14 @@ install(FILES "${CMAKE_MODULES_OUTPUT_DIRECTORY}/${PROJECT_NAME}/${DATACRUMBS_RE
     DESTINATION "${DATACRUMBS_INSTALL_ETC_MODULESDIR}/${PROJECT_NAME}"
 )
 
+# flux cli plugin file
+configure_file("${CMAKE_SOURCE_DIR}/etc/datacrumbs/flux/cli/plugins/datacrumbs.py"
+    "${CMAKE_FLUX_OUTPUT_DIRECTORY}/cli/plugins/datacrumbs.py" @ONLY)
+
+install(FILES "${CMAKE_FLUX_OUTPUT_DIRECTORY}/cli/plugins/datacrumbs.py"
+    DESTINATION "${DATACRUMBS_INSTALL_ETC_FLUX}/cli/plugins"
+)
+
 # ------------------------------------------------------------------------------
 # Install Datacrumbs scripts
 # ------------------------------------------------------------------------------
@@ -706,6 +725,54 @@ install(
     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_create_log_dir
     DESTINATION
     ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_server_run.sh.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_server_run.sh @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_server_run.sh
+    DESTINATION
+    ${DATACRUMBS_INSTALL_SBINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_server_stop.sh.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_server_stop.sh @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_server_stop.sh
+    DESTINATION
+    ${DATACRUMBS_INSTALL_SBINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/systemd/datacrumbs@.service.in ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs@.service @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs@.service
+    DESTINATION
+    ${DATACRUMBS_INSTALL_ETC_SYSTEMD}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_service_common.sh.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_service_common.sh @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_service_common.sh
+    DESTINATION
+    ${DATACRUMBS_INSTALL_SBINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_service_run.sh.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_service_run.sh @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_service_run.sh
+    DESTINATION
+    ${DATACRUMBS_INSTALL_SBINARYDIR}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_service_stop.sh.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_service_stop.sh @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_service_stop.sh
+    DESTINATION
+    ${DATACRUMBS_INSTALL_SBINARYDIR}
 )
 
 # Create an empty directory at install time

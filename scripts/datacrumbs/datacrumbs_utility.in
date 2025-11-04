@@ -57,15 +57,21 @@ function datacrumbs_init() {
     log "[DRY RUN] Would create log directory: ${DATACRUMBS_TRACE_DIR}"
     return 0
   fi
-  if [ ! -w "${DATACRUMBS_TRACE_DIR}" ]; then
-    warn "User does not have write access to ${DATACRUMBS_TRACE_DIR}. Ensure the directory exists."
-  else
-    datacrumbs_run_command "Failed to create log directory ${DATACRUMBS_TRACE_DIR}" mkdir -p "${DATACRUMBS_TRACE_DIR}"
+  if [ ! -d "${DATACRUMBS_TRACE_DIR}" ]; then
+    mkdir -p "${DATACRUMBS_TRACE_DIR}"
+    if [ $? -ne 0 ]; then
+      error "Failed to create trace directory: ${DATACRUMBS_TRACE_DIR}"
+      exit 1
+    fi
+    chown "$DATACRUMBS_INSTALL_USER:$DATACRUMBS_INSTALL_USER" "${DATACRUMBS_TRACE_DIR}"
   fi
-  
 }
 
 function datacrumbs_start_server() {
+  if [ "$RUNID" == "1000" ]; then
+    RUNID=$(date +"%Y-%m-%d-%H-%M-%S")
+  fi
+  READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
   exec=$1
   exec=($exec)
   if [ -z "$DATACRUMBS_TRACE_DIR" ]; then
@@ -82,6 +88,10 @@ function datacrumbs_start_server() {
     server_launch "${cmd[@]}"
   else
    server_launch "${cmd[@]}" > $DATACRUMBS_LOG_FILE 2>&1 &
+   PID=$!
+   echo $PID > "$DATACRUMBS_SERVER_PID_FILE"
+   log "Service started with PID: $PID"
+   chown ${DATACRUMBS_USER}:${DATACRUMBS_USER} $DATACRUMBS_LOG_FILE
   fi
 
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
@@ -96,18 +106,22 @@ function datacrumbs_start_server() {
       ELAPSED=$((ELAPSED + WAIT_INTERVAL))
       if [ $ELAPSED -ge $DATACRUMBS_SERVER_LOAD_TIMEOUT ]; then
           log "DATACRUMBS_SERVER_LOAD_TIMEOUT waiting for $READY_FILE"
-          sudo $DATACRUMBS_INSTALL_BIN_DIR/datacrumbs_stop
+          server_launch $DATACRUMBS_INSTALL_SBIN_DIR/datacrumbs_stop
           cat $DATACRUMBS_LOG_FILE
           exit 1
       fi
   done
-
+  echo $RUNID > "$DATACRUMBS_SERVER_RUNID_FILE"
   log "Started server"
 }
 
 function datacrumbs_stop_server() {
   exec=$1
   prog_name=$2
+  if [ "$RUNID" == "1000" ] && [ -f "$DATACRUMBS_SERVER_RUNID_FILE" ]; then
+    RUNID=$(cat "$DATACRUMBS_SERVER_RUNID_FILE" 2>/dev/null)
+  fi
+  READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
   exec=($exec)
   common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_TRACE_DIR" --run_id "$RUNID")
   cmd=("${exec[@]}" "stop" "${common_cmd[@]}")
@@ -117,7 +131,7 @@ function datacrumbs_stop_server() {
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
     server_launch "${cmd[@]}"
   else
-   server_launch "${cmd[@]}" > $DATACRUMBS_LOG_FILE 2>&1
+   server_launch "${cmd[@]}" >> $DATACRUMBS_LOG_FILE 2>&1
   fi
   
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
@@ -125,17 +139,26 @@ function datacrumbs_stop_server() {
     log "[DRY RUN] Would remove ready file: $READY_FILE"
     return 0
   fi
-  SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | grep -v "${prog_name}" | awk '{print $2}')
+  SERVER_PID=$(cat "$DATACRUMBS_SERVER_PID_FILE")
+  # SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | grep -v "${prog_name}" | awk '{print $2}')
   if [ -n "$SERVER_PID" ]; then
       log "Found process(es) with RUNID ${RUNID}: $SERVER_PID. Killing them."
-      sudo ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
+      if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
+        ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
+      else 
+        sudo ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
+      fi
       cat "${DATACRUMBS_LOG_FILE}"
   fi
   rm -f "${READY_FILE}"
+  rm -f "${DATACRUMBS_SERVER_RUNID_FILE}"
   log "Stopped server"
 }
 
 function datacrumbs_print_status() {
+  if [ "$RUNID" == "1000" ] && [ -f "$DATACRUMBS_SERVER_RUNID_FILE" ]; then
+    RUNID=$(cat "$DATACRUMBS_SERVER_RUNID_FILE" 2>/dev/null)
+  fi
   local status_file="/tmp/datacrumbs_${DATACRUMBS_USER}_status_${RUNID}.json"
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
     log "[DRY RUN] Would print status from: $status_file"
@@ -160,14 +183,14 @@ function datacrumbs_print_status() {
 }
 
 function check_regular_user() {
-  if [[ "$DATACRUMBS_IS_ROOT" == "1" || "$DATACRUMBS_USER" == "root" ]]; then
+  if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
     error "This script should be run as a regular user, not as root."
     exit 1
   fi
 }
 
 function check_sudo_user() {
-  if [[ "$DATACRUMBS_IS_ROOT" != "1" || "$DATACRUMBS_USER" == "root" ]]; then
+  if [[ "$DATACRUMBS_IS_ROOT" != "1" ]]; then
     error "This script should be run as root."
     exit 1
 fi
@@ -193,23 +216,37 @@ function job_launch() {
       log "[DRY RUN] Would launch job: ${cmd[*]}"
       return 0
     fi
+  log "Launching job command: ${cmd[*]}"
   "${cmd[@]}"
 }
 
 function server_launch() {
-  local cmd=()
+  local mpi_cmd=()
   if [[ -z "${DATACRUMBS_JOB_ENABLE_MPI}" || "${DATACRUMBS_JOB_ENABLE_MPI}" == "1" ]]; then
     debug "Launching server with MPI"
-    cmd=(${DATACRUMBS_JOB_RUN} "${DATACRUMBS_JOB_NODE_FLAG}" "${DATACRUMBS_JOB_NODES}" "${DATACRUMBS_JOB_PPN_FLAG}" "1" ${DATACRUMBS_JOB_OTHER_FLAGS} "sudo" "$@")
+    mpi_cmd=(${DATACRUMBS_JOB_RUN} "${DATACRUMBS_JOB_NODE_FLAG}" "${DATACRUMBS_JOB_NODES}" "${DATACRUMBS_JOB_PPN_FLAG}" "1" ${DATACRUMBS_JOB_OTHER_FLAGS})
   else
     debug "Launching server without MPI"
-    cmd=("$@")
+    mpi_cmd=()
+  fi
+  if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
+    cmd=("${mpi_cmd[@]}"  "$@")
+  else 
+    cmd=("${mpi_cmd[@]}" "sudo"  "$@")
+  fi
+  if [[ -z "${DATACRUMBS_JOB_ENABLE_MPI}" || "${DATACRUMBS_JOB_ENABLE_MPI}" == "1" ]]; then
+    debug "Launching server with MPI"
+    cmd=( "${cmd[@]}" )
+  else
+    debug "Launching server without MPI"
+    cmd=( "${cmd[@]}" --disable_mpi)
   fi
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
     log "[DRY RUN] Would launch server: ${cmd[*]}"
     return 0
   fi
-  sudo "${cmd[@]}"
+  log "Launching server command: ${cmd[*]}"
+  "${cmd[@]}"
 }
 
 if command -v module &> /dev/null

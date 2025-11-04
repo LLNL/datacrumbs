@@ -97,6 +97,9 @@ ArgumentParser::ArgumentParser(int argc, char** argv, ExecutableType exe_type) {
     } else if (arg == "--log_dir" && i + 1 < argc) {
       log_dir = argv[++i];
       DC_LOG_DEBUG("[ArgumentParser] Log directory set to: %s", log_dir->c_str());
+    } else if (arg == "--disable_mpi") {
+      disable_mpi = true;
+      DC_LOG_DEBUG("[ArgumentParser] disable_mpi set to: %s", disable_mpi ? "true" : "false");
     } else if (arg == "--help" || arg == "-h") {
       DC_LOG_PRINT(
           "Usage: %s <config_name> [--run_id <id>] [--trace_log_dir <path>] "
@@ -130,12 +133,6 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       capture_probes(),
       user("datacrumbs"),
       run_id("0") {
-  int initialized;
-  int status = MPI_Initialized(&initialized);
-  if (status == MPI_SUCCESS && initialized == true) {
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-  }
   struct rlimit rl;
   if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
     rl.rlim_cur = rl.rlim_max;  // Set soft limit to hard limit
@@ -442,6 +439,15 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       DC_LOG_DEBUG("[ConfigurationManager] No log directory specified, using default: %s",
                    this->log_dir.c_str());
     }
+    // Override disable_mpi if provided as argument
+    if (parser.disable_mpi) {
+      this->disable_mpi = *parser.disable_mpi;
+      DC_LOG_DEBUG("[ConfigurationManager] disable_mpi overridden by argument: %s",
+                   this->disable_mpi ? "true" : "false");
+    } else {
+      this->disable_mpi = false;
+      DC_LOG_DEBUG("[ConfigurationManager] No disable_mpi specified, using default: false");
+    }
   }
   // Derive additional configuration values and validate
   derive_configurations();
@@ -497,7 +503,6 @@ void ConfigurationManager::print_configurations() {
  */
 void ConfigurationManager::derive_configurations() {
   DC_LOG_TRACE("[ConfigurationManager] Deriving configurations...");
-
   DC_LOG_DEBUG("[ConfigurationManager] Process ID: %d for rank: %d", getpid(), this->mpi_rank);
 
   // Use this->hostname (std::string) instead of local char array
@@ -512,9 +517,13 @@ void ConfigurationManager::derive_configurations() {
   DC_LOG_DEBUG("[ConfigurationManager] Hostname: %s for rank: %d", this->hostname.c_str(),
                this->mpi_rank);
 
-  std::string generated_file_suffix = this->user + "-" + this->name + "-" +
-                                      std::to_string(this->mpi_rank) + "-" +
-                                      std::to_string(this->mpi_size) + "-" + this->run_id;
+  std::string generated_file_suffix;
+  if (this->disable_mpi) {
+    generated_file_suffix = this->user + "-" + this->run_id + "-" + hostname + "-" + this->name;
+  } else {
+    generated_file_suffix = this->user + "-" + this->run_id + "-" + std::to_string(this->mpi_rank) +
+                            "-" + std::to_string(this->mpi_size) + "-" + this->name;
+  }
 
   std::string trace_file_name = "trace-" + generated_file_suffix + ".pfw.gz";
   this->trace_file_path = this->trace_log_dir / trace_file_name;
@@ -633,6 +642,22 @@ void ConfigurationManager::validate_configurations() {
                  this->trace_log_dir.string().c_str(), this->mpi_rank);
     throw std::runtime_error("Trace log directory does not exist: " +
                              std::filesystem::path(this->trace_log_dir).string());
+  }
+}
+
+void ConfigurationManager::load_mpi_configurations() {
+  if (this->disable_mpi) {
+    this->mpi_rank = 0;
+    this->mpi_size = 1;
+    DC_LOG_DEBUG("[ConfigurationManager] MPI disabled, setting rank to 0 and size to 1.");
+  } else {
+    DC_LOG_DEBUG("[ConfigurationManager] MPI enabled, initializing rank and size.");
+    int initialized;
+    int status = MPI_Initialized(&initialized);
+    if (status == MPI_SUCCESS && initialized == true) {
+      MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+      MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    }
   }
 }
 

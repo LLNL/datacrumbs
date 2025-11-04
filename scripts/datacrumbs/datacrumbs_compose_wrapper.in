@@ -5,7 +5,7 @@ SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 # Load environment
 source "$SCRIPT_DIR/datacrumbs_setup"
 
-check_root_user
+check_sudo_user
 
 DATACRUMBS_COMPOSABLE_NAME=$1
 shift
