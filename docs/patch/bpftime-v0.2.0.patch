@@ -1,0 +1,269 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a36fe07..373a2b3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -231,7 +231,7 @@ if(${BPFTIME_BUILD_STATIC_LIB})
+   )
+ 
+   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbpftime.a
+-    DESTINATION ~/.bpftime
++	  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+   )
+ endif()
+ 
+@@ -253,12 +253,12 @@ endif()
+ 
+ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+ 
+-set(DEST_DIR "$ENV{HOME}/.bpftime")
++set(DEST_DIR "${CMAKE_INSTALL_PREFIX}")
+ 
+ if(${BPFTIME_BUILD_WITH_LIBBPF})
+-  install(TARGETS bpftime-agent bpftime_text_segment_transformer bpftime-syscall-server CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${DEST_DIR})
++  install(TARGETS bpftime-agent bpftime_text_segment_transformer bpftime-syscall-server CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${DEST_DIR}/lib)
+ else()
+-  install(TARGETS bpftime-agent bpftime-syscall-server CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${DEST_DIR})
++  install(TARGETS bpftime-agent bpftime-syscall-server CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${DEST_DIR}/lib)
+ endif()
+ 
+ # add_subdirectory(./example/mix-schedule-mnist/cpu)
+diff --git a/daemon/CMakeLists.txt b/daemon/CMakeLists.txt
+index 1ba02cc..fb5fab2 100644
+--- a/daemon/CMakeLists.txt
++++ b/daemon/CMakeLists.txt
+@@ -66,7 +66,7 @@ set_property(TARGET libbpftime_daemon PROPERTY CXX_STANDARD 20)
+ add_dependencies(bpftime_daemon libbpftime_daemon)
+ target_link_libraries(bpftime_daemon PRIVATE libbpftime_daemon)
+ 
+-install(TARGETS bpftime_daemon CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ~/.bpftime)
++install(TARGETS bpftime_daemon CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+ 
+ if(BPFTIME_ENABLE_UNIT_TESTING)
+     add_subdirectory(test)
+diff --git a/runtime/agent/CMakeLists.txt b/runtime/agent/CMakeLists.txt
+index 27ae066..7a54834 100644
+--- a/runtime/agent/CMakeLists.txt
++++ b/runtime/agent/CMakeLists.txt
+@@ -2,7 +2,7 @@ add_library(bpftime-agent SHARED
+   agent.cpp
+ )
+ 
+-
++set(EXTRA_LINK_LIBS -static-libstdc++)
+ if(${BPFTIME_BUILD_WITH_LIBBPF})
+   add_dependencies(bpftime-agent FridaGum spdlog::spdlog bpftime_frida_uprobe_attach_impl bpftime_syscall_trace_attach_impl)
+ else()
+@@ -40,7 +40,7 @@ if(${BPFTIME_ENABLE_CUDA_ATTACH})
+   target_link_options(bpftime-agent PUBLIC "-Wl,--whole-archive" "$<TARGET_FILE:bpftime_nv_attach_impl>" "$<TARGET_FILE:bpftime_llvm_vm>" "$<TARGET_FILE:bpftime_vm>" "$<TARGET_FILE:llvmbpf_vm>" "-Wl,--no-whole-archive")
+   target_link_libraries(bpftime-agent PUBLIC bpftime_nv_attach_impl)
+   target_include_directories(bpftime-agent PUBLIC ${NV_ATTACH_IMPL_INCLUDE})
+-  set(EXTRA_LINK_LIBS bpftime_llvm_vm
++  set(EXTRA_LINK_LIBS ${EXTRA_LINK_LIBS} bpftime_llvm_vm
+     bpftime_vm
+     llvmbpf_vm)
+ endif()
+diff --git a/runtime/include/bpftime_config.hpp b/runtime/include/bpftime_config.hpp
+index 8032193..8cd5118 100644
+--- a/runtime/include/bpftime_config.hpp
++++ b/runtime/include/bpftime_config.hpp
+@@ -4,19 +4,20 @@
+ #include <boost/interprocess/containers/string.hpp>
+ #include <boost/interprocess/interprocess_fwd.hpp>
+ #include <boost/interprocess/managed_shared_memory.hpp>
++#include "spdlog/spdlog.h"
+ #include <cstdlib>
+ #include <string>
+ #include <variant>
+ 
+ #ifndef DEFAULT_LOGGER_OUTPUT_PATH
+-#define DEFAULT_LOGGER_OUTPUT_PATH "~/.bpftime/runtime.log"
++#define DEFAULT_LOGGER_OUTPUT_PATH "/usr/workspace/dldl/bpftime.log"
+ #endif
+ 
+ #ifndef DEFAULT_VM_NAME
+ #define DEFAULT_VM_NAME "llvm"
+ #endif
+ 
+-#define LOG_PATH_MAX_LEN 1024
++#define LOG_PATH_MAX_LEN 16*1024
+ #define VM_NAME_MAX_LEN 128
+ 
+ // Default and limits for file descriptor count
+@@ -72,6 +73,7 @@ struct agent_config {
+ 
+ 	const char *get_logger_output_path() const
+ 	{
++		SPDLOG_INFO("logger_output_path: {}", logger_output_path);
+ 		return logger_output_path;
+ 	}
+ 	void set_logger_output_path(const char *path)
+diff --git a/runtime/include/bpftime_logger.hpp b/runtime/include/bpftime_logger.hpp
+index 6e1480e..69c5040 100644
+--- a/runtime/include/bpftime_logger.hpp
++++ b/runtime/include/bpftime_logger.hpp
+@@ -40,7 +40,9 @@ inline std::string expand_user_path(const std::string &input_path)
+ inline void bpftime_set_logger(const std::string &target) noexcept
+ {
+ 	std::string logger_target = expand_user_path(target);
+-	spdlog::drop_all();
++	SPDLOG_INFO("Initialize logger start");
++	// spdlog::drop_all();
++	SPDLOG_INFO("Initialize logger drop");
+ 	if (logger_target == "console") {
+ 		// Set logger to stderr
+ 		auto logger = spdlog::stderr_color_mt("stderr");
+@@ -58,8 +60,10 @@ inline void bpftime_set_logger(const std::string &target) noexcept
+ 		spdlog::set_default_logger(logger);
+ 	}
+ 
++	SPDLOG_INFO("Initialize logger");
+ 	// Load log level from environment
+ 	spdlog::cfg::load_env_levels();
++	SPDLOG_INFO("Initialize logger Levels");
+ }
+ 
+ /*
+diff --git a/runtime/include/bpftime_shm.hpp b/runtime/include/bpftime_shm.hpp
+index 1ff769c..8c45f10 100644
+--- a/runtime/include/bpftime_shm.hpp
++++ b/runtime/include/bpftime_shm.hpp
+@@ -16,6 +16,7 @@
+ #elif __APPLE__
+ #include "bpftime_epoll.h"
+ #endif
++#include <linux/types.h>
+ 
+ extern "C" {
+ struct ebpf_inst;
+diff --git a/runtime/src/bpf_helper.cpp b/runtime/src/bpf_helper.cpp
+index cb7693f..be1f313 100644
+--- a/runtime/src/bpf_helper.cpp
++++ b/runtime/src/bpf_helper.cpp
+@@ -22,7 +22,13 @@
+ #ifdef ENABLE_BPFTIME_VERIFIER
+ #include "bpftime-verifier.hpp"
+ #endif
++#ifndef _GNU_SOURCE
++#define _GNU_SOURCE
++#endif
++
++#include <sys/syscall.h>
+ 
++#define gettid() syscall(SYS_gettid)
+ #include "platform_utils.hpp"
+ #include "spdlog/spdlog.h"
+ #include <map>
+diff --git a/runtime/src/bpf_map/userspace/ringbuf_map.cpp b/runtime/src/bpf_map/userspace/ringbuf_map.cpp
+index 94f19bb..1700381 100644
+--- a/runtime/src/bpf_map/userspace/ringbuf_map.cpp
++++ b/runtime/src/bpf_map/userspace/ringbuf_map.cpp
+@@ -16,6 +16,7 @@
+ #if __APPLE__
+ #include "bpftime_epoll.h"
+ #endif
++#include <linux/types.h>
+ 
+ enum {
+ 	BPF_RINGBUF_BUSY_BIT = 2147483648,
+diff --git a/runtime/src/bpftime_config.cpp b/runtime/src/bpftime_config.cpp
+index a46e326..22d43e0 100644
+--- a/runtime/src/bpftime_config.cpp
++++ b/runtime/src/bpftime_config.cpp
+@@ -98,21 +98,25 @@ agent_config bpftime::construct_agent_config_from_env() noexcept
+ 		auto helpers_sv = std::string_view(custom_helpers);
+ 		process_helper_sv(helpers_sv, ',', agent_config);
+ 	} else {
++		SPDLOG_INFO("Using custom_helpers: {}", true);
+ 		agent_config.enable_kernel_helper_group =
+ 			agent_config.enable_shm_maps_helper_group =
+ 				agent_config.enable_ufunc_helper_group = true;
+ 	}
+ 
+ 	if (getenv("BPFTIME_DISABLE_JIT") != nullptr) {
++		SPDLOG_INFO("Using jit_enabled: {}", false);
+ 		agent_config.jit_enabled = false;
+ 	}
+ 
+ 	if (getenv("BPFTIME_ALLOW_EXTERNAL_MAPS") != nullptr) {
++		SPDLOG_INFO("Using allow_non_buildin_map_types: {}", true);
+ 		agent_config.allow_non_buildin_map_types = true;
+ 	}
+ 
+ 	// Parse shared memory size with validation (1MB min, 10GB max)
+ 	if (auto shm_size = parse_numeric_env<int>("BPFTIME_SHM_MEMORY_MB", 1, 10240)) {
++		SPDLOG_INFO("Using shm_memory_size: {}", *shm_size);
+ 		agent_config.shm_memory_size = *shm_size;
+ 	}
+ 
+@@ -120,6 +124,7 @@ agent_config bpftime::construct_agent_config_from_env() noexcept
+ 	if (auto max_fd = parse_numeric_env<size_t>("BPFTIME_MAX_FD_COUNT", 
+ 	                                             MIN_MAX_FD_COUNT, 
+ 	                                             MAX_MAX_FD_COUNT)) {
++		SPDLOG_INFO("Using max_fd_count: {}", *max_fd);
+ 		agent_config.max_fd_count = *max_fd;
+ 	}
+ 
+@@ -132,6 +137,7 @@ agent_config bpftime::construct_agent_config_from_env() noexcept
+ 
+ 	const char *logger_target = std::getenv("BPFTIME_LOG_OUTPUT");
+ 	if (logger_target != nullptr) {
++		SPDLOG_INFO("Using logger_target: {}", logger_target);
+ 		agent_config.set_logger_output_path(logger_target);
+ 	}
+ 	return agent_config;
+diff --git a/runtime/syscall-server/CMakeLists.txt b/runtime/syscall-server/CMakeLists.txt
+index 20ac675..3dc1a07 100644
+--- a/runtime/syscall-server/CMakeLists.txt
++++ b/runtime/syscall-server/CMakeLists.txt
+@@ -29,7 +29,8 @@ target_link_libraries(bpftime-syscall-server PUBLIC
+     -lpthread
+     -lm
+     -ldl
+-    spdlog::spdlog)
++    spdlog::spdlog
++    -static-libstdc++)
+ 
+ add_dependencies(bpftime-syscall-server spdlog::spdlog)
+ 
+diff --git a/runtime/syscall-server/syscall_server_utils.cpp b/runtime/syscall-server/syscall_server_utils.cpp
+index 0699e72..cfaf10e 100644
+--- a/runtime/syscall-server/syscall_server_utils.cpp
++++ b/runtime/syscall-server/syscall_server_utils.cpp
+@@ -43,6 +43,7 @@ void start_up(syscall_context &ctx)
+ 	SPDLOG_INFO("Starting syscall server..");
+ 	already_setup = true;
+ 	auto agent_config = construct_agent_config_from_env();
++	SPDLOG_INFO("Initialize syscall server agent_config done");
+ 	bpftime_set_logger(std::string(agent_config.get_logger_output_path()));
+ 	SPDLOG_INFO("Initialize syscall server");
+ 
+diff --git a/tools/aot/CMakeLists.txt b/tools/aot/CMakeLists.txt
+index 66be305..cf7c50c 100644
+--- a/tools/aot/CMakeLists.txt
++++ b/tools/aot/CMakeLists.txt
+@@ -21,4 +21,4 @@ target_compile_definitions(bpftime-aot-cli PRIVATE _GNU_SOURCE)
+ 
+ add_dependencies(bpftime-aot-cli spdlog::spdlog argparse bpftime_vm_compat bpftime_llvm_vm libbpf)
+ 
+-install(TARGETS bpftime-aot-cli CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ~/.bpftime)
++install(TARGETS bpftime-aot-cli CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+diff --git a/tools/bpftimetool/CMakeLists.txt b/tools/bpftimetool/CMakeLists.txt
+index 4d67c56..1920c37 100644
+--- a/tools/bpftimetool/CMakeLists.txt
++++ b/tools/bpftimetool/CMakeLists.txt
+@@ -38,4 +38,4 @@ else()
+   )
+ endif()
+ 
+-install(TARGETS bpftimetool CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ~/.bpftime)
++install(TARGETS bpftimetool CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+diff --git a/tools/cli/CMakeLists.txt b/tools/cli/CMakeLists.txt
+index eb9c5f8..bac265f 100644
+--- a/tools/cli/CMakeLists.txt
++++ b/tools/cli/CMakeLists.txt
+@@ -24,4 +24,4 @@ target_compile_definitions(bpftime-cli-cpp PRIVATE _GNU_SOURCE)
+ 
+ add_dependencies(bpftime-cli-cpp spdlog::spdlog FridaCore argparse spdlog runtime bpftime_vm bpftime_vm_compat)
+ 
+-install(TARGETS bpftime-cli-cpp CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ~/.bpftime)
++install(TARGETS bpftime-cli-cpp CONFIGURATIONS Release Debug RelWithDebInfo DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
