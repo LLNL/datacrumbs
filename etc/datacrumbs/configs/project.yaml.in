@@ -22,8 +22,10 @@ trace:
 log:
   dir: @DATACRUMBS_CONFIGURED_LOG_DIR@
 server:
-  load_timeout: ${DATACRUMBS_SERVER_TIMEOUT_USER:-10}
+  load_timeout: ${DATACRUMBS_SERVER_TIMEOUT_USER:-600}
   pid_file: /var/run/datacrumbs.pid
+  module: 0
+  preamble:  
 job:
   run: flux run
   node_flag: -N

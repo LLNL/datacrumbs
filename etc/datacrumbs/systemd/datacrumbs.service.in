@@ -10,8 +10,8 @@ User=root
 # Optional:
 RemainAfterExit=no
 PIDFile=/run/datacrumbs.pid
-TimeoutStartSec=5min 
-TimeoutStopSec=1min 
+TimeoutStartSec=10min 
+TimeoutStopSec=5min 
 EnvironmentFile=/run/datacrumbs.env
 
 [Install]

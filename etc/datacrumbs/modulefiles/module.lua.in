@@ -33,6 +33,7 @@ prepend_path("PATH", bin_dir)
 prepend_path("PATH", sbin_dir)
 prepend_path("PATH", libexec_dir)
 prepend_path("LD_LIBRARY_PATH", lib_dir)
+prepend_path("LD_LIBRARY_PATH", "@DEPENDENCY_LIBRARY_DIRS_COLON@")
 prepend_path("ETCPATH", etc_dir)
 
 -- Set additional flags

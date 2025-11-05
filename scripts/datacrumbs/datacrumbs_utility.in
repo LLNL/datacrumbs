@@ -87,6 +87,7 @@ function datacrumbs_start_server() {
    PID=$!
    echo $PID > "$DATACRUMBS_SERVER_PID_FILE"
    log "Service started with PID: $PID"
+   chown ${DATACRUMBS_USER}:${DATACRUMBS_USER} $DATACRUMBS_LOG_FILE
   fi
 
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
@@ -101,7 +102,7 @@ function datacrumbs_start_server() {
       ELAPSED=$((ELAPSED + WAIT_INTERVAL))
       if [ $ELAPSED -ge $DATACRUMBS_SERVER_LOAD_TIMEOUT ]; then
           log "DATACRUMBS_SERVER_LOAD_TIMEOUT waiting for $READY_FILE"
-          server_launch $DATACRUMBS_INSTALL_BIN_DIR/datacrumbs_stop
+          server_launch $DATACRUMBS_INSTALL_SBIN_DIR/datacrumbs_stop
           cat $DATACRUMBS_LOG_FILE
           exit 1
       fi
@@ -199,6 +200,7 @@ function job_launch() {
       log "[DRY RUN] Would launch job: ${cmd[*]}"
       return 0
     fi
+  log "Launching job command: ${cmd[*]}"
   "${cmd[@]}"
 }
 
@@ -216,10 +218,18 @@ function server_launch() {
   else 
     cmd=("${mpi_cmd[@]}" "sudo"  "$@")
   fi
+  if [[ -z "${DATACRUMBS_JOB_ENABLE_MPI}" || "${DATACRUMBS_JOB_ENABLE_MPI}" == "1" ]]; then
+    debug "Launching server with MPI"
+    cmd=( "${cmd[@]}" )
+  else
+    debug "Launching server without MPI"
+    cmd=( "${cmd[@]}" --disable_mpi)
+  fi
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
     log "[DRY RUN] Would launch server: ${cmd[*]}"
     return 0
   fi
+  log "Launching server command: ${cmd[*]}"
   "${cmd[@]}"
 }
 
