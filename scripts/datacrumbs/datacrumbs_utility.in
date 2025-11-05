@@ -71,6 +71,7 @@ function datacrumbs_start_server() {
   if [ "$RUNID" == "1000" ]; then
     RUNID=$(date +"%Y-%m-%d-%H-%M-%S")
   fi
+  READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
   exec=$1
   exec=($exec)
   if [ -z "$DATACRUMBS_TRACE_DIR" ]; then
@@ -120,6 +121,7 @@ function datacrumbs_stop_server() {
   if [ "$RUNID" == "1000" ] && [ -f "$DATACRUMBS_SERVER_RUNID_FILE" ]; then
     RUNID=$(cat "$DATACRUMBS_SERVER_RUNID_FILE" 2>/dev/null)
   fi
+  READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
   exec=($exec)
   common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_TRACE_DIR" --run_id "$RUNID")
   cmd=("${exec[@]}" "stop" "${common_cmd[@]}")
@@ -141,7 +143,11 @@ function datacrumbs_stop_server() {
   # SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | grep -v "${prog_name}" | awk '{print $2}')
   if [ -n "$SERVER_PID" ]; then
       log "Found process(es) with RUNID ${RUNID}: $SERVER_PID. Killing them."
-      server_launch ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
+      if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
+        ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
+      else 
+        sudo ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
+      fi
       cat "${DATACRUMBS_LOG_FILE}"
   fi
   rm -f "${READY_FILE}"
@@ -150,6 +156,9 @@ function datacrumbs_stop_server() {
 }
 
 function datacrumbs_print_status() {
+  if [ "$RUNID" == "1000" ] && [ -f "$DATACRUMBS_SERVER_RUNID_FILE" ]; then
+    RUNID=$(cat "$DATACRUMBS_SERVER_RUNID_FILE" 2>/dev/null)
+  fi
   local status_file="/tmp/datacrumbs_${DATACRUMBS_USER}_status_${RUNID}.json"
   if [ "${DRY_RUN:-0}" -eq 1 ]; then
     log "[DRY RUN] Would print status from: $status_file"

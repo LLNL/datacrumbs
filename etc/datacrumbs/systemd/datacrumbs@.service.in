@@ -1,0 +1,18 @@
+[Unit]
+Description=Datacrumbs Service for composite: %I
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=@DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_server_run.sh --verbose --composite-name %i
+ExecStop=@DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_server_stop.sh --verbose --composite-name %i
+User=root
+# Optional:
+RemainAfterExit=no
+PIDFile=/run/datacrumbs.pid
+TimeoutStartSec=10min 
+TimeoutStopSec=5min 
+EnvironmentFile=/run/datacrumbs.env
+
+[Install]
+WantedBy=multi-user.target

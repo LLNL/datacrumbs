@@ -601,6 +601,14 @@ install(FILES "${CMAKE_MODULES_OUTPUT_DIRECTORY}/${PROJECT_NAME}/${DATACRUMBS_RE
     DESTINATION "${DATACRUMBS_INSTALL_ETC_MODULESDIR}/${PROJECT_NAME}"
 )
 
+# flux cli plugin file
+configure_file("${CMAKE_SOURCE_DIR}/etc/datacrumbs/flux/cli/plugins/datacrumbs.py"
+    "${CMAKE_FLUX_OUTPUT_DIRECTORY}/cli/plugins/datacrumbs.py" @ONLY)
+
+install(FILES "${CMAKE_FLUX_OUTPUT_DIRECTORY}/cli/plugins/datacrumbs.py"
+    DESTINATION "${DATACRUMBS_INSTALL_ETC_FLUX}/cli/plugins"
+)
+
 # ------------------------------------------------------------------------------
 # Install Datacrumbs scripts
 # ------------------------------------------------------------------------------
@@ -732,12 +740,20 @@ install(
     ${DATACRUMBS_INSTALL_SBINARYDIR}
 )
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/systemd/datacrumbs.service.in ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs.service @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/systemd/datacrumbs@.service.in ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs@.service @ONLY)
 install(
     PROGRAMS
-    ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs.service
+    ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs@.service
     DESTINATION
     ${DATACRUMBS_INSTALL_ETC_SYSTEMD}
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_service_common.sh.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_service_common.sh @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_service_common.sh
+    DESTINATION
+    ${DATACRUMBS_INSTALL_SBINARYDIR}
 )
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_service_run.sh.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_service_run.sh @ONLY)

@@ -517,9 +517,13 @@ void ConfigurationManager::derive_configurations() {
   DC_LOG_DEBUG("[ConfigurationManager] Hostname: %s for rank: %d", this->hostname.c_str(),
                this->mpi_rank);
 
-  std::string generated_file_suffix = this->user + "-" + this->name + "-" +
-                                      std::to_string(this->mpi_rank) + "-" +
-                                      std::to_string(this->mpi_size) + "-" + this->run_id;
+  std::string generated_file_suffix;
+  if (this->disable_mpi) {
+    generated_file_suffix = this->user + "-" + this->run_id + "-" + hostname + "-" + this->name;
+  } else {
+    generated_file_suffix = this->user + "-" + this->run_id + "-" + std::to_string(this->mpi_rank) +
+                            "-" + std::to_string(this->mpi_size) + "-" + this->name;
+  }
 
   std::string trace_file_name = "trace-" + generated_file_suffix + ".pfw.gz";
   this->trace_file_path = this->trace_log_dir / trace_file_name;

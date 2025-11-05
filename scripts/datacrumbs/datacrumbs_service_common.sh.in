@@ -1,0 +1,41 @@
+#!/bin/bash
+
+FLUX_DATACRUMBS=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs)
+
+warn_user() {
+    ## post exception to flux log, cancel job
+    flux job raise --severity=1 ${FLUX_JOB_ID}  "datacrumbs-prolog: $@"
+}
+
+if [[ ${FLUX_DATACRUMBS} == "null" ]]; then
+    logger "User hasn't requested datacrumbs feature, exiting."
+    return 1
+fi
+FLUX_DATACRUMBS=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs.enable)
+if [[ ${FLUX_DATACRUMBS} == "null" || "${FLUX_DATACRUMBS}" != "yes" ]]; then
+    logger "User hasn't requested datacrumbs feature, exiting."
+    return 1
+fi
+
+FLUX_DATACRUMBS_COMPOSE=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs.composite)
+if [[ ${FLUX_DATACRUMBS_COMPOSE} == "null"  || ${FLUX_DATACRUMBS_COMPOSE} == "" ]]; then
+    DATACRUMBS_COMPOSABLE_NAME="NONE"
+    logger "User hasn't requested datacrumbs' composite feature using ${DATACRUMBS_COMPOSABLE_NAME}."
+else
+    DATACRUMBS_COMPOSABLE_NAME=${FLUX_DATACRUMBS_COMPOSE}
+    if [ -n "$FLUX_JOB_USERID" ]; then
+        DATACRUMBS_USER=$(id -nu $FLUX_JOB_USERID)
+    fi
+    if [[ ! -f "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXEC_DIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/${DATACRUMBS_USER}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME}" ]]; then
+        warn_user "Error: Composable name ${DATACRUMBS_COMPOSABLE_NAME} does not exist."
+        return 1
+    fi
+    logger "User has requested datacrumbs' composite feature using ${DATACRUMBS_COMPOSABLE_NAME}."
+fi
+
+if [[ ! ${DATACRUMBS_COMPOSABLE_NAME} =~ ^[a-zA-Z_]+$ ]]; then
+    warn_user "Error: DATACRUMBS_COMPOSABLE_NAME: ${DATACRUMBS_COMPOSABLE_NAME} contains invalid characters. Only alphabets and underscores are allowed."
+    return 1
+fi
+
+export DATACRUMBS_COMPOSABLE_NAME

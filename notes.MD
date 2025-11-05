@@ -27,11 +27,12 @@ sudo ssh lead${i} rm /etc/flux/system/prolog-job-manager.d/datacrumbs*
 sudo ssh lead${i} rm /etc/flux/system/epilog.d/datacrumbs*
 sudo scp -p ./bin/datacrumbs_service_run.sh lead${i}:/etc/flux/system/prolog-job-manager.d/
 sudo scp -p ./bin/datacrumbs_service_stop.sh lead${i}:/etc/flux/system/epilog.d/
-sudo scp -p ./etc/datacrumbs/systemd/datacrumbs.service lead${i}:/etc/systemd/system/
+sudo scp -p ./etc/datacrumbs/systemd/datacrumbs@.service lead${i}:/etc/systemd/system/
 sudo ssh lead${i} << 'EOF'
 chmod u+x /etc/flux/system/prolog-job-manager.d/datacrumbs*
 chmod u+x /etc/flux/system/epilog.d//datacrumbs*
 rm -r /tmp/datacrumbs*
+systemctl daemon-reload
 EOF
 done
 ```
@@ -49,7 +50,7 @@ done
 ```bash
 for i in 2 {4..6} {9..11}; do
 sudo ssh lead${i} << 'EOF'
-/admin/scripts/flux_reconfig.sh
+rm /etc/systemd/system/datacrumbs.service
 EOF
 done
 for i in 2 {4..6} {9..11}; do
@@ -63,7 +64,7 @@ done
 for i in 2 {4..6} {9..11}; do
 echo Checking lead${i}
 sudo ssh lead${i} << 'EOF'
-cat /etc/flux/system/conf.d/job-manager.toml
+systemctl daemon-reload
 EOF
 done
 ```
@@ -79,9 +80,23 @@ Then allocate
 
 
 ```bash
+error_user() {
+    ## post exception to flux log, cancel job
+    flux job raise --severity=0 ${FLUX_JOB_ID}  "blockfile-prolog: $@"
+    ## For convenience of sysadmins, do not drain nodes whenever a user
+    ## does something silly that doesn't affect anyone else.
+    exit 0
+}
 warn_user() {
     ## post exception to flux log, cancel job
-    flux job raise ${FLUX_JOB_ID} --severity=0 "blockfile-prolog: $@"
+    flux job raise --severity=1 ${FLUX_JOB_ID}  "datacrumbs-prolog: $@"
+    ## For convenience of sysadmins, do not drain nodes whenever a user
+    ## does something silly that doesn't affect anyone else.
+    exit 0
+}
+info_user() {
+    ## post exception to flux log, cancel job
+    flux job raise --severity=7 ${FLUX_JOB_ID}  "blockfile-prolog: $@"
     ## For convenience of sysadmins, do not drain nodes whenever a user
     ## does something silly that doesn't affect anyone else.
     exit 0
@@ -89,3 +104,11 @@ warn_user() {
 ```
 
 sudo journalctl -u "flux*" --no-pager
+
+```bash
+nodes=2
+flux run -N $nodes --tasks-per-node 16 ~/software/ior/install/bin/ior -t 1m -b 16m -F -o /tmp/file2
+flux run -N $nodes  --tasks-per-node 16 ~/software/ior/install/bin/ior -a MPIIO -t 1m -b 16m -F -o /tmp/file2
+flux run -N $nodes --tasks-per-node 16 ~/software/ior/install/bin/ior -c -t 1m -b 16m -F -o /tmp/file2 -z
+flux run -N $nodes  --tasks-per-node 16 ~/software/ior/install/bin/ior -t 1m -b 16m -F -o /tmp/file2
+```

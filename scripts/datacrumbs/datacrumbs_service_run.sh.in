@@ -1,7 +1,13 @@
 #!/bin/bash
-ulimit -c unlimited
-umask 022
-printenv > /run/datacrumbs.env
-echo datacrumbs_service_run "Starting datacrumbs service run script on job ${FLUX_JOB_ID}"
-sudo systemctl enable datacrumbs.service
-sudo systemctl start datacrumbs.service
+
+source @DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_service_common.sh
+if [ $? -eq 0 ]; then
+    umask 022
+    printenv > /run/datacrumbs.env
+    echo datacrumbs_service_run "Starting datacrumbs service run script on job ${FLUX_JOB_ID}"
+    sudo systemctl enable datacrumbs@$DATACRUMBS_COMPOSABLE_NAME.service
+    sudo systemctl start datacrumbs@$DATACRUMBS_COMPOSABLE_NAME.service
+fi
+exit 0
+
+

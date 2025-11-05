@@ -12,33 +12,21 @@ capture_probes:
     type: header
     file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/syscalls.h
     regex: sys_.*
-  - name: libc
-    probe: uprobe
-    type: binary
-    file: @DATACRUMBS_LIBC_SO@
-    regex: .*fork.*
-  - name: bio
-    probe: kprobe
-    type: ksym
-    regex: bio.*
-  - name: python
-    probe: usdt
-    type: usdt
-    binary_path: /usr/lib64/libpython3.9.so
-    provider: python
   - name: os_page_cache
     probe: kprobe
     type: header
     file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/pagemap.h
-  - name: shm
+  - name: lustre
     probe: kprobe
-    type: header
-    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/shmem_fs.h
-  - name: fscache
-    probe: kprobe
-    type: header
-    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/fscache.h
-  - name: iomap
-    probe: kprobe
-    type: ksym
-    regex: ^iomap(?!.*cold).*
+    type: binary
+    file: /usr/lib/modules/5.14.0-570.55.1.1toss.t5.x86_64/weak-updates/lustre/fs/lustre.ko
+  - name: mpiio
+    probe: uprobe
+    type: binary
+    file: /opt/toss/openmpi/4.1/gnu/lib/libmpi.so
+    regex: .*
+  - name: ior
+    probe: uprobe
+    type: binary
+    file: /home/haridev/software/ior/install/bin/ior
+    regex: .*

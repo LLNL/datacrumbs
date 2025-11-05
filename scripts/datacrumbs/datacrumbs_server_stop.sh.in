@@ -12,10 +12,11 @@ fi
 source "$SCRIPT_DIR/datacrumbs_args"
 
 dc_args_init "DATACRUMBS"
-dc_args_add_option "DATACRUMBS" "enable_mpi" "OPTIONAL" "switch to enable MPI" "bool" "0"
+dc_args_add_option "DATACRUMBS" "composite-name" "OPTIONAL" "Composable name" "string"
+dc_args_add_option "DATACRUMBS" "enable-mpi" "OPTIONAL" "switch to enable MPI" "bool" "0"
 dc_args_add_option "DATACRUMBS" "nodes" "OPTIONAL" "Set number of nodes" "int" "1"
 dc_args_add_option "DATACRUMBS" "ppn" "OPTIONAL" "Set processes per node" "int" "1"
-dc_args_add_subcommand "DATACRUMBS" "enable_mpi" "1" "nodes" "ppn"
+dc_args_add_subcommand "DATACRUMBS" "enable-mpi" "1" "nodes" "ppn"
 
 dc_args_parse "DATACRUMBS" "datacrumbs_run" "$@"
 
@@ -29,12 +30,21 @@ export DATACRUMBS_JOB_ENABLE_MPI=${DATACRUMBS_ENABLE_MPI:-0}
 export DATACRUMBS_JOB_NODES=${DATACRUMBS_NODES:-1}
 export DATACRUMBS_JOB_PPN=${DATACRUMBS_PPN:-1}
 
-# Convert APP_CMD string into array, splitting on spaces
-read -ra APP_CMD <<< "${DATACRUMBS_APP}"
 
 PROG_NAME=$(basename "$0")
 
 source $SCRIPT_DIR/datacrumbs_setup
+
+if [[ "$DATACRUMBS_COMPOSITE_NAME" != "" ]] && [[ "$DATACRUMBS_COMPOSITE_NAME" != "NONE" ]]; then
+    if [[ ! -f "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSITE_NAME}" ]]; then
+        error "Composite ${DATACRUMBS_COMPOSITE_NAME} not found for ${DATACRUMBS_USER}"
+        exit 1
+    fi
+fi
+
+# Convert APP_CMD string into array, splitting on spaces
+read -ra APP_CMD <<< "${DATACRUMBS_APP}"
+
 
 check_sudo_user
 
@@ -50,7 +60,14 @@ debug "DATACRUMBS_LOG_FILE: $DATACRUMBS_LOG_FILE"
 debug "READY_FILE: $READY_FILE"
 echo "Running cmd: ${APP_CMD[*]} as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_TRACE_DIR and log file $DATACRUMBS_LOG_FILE"
 
-datacrumbs_stop_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs $PROG_NAME
+exec=()
+if [[ "$DATACRUMBS_COMPOSITE_NAME" != "" ]] && [[ "$DATACRUMBS_COMPOSITE_NAME" != "NONE" ]]; then
+    exec=("${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_compose_wrapper" "${DATACRUMBS_COMPOSITE_NAME}")
+else
+    exec=(@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs)
+fi
+
+datacrumbs_stop_server "${exec[*]}" $PROG_NAME
 
 datacrumbs_print_status
 

@@ -17,6 +17,11 @@ if [ "${DATACRUMBS_ENV_LOADED:-0}" -eq 0 ]; then
             DATACRUMBS_USER=$USER
             debug "User is root."
         fi
+        if [ -z "$DATACRUMBS_USER" ] || [ "$DATACRUMBS_USER" = "root" ]; then
+            if [ -n "$FLUX_JOB_USERID" ]; then
+            DATACRUMBS_USER=$(id -nu $FLUX_JOB_USERID)
+            fi
+        fi
     fi
     
     readonly DATACRUMBS_IS_ROOT
