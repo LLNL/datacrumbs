@@ -24,6 +24,7 @@ log:
 server:
   load_timeout: ${DATACRUMBS_SERVER_TIMEOUT_USER:-600}
   pid_file: /var/run/datacrumbs.pid
+  ts_file: /tmp/datacrumbs.ts
   module: 0
   preamble:  
 job:

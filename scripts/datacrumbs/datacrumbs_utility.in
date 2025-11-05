@@ -68,6 +68,9 @@ function datacrumbs_init() {
 }
 
 function datacrumbs_start_server() {
+  if [ "$RUNID" == "1000" ]; then
+    RUNID=$(date +"%Y-%m-%d-%H-%M-%S")
+  fi
   exec=$1
   exec=($exec)
   if [ -z "$DATACRUMBS_TRACE_DIR" ]; then
@@ -107,13 +110,16 @@ function datacrumbs_start_server() {
           exit 1
       fi
   done
-
+  echo $RUNID > "$DATACRUMBS_SERVER_RUNID_FILE"
   log "Started server"
 }
 
 function datacrumbs_stop_server() {
   exec=$1
   prog_name=$2
+  if [ "$RUNID" == "1000" ] && [ -f "$DATACRUMBS_SERVER_RUNID_FILE" ]; then
+    RUNID=$(cat "$DATACRUMBS_SERVER_RUNID_FILE" 2>/dev/null)
+  fi
   exec=($exec)
   common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_TRACE_DIR" --run_id "$RUNID")
   cmd=("${exec[@]}" "stop" "${common_cmd[@]}")
@@ -139,6 +145,7 @@ function datacrumbs_stop_server() {
       cat "${DATACRUMBS_LOG_FILE}"
   fi
   rm -f "${READY_FILE}"
+  rm -f "${DATACRUMBS_SERVER_RUNID_FILE}"
   log "Stopped server"
 }
 
