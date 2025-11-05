@@ -5,3 +5,4 @@ printenv > /run/datacrumbs.env
 echo datacrumbs_service_run "Starting datacrumbs service run script on job ${FLUX_JOB_ID}"
 sudo systemctl enable datacrumbs.service
 sudo systemctl start datacrumbs.service
+FLUX_JOB_USERID=35619
