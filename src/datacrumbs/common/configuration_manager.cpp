@@ -445,7 +445,7 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       DC_LOG_DEBUG("[ConfigurationManager] disable_mpi overridden by argument: %s",
                    this->disable_mpi ? "true" : "false");
     } else {
-      this->disable_mpi = true;
+      this->disable_mpi = false;
       DC_LOG_DEBUG("[ConfigurationManager] No disable_mpi specified, using default: false");
     }
   }
