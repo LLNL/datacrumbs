@@ -158,9 +158,11 @@ int EventProcessor::update_filename(const char* filename, unsigned int hash) {
     DC_LOG_DEBUG("Filename %s with hash %u already processed, skipping", filename, hash);
     return 0;  // Skip if already processed
   }
+  auto file_str = utils::remove_non_utf8(filename);
+
   processed_hashes_.insert(hash);  // Mark this hash as processed
   auto args = new DataCrumbsArgs();
-  args->emplace("value", std::string(filename));
+  args->emplace("value", file_str);
   args->emplace("hash", hash);
   auto event =
       new datacrumbs::EventWithId(METADATA_EVENT, event_index.fetch_add(1), 0, 0, 0, 0, 0, args);

@@ -97,14 +97,14 @@ ArgumentParser::ArgumentParser(int argc, char** argv, ExecutableType exe_type) {
     } else if (arg == "--log_dir" && i + 1 < argc) {
       log_dir = argv[++i];
       DC_LOG_DEBUG("[ArgumentParser] Log directory set to: %s", log_dir->c_str());
-    } else if (arg == "--disable_mpi") {
+    } else if (arg == "--disable-mpi") {
       disable_mpi = true;
       DC_LOG_DEBUG("[ArgumentParser] disable_mpi set to: %s", disable_mpi ? "true" : "false");
     } else if (arg == "--help" || arg == "-h") {
       DC_LOG_PRINT(
           "Usage: %s <config_name> [--run_id <id>] [--trace_log_dir <path>] "
           "[--config_path <path>] [--user <user>] [--data_dir "
-          "<path>] [--inclusion_path <path>] [--log_dir <path>]",
+          "<path>] [--inclusion_path <path>] [--log_dir <path>] [--disable-mpi]",
           argv[0]);
       exit(0);
     } else {
