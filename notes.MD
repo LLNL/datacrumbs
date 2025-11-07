@@ -21,7 +21,7 @@ for i in {3..6} {9..11}; do
 done
 ```
 ```bash
-for i in 2 {4..6} {9..11}; do
+for i in {2..6} {9..11}; do
 echo "Copying prolog and epilog files into server:lead${i}"
 sudo ssh lead${i} rm /etc/flux/system/prolog-job-manager.d/datacrumbs*
 sudo ssh lead${i} rm /etc/flux/system/epilog.d/datacrumbs*
@@ -53,7 +53,7 @@ sudo ssh lead${i} << 'EOF'
 rm /etc/systemd/system/datacrumbs.service
 EOF
 done
-for i in 2 {4..6} {9..11}; do
+for i in 2; do
 sudo ssh lead${i} << 'EOF'
 /admin/scripts/flux_reconfig.sh
 flux config reload
@@ -61,10 +61,10 @@ EOF
 done
 ```
 ```bash
-for i in 2 {4..6} {9..11}; do
+for i in {2..6} {9..11}; do
 echo Checking lead${i}
 sudo ssh lead${i} << 'EOF'
-systemctl daemon-reload
+chmod 777 /p/ssd
 EOF
 done
 ```
@@ -111,4 +111,19 @@ flux run -N $nodes --tasks-per-node 16 ~/software/ior/install/bin/ior -t 1m -b 1
 flux run -N $nodes  --tasks-per-node 16 ~/software/ior/install/bin/ior -a MPIIO -t 1m -b 16m -F -o /tmp/file2
 flux run -N $nodes --tasks-per-node 16 ~/software/ior/install/bin/ior -c -t 1m -b 16m -F -o /tmp/file2 -z
 flux run -N $nodes  --tasks-per-node 16 ~/software/ior/install/bin/ior -t 1m -b 16m -F -o /tmp/file2
+```
+
+```bash
+mkfs /dev/sda
+DIR=/p/ssd
+pdsh -g compute mkdir -p $DIR
+pdsh -g compute 'mount /dev/sda $DIR'
+pdsh -g compute 'chmod 777 $DIR'
+```
+
+```bash
+for i in {0..16}; do
+done
+flux run -n 1 ~/software/ior/install/bin/ior -o /p/ssd/test -t 1g -b 64g
+flux run -n 16 ~/software/ior/install/bin/ior -o /p/ssd/test -t 32m -b 4g
 ```

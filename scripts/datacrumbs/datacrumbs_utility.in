@@ -53,20 +53,25 @@ function datacrumbs_init() {
 }
 
 function datacrumbs_start_server() {
-  if [[ "$RUNID" == "1000" ]]; then
-    RUNID=$(date +"%Y-%m-%d-%H-%M-%S")
-  fi
-  READY_FILE="@DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
-  exec=$1
-  exec=($exec)
-  if [[ -z "$DATACRUMBS_TRACE_DIR" ]]; then
-    error "DATACRUMBS_TRACE_DIR is empty. Please set the trace directory."
-    exit 1
-  fi
-  common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_TRACE_DIR" --run_id "$RUNID")
-  cmd=("${exec[@]}" "run" "${common_cmd[@]}")
-  WAIT_INTERVAL=2
-  ELAPSED=0
+	if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
+		mkdir -p "$DATACRUMBS_SERVER_RUN_DIR"
+	else
+		sudo mkdir -p "$DATACRUMBS_SERVER_RUN_DIR"
+	fi
+	if [[ ! -w "$DATACRUMBS_SERVER_RUN_DIR" ]]; then
+		warn "Cannot write to DATACRUMBS_SERVER_RUN_DIR: $DATACRUMBS_SERVER_RUN_DIR. Trying sudo."
+		sudo mkdir -p "$DATACRUMBS_SERVER_RUN_DIR"
+	fi
+	exec=$1
+	exec=($exec)
+	if [[ -z "$DATACRUMBS_TRACE_DIR" ]]; then
+		error "DATACRUMBS_TRACE_DIR is empty. Please set the trace directory."
+		exit 1
+	fi
+	common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_TRACE_DIR" --run_id "$DATACRUMBS_SERVER_RUN_ID")
+	cmd=("${exec[@]}" "run" "${common_cmd[@]}")
+	WAIT_INTERVAL=2
+	ELAPSED=0
 
   log "Starting Server: ${cmd[*]}"
   if [[ "${DRY_RUN:-0}" == "1" ]]; then
@@ -119,25 +124,27 @@ function datacrumbs_stop_server() {
    server_launch "${cmd[@]}" >> $DATACRUMBS_LOG_FILE 2>&1
   fi
 
-  if [[ "${DRY_RUN:-0}" == "1" ]]; then
-    log "[DRY RUN] Would find and kill process(es) with RUNID ${RUNID}"
-    log "[DRY RUN] Would remove ready file: $READY_FILE"
-    return 0
-  fi
-  SERVER_PID=$(cat "$DATACRUMBS_SERVER_PID_FILE")
-  # SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | grep -v "${prog_name}" | awk '{print $2}')
-  if [[ -n "$SERVER_PID" ]]; then
-      log "Found process(es) with RUNID ${RUNID}: $SERVER_PID. Killing them."
-      if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
-        ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
-      else 
-        sudo ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
-      fi
-      cat "${DATACRUMBS_LOG_FILE}"
-  fi
-  rm -f "${READY_FILE}"
-  rm -f "${DATACRUMBS_SERVER_RUNID_FILE}"
-  log "Stopped server"
+	if [[ "${DRY_RUN:-0}" == "1" ]]; then
+		log "[DRY RUN] Would find and kill process(es) with DATACRUMBS_SERVER_RUN_ID ${DATACRUMBS_SERVER_RUN_ID}"
+		log "[DRY RUN] Would remove ready file: $DATACRUMBS_SERVER_READY_FILE"
+		return 0
+	fi
+	SERVER_PID=$(cat "$DATACRUMBS_SERVER_PID_FILE" 2>/dev/null || true)
+	# SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | grep -v "${prog_name}" | awk '{print $2}')
+	if [[ -n "$SERVER_PID" ]]; then
+		log "Found process(es) with DATACRUMBS_SERVER_RUN_ID ${DATACRUMBS_SERVER_RUN_ID}: $SERVER_PID. Killing them."
+		if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
+			${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
+		else
+			sudo ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
+		fi
+		cat "${DATACRUMBS_LOG_FILE}"
+	fi
+	rm -f "${DATACRUMBS_SERVER_READY_FILE}"
+	rm -f "${DATACRUMBS_SERVER_RUN_ID_FILE}"
+	rm -f "${DATACRUMBS_SERVER_PID_FILE}"
+	rm -f "${DATACRUMBS_SERVER_SYSTEMD_PID_FILE}"
+	log "Stopped server"
 }
 
 function datacrumbs_print_status() {
@@ -224,9 +231,9 @@ function server_launch() {
     cmd=( "${cmd[@]}" )
   else
     debug "Launching server without MPI"
-    cmd=( "${cmd[@]}" --disable_mpi)
+    cmd=( "${cmd[@]}" --disable-mpi)
   fi
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would launch server: ${cmd[*]}"
     return 0
   fi
