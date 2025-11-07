@@ -268,9 +268,19 @@ dc_args_usage() {
                         done
                     done
                     if (( ${#__vals[@]} > 0 )); then
-                        local __vals_joined
-                        IFS='|' read -r __vals_joined <<< "${__vals[*]}"
-                        note=" (required when --$SUBCMD_OPT=$__vals_joined)"
+                        # Check if the subcommand option is a bool type
+                        local __subcmd_idx="${IDX[$SUBCMD_OPT]}"
+                        local __subcmd_type="${T[$__subcmd_idx]}"
+                        
+                        if [[ "$__subcmd_type" == "bool" ]]; then
+                            # For bool, just show --option without =value
+                            note=" (required when --$SUBCMD_OPT)"
+                        else
+                            # For non-bool, show --option=value1|value2
+                            local __vals_joined
+                            IFS='|' read -r __vals_joined <<< "${__vals[*]}"
+                            note=" (required when --$SUBCMD_OPT=$__vals_joined)"
+                        fi
                     fi
                 fi
                 if [[ "${T[i]}" == "bool" ]]; then
@@ -505,12 +515,22 @@ dc_args_pretty_print() {
                         done
                     done
                     if (( ${#__vals[@]} > 0 )); then
-                        local __joined=""; local __idx
-                        for __idx in "${!__vals[@]}"; do
-                            [[ "$__idx" -gt 0 ]] && __joined+="|"
-                            __joined+="${__vals[$__idx]}"
-                        done
-                        note=" (required when --$SUBCMD_OPT=$__joined)"
+                        # Check if the subcommand option is a bool type
+                        local __subcmd_idx="${IDX[$SUBCMD_OPT]}"
+                        local __subcmd_type="${T[$__subcmd_idx]}"
+                        
+                        if [[ "$__subcmd_type" == "bool" ]]; then
+                            # For bool, just show --option without =value
+                            note=" (required when --$SUBCMD_OPT)"
+                        else
+                            # For non-bool, show --option=value1|value2|...
+                            local __joined=""; local __idx
+                            for __idx in "${!__vals[@]}"; do
+                                [[ "$__idx" -gt 0 ]] && __joined+="|"
+                                __joined+="${__vals[$__idx]}"
+                            done
+                            note=" (required when --$SUBCMD_OPT=$__joined)"
+                        fi
                     fi
                 fi
 
