@@ -3,18 +3,6 @@ FROM hdevarajan92/datacrumbs:latest
 RUN mkdir -p /opt/datacrumbs
 COPY . /opt/datacrumbs/
 
-# Create a non-root user 'docker' with passwordless sudo access and install tools
-RUN (dnf -y install epel-release || yum -y install epel-release) && \
-    (dnf -y install sudo || yum -y install sudo) && \
-    (dnf -y install patchelf || yum -y install patchelf) && \
-    (dnf -y install openmpi-devel || yum -y install openmpi-devel) && \
-    (dnf clean all || yum clean all) && \
-    groupadd -f wheel && \
-    useradd -m -s /bin/bash docker && \
-    usermod -aG wheel docker && \
-    echo 'docker ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/docker && \
-    chmod 0440 /etc/sudoers.d/docker
-
 RUN . /opt/rh/gcc-toolset-11/enable && \
     mkdir -p datacrumbs-build && \
     rm -rf datacrumbs-build/* && \
