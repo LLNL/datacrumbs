@@ -52,7 +52,7 @@ if [[ -n "${DRY_RUN}" && "${DRY_RUN}" != "0" ]]; then
 fi
 
 run() {
-    if [[ "$DRY_RUN_MODE" -eq 1 ]]; then
+    if [[ "$DRY_RUN_MODE" == "1" ]]; then
         printf "[DRY-RUN]"
         printf " %q" "$@"
         printf "\n"

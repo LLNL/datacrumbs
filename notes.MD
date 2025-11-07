@@ -21,7 +21,7 @@ for i in {3..6} {9..11}; do
 done
 ```
 ```bash
-for i in 2 {4..6} {9..11}; do
+for i in {2..6} {9..11}; do
 echo "Copying prolog and epilog files into server:lead${i}"
 sudo ssh lead${i} rm /etc/flux/system/prolog-job-manager.d/datacrumbs*
 sudo ssh lead${i} rm /etc/flux/system/epilog.d/datacrumbs*
@@ -111,4 +111,12 @@ flux run -N $nodes --tasks-per-node 16 ~/software/ior/install/bin/ior -t 1m -b 1
 flux run -N $nodes  --tasks-per-node 16 ~/software/ior/install/bin/ior -a MPIIO -t 1m -b 16m -F -o /tmp/file2
 flux run -N $nodes --tasks-per-node 16 ~/software/ior/install/bin/ior -c -t 1m -b 16m -F -o /tmp/file2 -z
 flux run -N $nodes  --tasks-per-node 16 ~/software/ior/install/bin/ior -t 1m -b 16m -F -o /tmp/file2
+```
+
+```bash
+mkfs /dev/sda
+DIR=/p/ssd
+pdsh -g compute mkdir -p $DIR
+pdsh -g compute 'mount /dev/sda $DIR'
+pdsh -g compute 'chmod 777 $DIR'
 ```

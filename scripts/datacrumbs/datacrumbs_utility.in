@@ -239,9 +239,9 @@ function server_launch() {
     cmd=( "${cmd[@]}" )
   else
     debug "Launching server without MPI"
-    cmd=( "${cmd[@]}" --disable_mpi)
+    cmd=( "${cmd[@]}" --disable-mpi)
   fi
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would launch server: ${cmd[*]}"
     return 0
   fi

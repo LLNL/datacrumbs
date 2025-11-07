@@ -150,5 +150,66 @@ class Timer {
   double elapsed_time;                                // Accumulated elapsed time in seconds
 };
 
+// Function to remove non-UTF8 characters from a string
+inline std::string remove_non_utf8(const std::string& input) {
+  DC_LOG_TRACE("Start remove_non_utf8, input size: %zu", input.size());
+  std::string result;
+  result.reserve(input.size());
+
+  for (size_t i = 0; i < input.size();) {
+    unsigned char byte = static_cast<unsigned char>(input[i]);
+
+    // Single-byte UTF-8 character (0xxxxxxx)
+    if (byte <= 0x7F) {
+      // Only keep characters valid for filenames/paths
+      if ((byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') ||
+          (byte >= '0' && byte <= '9') || byte == '_' || byte == '-' || byte == '.' ||
+          byte == '/' || byte == '\\') {
+        result += input[i];
+      } else {
+        DC_LOG_DEBUG("Skipping invalid filename character 0x%02X at position %zu", byte, i);
+      }
+      i++;
+    }
+    // Multi-byte UTF-8 character
+    else if ((byte & 0xE0) == 0xC0) {  // 2-byte (110xxxxx)
+      if (i + 1 < input.size() && (static_cast<unsigned char>(input[i + 1]) & 0xC0) == 0x80) {
+        result += input.substr(i, 2);
+        i += 2;
+      } else {
+        DC_LOG_DEBUG("Invalid 2-byte UTF-8 sequence at position %zu", i);
+        i++;
+      }
+    } else if ((byte & 0xF0) == 0xE0) {  // 3-byte (1110xxxx)
+      if (i + 2 < input.size() && (static_cast<unsigned char>(input[i + 1]) & 0xC0) == 0x80 &&
+          (static_cast<unsigned char>(input[i + 2]) & 0xC0) == 0x80) {
+        result += input.substr(i, 3);
+        i += 3;
+      } else {
+        DC_LOG_DEBUG("Invalid 3-byte UTF-8 sequence at position %zu", i);
+        i++;
+      }
+    } else if ((byte & 0xF8) == 0xF0) {  // 4-byte (11110xxx)
+      if (i + 3 < input.size() && (static_cast<unsigned char>(input[i + 1]) & 0xC0) == 0x80 &&
+          (static_cast<unsigned char>(input[i + 2]) & 0xC0) == 0x80 &&
+          (static_cast<unsigned char>(input[i + 3]) & 0xC0) == 0x80) {
+        result += input.substr(i, 4);
+        i += 4;
+      } else {
+        DC_LOG_DEBUG("Invalid 4-byte UTF-8 sequence at position %zu", i);
+        i++;
+      }
+    } else {
+      // Invalid UTF-8 start byte
+      DC_LOG_DEBUG("Invalid UTF-8 start byte 0x%02X at position %zu", byte, i);
+      i++;
+    }
+  }
+
+  DC_LOG_DEBUG("remove_non_utf8 completed, output size: %zu", result.size());
+  DC_LOG_TRACE("End remove_non_utf8");
+  return result;
+}
+
 }  // namespace utils
 }  // namespace datacrumbs

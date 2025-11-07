@@ -1,7 +1,4 @@
 {
-    "cmake.configureArgs": [
-        "-DCMAKE_PREFIX_PATH=/home/cc/datacrumbs/dependency/.spack-env/view"
-    ],
     "editor.formatOnSave": true,
     "files.associations": {
         "string": "cpp",
