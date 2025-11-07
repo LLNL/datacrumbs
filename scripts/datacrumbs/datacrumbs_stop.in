@@ -13,7 +13,7 @@ if [[ "$DATACRUMBS_IS_ROOT" != "1" ]]; then
     exit 1
 fi
 
-if [ "$PROG_NAME" == "" ]; then
+if [[ "$PROG_NAME" == "" ]]; then
     ps -aef | grep 'datacrumbs' | grep ${DATACRUMBS_USER} | awk '{print $2}' | xargs kill -9
 else
     ps -aef | grep 'datacrumbs' | grep ${DATACRUMBS_USER} | grep -v $PROG_NAME | awk '{print $2}' | xargs kill -9

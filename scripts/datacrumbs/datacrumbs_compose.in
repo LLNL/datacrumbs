@@ -92,7 +92,7 @@ elif [[ "$ACTION" == "compose" ]]; then
     done
 
     log "Composing $COMPOSABLE_NAME for: ${DATACRUMBS_USER}"
-    BUILD_DIR="/tmp/datacrumbs_${DATACRUMBS_USER}_$(date +%s%N)"
+    BUILD_DIR="@DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs_${DATACRUMBS_USER}_$(date +%s%N)"
     if [[ -d "${BUILD_DIR}" ]]; then
         warn "Cleaning existing build directory: ${BUILD_DIR}"
         run rm -rf "${BUILD_DIR}"

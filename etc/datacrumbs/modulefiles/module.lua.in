@@ -23,7 +23,7 @@ local user = os.getenv("DATACRUMBS_USER") or os.getenv("USER") or "@DATACRUMBS_I
 local bin_dir = pathJoin(prefix, "@CMAKE_INSTALL_BINDIR@")
 local sbin_dir = pathJoin(prefix, "@CMAKE_INSTALL_SBINDIR@")
 local etc_dir = pathJoin(prefix, "@CMAKE_INSTALL_SYSCONFDIR@")
-local userbin = prefix .. "/@CMAKE_INSTALL_LIBEXEC_DIR@/@CMAKE_INSTALL_SBINDIR@/" .. user
+local userbin = prefix .. "/@CMAKE_INSTALL_LIBEXECDIR@/@CMAKE_INSTALL_SBINDIR@/" .. user
 local libexec_dir = pathJoin(prefix, userbin)
 local lib_dir = pathJoin(prefix, "@DATACRUMBS_INSTALL_LIB_DIR@")
 

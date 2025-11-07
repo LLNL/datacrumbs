@@ -1,6 +1,6 @@
 #!/bin/bash
 source @DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_service_common.sh
-if [ $? -eq 0 ]; then
+if [[ $? -eq 0 ]]; then
     umask 022
     printenv > /run/datacrumbs.env
     echo datacrumbs_service_run "Starting datacrumbs service run script on job ${FLUX_JOB_ID}"

@@ -1,7 +1,7 @@
 #! /bin/bash
 
 clang_format_exe="clang-format"
-if [ $# -ge 1 ]; then
+if [[ $# -ge 1 ]]; then
     clang_format_exe="$1"
 fi
 

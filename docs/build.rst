@@ -51,7 +51,7 @@ The following dependencies are required for building `datacrumbs`:
     bpf_header=$(find . -name bpf.h | head -n 1)
     bpf_header=$(readlink -f $bpf_header)
     bpf_install_dir=$(dirname $(dirname $(dirname $bpf_header)))
-    if [ "$bpf_install_dir" != "$PREFIX" ]; then
+    if [[ "$bpf_install_dir" != "$PREFIX" ]]; then
         mv $bpf_install_dir/include $PREFIX
         mv $bpf_install_dir/lib* $PREFIX
     fi
@@ -59,7 +59,7 @@ The following dependencies are required for building `datacrumbs`:
     bpftool=$(find . -name bpftool | head -n 1)
     bpftool=$(readlink -f $bpftool)
     bpftool_install_dir=$(dirname $(dirname $bpftool))
-    if [ "$bpftool_install_dir" != "$PREFIX" ]; then  
+    if [[ "$bpftool_install_dir" != "$PREFIX" ]]; then
         mv $bpftool_install_dir/* $PREFIX
     fi
     popd
