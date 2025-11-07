@@ -7,14 +7,61 @@
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/typedefs.h>
-#include <datacrumbs/server/bpf/shared.h>
 // dependency headers
 #include <json-c/json.h>
+
+#ifndef DATACRUMBS_MAX_CAPTURE_ARGS
+#define DATACRUMBS_MAX_CAPTURE_ARGS 5
+#endif
+#ifndef DATACRUMBS_MAX_CAPTURE_BYTES
+#define DATACRUMBS_MAX_CAPTURE_BYTES 64
+#endif
 // std headers
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace datacrumbs {
+struct ProbeArgCaptureSpec {
+  unsigned int index = 0;
+  unsigned int num_bytes = 0;
+  bool is_pointer = false;
+  std::string label;
+  std::string c_type;
+
+  json_object* toJson() const {
+    json_object* j = json_object_new_object();
+    json_object_object_add(j, "index", json_object_new_int(index));
+    json_object_object_add(j, "num_bytes", json_object_new_int(num_bytes));
+    json_object_object_add(j, "is_pointer", json_object_new_boolean(is_pointer));
+    json_object_object_add(j, "label", json_object_new_string(label.c_str()));
+    json_object_object_add(j, "c_type", json_object_new_string(c_type.c_str()));
+    return j;
+  }
+
+  static ProbeArgCaptureSpec fromJson(const json_object* j) {
+    ProbeArgCaptureSpec spec;
+    json_object* obj = nullptr;
+    if (json_object_object_get_ex(j, "index", &obj)) spec.index = json_object_get_int(obj);
+    if (json_object_object_get_ex(j, "num_bytes", &obj)) spec.num_bytes = json_object_get_int(obj);
+    if (json_object_object_get_ex(j, "is_pointer", &obj)) {
+      spec.is_pointer = json_object_get_boolean(obj);
+    }
+    if (json_object_object_get_ex(j, "label", &obj) && obj)
+      spec.label = json_object_get_string(obj);
+    if (json_object_object_get_ex(j, "c_type", &obj) && obj)
+      spec.c_type = json_object_get_string(obj);
+    return spec;
+  }
+};
+
+struct RuntimeEventMetadata {
+  ProbeType probe_type = ProbeType::KPROBE;
+  std::string probe_name;
+  std::string function_name;
+  std::vector<ProbeArgCaptureSpec> arg_specs;
+};
+
 struct EventWithId {
   char event_type;
   unsigned long long index;
@@ -64,13 +111,20 @@ class Probe {
   // Default constructor
   Probe() {}
   // Copy constructor
-  Probe(const Probe& other) : type(other.type), name(other.name), functions(other.functions) {
+  Probe(const Probe& other)
+      : type(other.type),
+        name(other.name),
+        functions(other.functions),
+        function_arguments(other.function_arguments) {
     DC_LOG_TRACE("Probe copy constructor called");
   }
 
   // Move constructor
   Probe(Probe&& other) noexcept
-      : type(other.type), name(std::move(other.name)), functions(std::move(other.functions)) {
+      : type(other.type),
+        name(std::move(other.name)),
+        functions(std::move(other.functions)),
+        function_arguments(std::move(other.function_arguments)) {
     DC_LOG_TRACE("Probe move constructor called");
   }
   // Constructor initializing the probe type
@@ -79,6 +133,8 @@ class Probe {
   ProbeType type;                      // The type of probe (e.g., SYSCALLS, KPROBE, etc.)
   std::string name;                    // Name of the probe
   std::vector<std::string> functions;  // List of functions or arguments for the probe
+  std::unordered_map<std::string, std::vector<ProbeArgCaptureSpec>>
+      function_arguments;  // Optional per-function runtime arg capture specification
 
   // Validates the probe's configuration
   virtual bool validate() const {
@@ -112,6 +168,18 @@ class Probe {
 
     json_object_object_add(j, "functions", funcs);
 
+    if (!function_arguments.empty()) {
+      json_object* jfunction_arguments = json_object_new_object();
+      for (const auto& [function_name, arg_specs] : function_arguments) {
+        json_object* jarg_specs = json_object_new_array();
+        for (const auto& arg_spec : arg_specs) {
+          json_object_array_add(jarg_specs, arg_spec.toJson());
+        }
+        json_object_object_add(jfunction_arguments, function_name.c_str(), jarg_specs);
+      }
+      json_object_object_add(j, "function_arguments", jfunction_arguments);
+    }
+
     return j;
   }
 
@@ -130,7 +198,35 @@ class Probe {
         if (func) p.functions.push_back(json_object_get_string(func));
       }
     }
+
+    json_object* function_arguments_obj = json_object_object_get(j, "function_arguments");
+    if (function_arguments_obj &&
+        json_object_get_type(function_arguments_obj) == json_type_object) {
+      json_object_object_foreach(function_arguments_obj, function_name, arg_specs_obj) {
+        if (!arg_specs_obj || json_object_get_type(arg_specs_obj) != json_type_array) {
+          continue;
+        }
+        std::vector<ProbeArgCaptureSpec> arg_specs;
+        const int spec_len = json_object_array_length(arg_specs_obj);
+        for (int i = 0; i < spec_len; ++i) {
+          json_object* arg_spec_obj = json_object_array_get_idx(arg_specs_obj, i);
+          if (!arg_spec_obj || json_object_get_type(arg_spec_obj) != json_type_object) {
+            continue;
+          }
+          arg_specs.push_back(ProbeArgCaptureSpec::fromJson(arg_spec_obj));
+        }
+        p.function_arguments[function_name] = std::move(arg_specs);
+      }
+    }
     return p;
+  }
+
+  const std::vector<ProbeArgCaptureSpec>* getArgSpecs(const std::string& function_name) const {
+    const auto it = function_arguments.find(function_name);
+    if (it == function_arguments.end()) {
+      return nullptr;
+    }
+    return &it->second;
   }
 };
 
@@ -162,6 +258,7 @@ struct SysCallProbe : public Probe {
     p.type = base.type;
     p.name = base.name;
     p.functions = base.functions;
+    p.function_arguments = base.function_arguments;
     return p;
   }
 };
@@ -194,6 +291,7 @@ struct KProbe : public Probe {
     p.type = base.type;
     p.name = base.name;
     p.functions = base.functions;
+    p.function_arguments = base.function_arguments;
     return p;
   }
 };
@@ -238,6 +336,7 @@ struct UProbe : public Probe {
     p.type = base.type;
     p.name = base.name;
     p.functions = base.functions;
+    p.function_arguments = base.function_arguments;
     json_object* bin_obj = json_object_object_get(j, "binary_path");
     if (bin_obj) p.binary_path = json_object_get_string(bin_obj);
 
@@ -293,6 +392,7 @@ struct USDTProbe : public Probe {
     p.type = base.type;
     p.name = base.name;
     p.functions = base.functions;
+    p.function_arguments = base.function_arguments;
 
     json_object* bin_obj = json_object_object_get(j, "binary_path");
     if (bin_obj) p.binary_path = json_object_get_string(bin_obj);
@@ -367,6 +467,7 @@ struct CustomProbe : public Probe {
     p.type = base.type;
     p.name = base.name;
     p.functions = base.functions;
+    p.function_arguments = base.function_arguments;
 
     json_object* bpf_obj = json_object_object_get(j, "bpf_path");
     if (bpf_obj) p.bpf_path = json_object_get_string(bpf_obj);
@@ -394,6 +495,45 @@ class CaptureProbe {
   std::string name;      // Name of the capture probe
   ProbeType probe_type;  // Type of probe associated with the capture
   bool enable_explorer;  // Flag to enable explorer for this capture probe
+  std::unordered_map<std::string, std::vector<ProbeArgCaptureSpec>>
+      function_arguments;  // Optional per-function arg capture specification from YAML
+
+  const std::vector<ProbeArgCaptureSpec>* getArgSpecs(const std::string& function_name) const {
+    auto lookup = [this](const std::string& key) -> const std::vector<ProbeArgCaptureSpec>* {
+      const auto it = function_arguments.find(key);
+      if (it == function_arguments.end()) {
+        return nullptr;
+      }
+      return &it->second;
+    };
+
+    if (const auto* exact = lookup(function_name)) {
+      return exact;
+    }
+
+    const auto offset_pos = function_name.find(':');
+    const std::string base_name =
+        (offset_pos == std::string::npos) ? function_name : function_name.substr(0, offset_pos);
+    if (base_name != function_name) {
+      if (const auto* base = lookup(base_name)) {
+        return base;
+      }
+    }
+
+    if (probe_type == ProbeType::SYSCALLS) {
+      if (const auto* prefixed = lookup("sys_" + base_name)) {
+        return prefixed;
+      }
+      if (const auto* x64_prefixed = lookup("__x64_sys_" + base_name)) {
+        return x64_prefixed;
+      }
+    }
+
+    if (const auto* wildcard = lookup("*")) {
+      return wildcard;
+    }
+    return lookup("default");
+  }
 };
 
 // Capture probe for kernel symbols
