@@ -275,61 +275,58 @@ dc_args_usage() {
 		fi
 	done
 
-	log "Usage: $prog [OPTIONS]${pos_usage} -- [args...]"
-	log ""
-	local print_group
-	print_group() {
-		local want="$1" header="$2"
-		local any=0 i
-		for ((i = 0; i < ${#N[@]}; ++i)); do
-			if [[ "${R[i]}" == "$want" ]]; then
-				((any == 0)) && {
-					log "$header"
-					any=1
-				}
-				# Determine conditional requirement note based on subcommands
-				local note=""
-				if [[ -n "$SUBCMD_OPT" ]]; then
-					local __vals=()
-					local __k
-					for __k in "${!SUBCMDS[@]}"; do
-						local __opts_str="${SUBCMDS[$__k]}"
-						IFS=',' read -ra __opts <<<"$__opts_str"
-						local __o
-						for __o in "${__opts[@]}"; do
-							if [[ "$__o" == "${N[i]}" ]]; then
-								__vals+=("$__k")
-								break
-							fi
-						done
-					done
-					if ((${#__vals[@]} > 0)); then
-						# Check if the subcommand option is a bool type
-						local __subcmd_idx="${IDX[$SUBCMD_OPT]}"
-						local __subcmd_type="${T[$__subcmd_idx]}"
-
-						if [[ "$__subcmd_type" == "bool" ]]; then
-							# For bool, just show --option without =value
-							note=" (required when --$SUBCMD_OPT)"
-						else
-							# For non-bool, show --option=value1|value2
-							local __vals_joined
-							IFS='|' read -r __vals_joined <<<"${__vals[*]}"
-							note=" (required when --$SUBCMD_OPT=$__vals_joined)"
-						fi
-					fi
-				fi
-				if [[ "${T[i]}" == "bool" ]]; then
-					log "  --%-18s %s%s\n" "${N[i]}" "${D[i]}" "$note"
-				else
-					log "  --%-18s %s%s\n" "${N[i]} <${T[i]}>" "${D[i]}" "$note"
-				fi
-			fi
-		done
-		((any == 1)) && log ""
-	}
-	print_group "MANDATORY" "Mandatory options:"
-	print_group "OPTIONAL" "Optional options:"
+    log "Usage: $prog [OPTIONS]${pos_usage} -- [args...]"
+    log ""
+    local print_group
+    print_group() {
+        local want="$1" header="$2"
+        local any=0 i
+        for ((i=0; i<${#N[@]}; ++i)); do
+            if [[ "${R[i]}" == "$want" ]]; then
+                (( any==0 )) && { log "$header"; any=1; }
+                # Determine conditional requirement note based on subcommands
+                local note=""
+                if [[ -n "$SUBCMD_OPT" ]]; then
+                    local __vals=()
+                    local __k
+                    for __k in "${!SUBCMDS[@]}"; do
+                        local __opts_str="${SUBCMDS[$__k]}"
+                        IFS=',' read -ra __opts <<< "$__opts_str"
+                        local __o
+                        for __o in "${__opts[@]}"; do
+                            if [[ "$__o" == "${N[i]}" ]]; then
+                                __vals+=("$__k")
+                                break
+                            fi
+                        done
+                    done
+                    if (( ${#__vals[@]} > 0 )); then
+                        # Check if the subcommand option is a bool type
+                        local __subcmd_idx="${IDX[$SUBCMD_OPT]}"
+                        local __subcmd_type="${T[$__subcmd_idx]}"
+                        
+                        if [[ "$__subcmd_type" == "bool" ]]; then
+                            # For bool, just show --option without =value
+                            note=" (required when --$SUBCMD_OPT)"
+                        else
+                            # For non-bool, show --option=value1|value2
+                            local __vals_joined
+                            IFS='|' read -r __vals_joined <<< "${__vals[*]}"
+                            note=" (required when --$SUBCMD_OPT=$__vals_joined)"
+                        fi
+                    fi
+                fi
+                if [[ "${T[i]}" == "bool" ]]; then
+                    log "  --%-18s %s%s\n" "${N[i]}" "${D[i]}" "$note"
+                else
+                    log "  --%-18s %s%s\n" "${N[i]} <${T[i]}>" "${D[i]}" "$note"
+                fi
+            fi
+        done
+        (( any==1 )) && log ""
+    }
+    print_group "MANDATORY" "Mandatory options:"
+    print_group "OPTIONAL"  "Optional options:"
 
 	if ((${#PN[@]} > 0)); then
 		log "Positional arguments:"
@@ -548,65 +545,52 @@ dc_args_parse() {
 }
 
 dc_args_pretty_print() {
-	local prefix="$1" prog="$2"
-	[[ -z "$prefix" ]] && {
-		error "dc_args_pretty_print: missing prefix"
-		return 64
-	}
-	[[ -z "$prog" ]] && prog="$0"
-	dc__bind_spec "$prefix"
-	debug "$prog arguments:"
-	debug ""
-	local i max=0
-	for ((i = 0; i < ${#N[@]}; ++i)); do ((${#N[i]} > max)) && max=${#N[i]}; done
-	local print_group
-	print_group() {
-		local want="$1" header="$2" any=0
-		for ((i = 0; i < ${#N[@]}; ++i)); do
-			if [[ "${R[i]}" == "$want" ]]; then
-				((any == 0)) && {
-					debug "$header"
-					any=1
-				}
-				local var val disp
-				var="${V[i]}"
-				val="${!var}"
-				disp=""
-				# Compute conditional requirement note for this option (if any)
-				local note=""
-				if [[ -n "$SUBCMD_OPT" ]]; then
-					local __vals=() __k
-					for __k in "${!SUBCMDS[@]}"; do
-						local __opts_str="${SUBCMDS[$__k]}"
-						IFS=',' read -ra __opts <<<"$__opts_str"
-						local __o
-						for __o in "${__opts[@]}"; do
-							if [[ "$__o" == "${N[i]}" ]]; then
-								__vals+=("$__k")
-								break
-							fi
-						done
-					done
-					if ((${#__vals[@]} > 0)); then
-						# Check if the subcommand option is a bool type
-						local __subcmd_idx="${IDX[$SUBCMD_OPT]}"
-						local __subcmd_type="${T[$__subcmd_idx]}"
-
-						if [[ "$__subcmd_type" == "bool" ]]; then
-							# For bool, just show --option without =value
-							note=" (required when --$SUBCMD_OPT)"
-						else
-							# For non-bool, show --option=value1|value2|...
-							local __joined=""
-							local __idx
-							for __idx in "${!__vals[@]}"; do
-								[[ "$__idx" -gt 0 ]] && __joined+="|"
-								__joined+="${__vals[$__idx]}"
-							done
-							note=" (required when --$SUBCMD_OPT=$__joined)"
-						fi
-					fi
-				fi
+    local prefix="$1" prog="$2"; [[ -z "$prefix" ]] && { error "dc_args_pretty_print: missing prefix"; return 64; }
+    [[ -z "$prog" ]] && prog="$0"
+    dc__bind_spec "$prefix"
+    debug "$prog arguments:"; debug ""
+    local i max=0; for ((i=0; i<${#N[@]}; ++i)); do (( ${#N[i]}>max )) && max=${#N[i]}; done
+    local print_group
+    print_group() {
+        local want="$1" header="$2" any=0
+        for ((i=0; i<${#N[@]}; ++i)); do
+            if [[ "${R[i]}" == "$want" ]]; then
+                (( any==0 )) && { debug "$header"; any=1; }
+                local var val disp; var="${V[i]}"; val="${!var}"; disp=""
+                # Compute conditional requirement note for this option (if any)
+                local note=""
+                if [[ -n "$SUBCMD_OPT" ]]; then
+                    local __vals=() __k
+                    for __k in "${!SUBCMDS[@]}"; do
+                        local __opts_str="${SUBCMDS[$__k]}"
+                        IFS=',' read -ra __opts <<< "$__opts_str"
+                        local __o
+                        for __o in "${__opts[@]}"; do
+                            if [[ "$__o" == "${N[i]}" ]]; then
+                                __vals+=("$__k")
+                                break
+                            fi
+                        done
+                    done
+                    if (( ${#__vals[@]} > 0 )); then
+                        # Check if the subcommand option is a bool type
+                        local __subcmd_idx="${IDX[$SUBCMD_OPT]}"
+                        local __subcmd_type="${T[$__subcmd_idx]}"
+                        
+                        if [[ "$__subcmd_type" == "bool" ]]; then
+                            # For bool, just show --option without =value
+                            note=" (required when --$SUBCMD_OPT)"
+                        else
+                            # For non-bool, show --option=value1|value2|...
+                            local __joined=""; local __idx
+                            for __idx in "${!__vals[@]}"; do
+                                [[ "$__idx" -gt 0 ]] && __joined+="|"
+                                __joined+="${__vals[$__idx]}"
+                            done
+                            note=" (required when --$SUBCMD_OPT=$__joined)"
+                        fi
+                    fi
+                fi
 
 				if [[ "${T[i]}" == "bool" ]]; then
 					if [[ "$val" == "1" ]]; then val="true"; else val="false"; fi

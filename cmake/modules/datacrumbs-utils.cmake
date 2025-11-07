@@ -30,15 +30,12 @@ macro(include_dependencies)
     QUIET
   )
 
-  # all validator
-  if(LIBBPF_VERSION VERSION_LESS "1.0.0")
-    message(
-      FATAL_ERROR
-        "[${UPPER_PROJECT_NAME}] libbpf version 1.0.0 or newer is required, but found ${LIBBPF_VERSION}"
-    )
-  endif()
+    # all validator
+    if(LIBBPF_VERSION VERSION_LESS "1.0.0")
+        message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] libbpf version 1.0.0 or newer is required, but found ${LIBBPF_VERSION}")
+    endif()
 
-  set(PKG_CONFIG_PATH $ENV{PKG_CONFIG_PATH})
+    set(PKG_CONFIG_PATH $ENV{PKG_CONFIG_PATH})
 
   # include all links
   if(LIBBPF_FOUND)
@@ -110,47 +107,47 @@ macro(include_dependencies)
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] LLVM is needed for ${PROJECT_NAME} build")
   endif()
 
-  if(json-c_FOUND)
-    get_filename_component(json-c_INCLUDE_DIR "${json-c_DIR}/../../../include" ABSOLUTE)
-    get_filename_component(json-c_LIBRARY_DIR "${json-c_DIR}/../../" ABSOLUTE)
-    include_directories(${json-c_INCLUDE_DIR})
-    list(APPEND DEPENDENCY_LIBRARY_DIRS ${json-c_LIBRARY_DIR})
-    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -ljson-c)
-  else()
-    message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] json-c is needed for ${PROJECT_NAME} build")
-  endif()
+    if(json-c_FOUND)
+        get_filename_component(json-c_INCLUDE_DIR "${json-c_DIR}/../../../include" ABSOLUTE)
+        get_filename_component(json-c_LIBRARY_DIR "${json-c_DIR}/../../" ABSOLUTE)
+        include_directories(${json-c_INCLUDE_DIR})
+        list(APPEND DEPENDENCY_LIBRARY_DIRS ${json-c_LIBRARY_DIR})
+        set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -ljson-c)
+    else()
+        message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] json-c is needed for ${PROJECT_NAME} build")
+    endif()
 
-  if(ZLIB_FOUND)
-    include_directories(${ZLIB_INCLUDE_DIRS})
-    get_filename_component(ZLIB_LIBRARY_DIRS "${ZLIB_LIBRARIES}/../" ABSOLUTE)
-    list(APPEND DEPENDENCY_LIBRARY_DIRS ${ZLIB_LIBRARY_DIRS})
-    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -lz)
-  else()
-    message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] zlib is needed for ${PROJECT_NAME} build")
-  endif()
+    if(ZLIB_FOUND)
+        include_directories(${ZLIB_INCLUDE_DIRS})
+        get_filename_component(ZLIB_LIBRARY_DIRS "${ZLIB_LIBRARIES}/../" ABSOLUTE)
+        list(APPEND DEPENDENCY_LIBRARY_DIRS ${ZLIB_LIBRARY_DIRS})
+        set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -lz)
+    else()
+        message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] zlib is needed for ${PROJECT_NAME} build")
+    endif()
 
   if(${MPI_CXX_FOUND})
     # MPI_CXX_FOUND MPI_CXX_VERSION MPI_CXX_INCLUDE_DIRS MPI_CXX_LIBRARIES
     get_filename_component(MPI_CXX_INCLUDE_DIRS "${MPI_CXX_INCLUDE_DIRS}" ABSOLUTE)
     include_directories(${MPI_CXX_INCLUDE_DIRS})
 
-    if(NOT DEFINED MPI_CXX_LIBRARY_DIR)
-      if(MPI_CXX_LIBRARIES)
-        # If MPI_CXX_LIBRARIES is a list, get parent dir of each library
-        set(MPI_CXX_LIBRARY_DIR "")
+        if(NOT DEFINED MPI_CXX_LIBRARY_DIR)
+            if(MPI_CXX_LIBRARIES)
+                # If MPI_CXX_LIBRARIES is a list, get parent dir of each library
+                set(MPI_CXX_LIBRARY_DIR "")
 
-        foreach(_lib ${MPI_CXX_LIBRARIES})
-          get_filename_component(_lib_dir "${_lib}" DIRECTORY)
-          get_filename_component(_lib_dir "${_lib_dir}" ABSOLUTE)
-          list(APPEND MPI_CXX_LIBRARY_DIR "${_lib_dir}")
-        endforeach()
+                foreach(_lib ${MPI_CXX_LIBRARIES})
+                    get_filename_component(_lib_dir "${_lib}" DIRECTORY)
+                    get_filename_component(_lib_dir "${_lib_dir}" ABSOLUTE)
+                    list(APPEND MPI_CXX_LIBRARY_DIR "${_lib_dir}")
+                endforeach()
 
-        list(REMOVE_DUPLICATES MPI_CXX_LIBRARY_DIR)
-      else()
-        get_filename_component(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARIES}" DIRECTORY)
-        set(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARY_DIR}")
-      endif()
-    endif()
+                list(REMOVE_DUPLICATES MPI_CXX_LIBRARY_DIR)
+            else()
+                get_filename_component(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARIES}" DIRECTORY)
+                set(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARY_DIR}")
+            endif()
+        endif()
 
     list(APPEND DEPENDENCY_LIBRARY_DIRS ${MPI_CXX_LIBRARY_DIR})
     set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${MPI_CXX_LIBRARY_DIR} ${MPI_CXX_LIBRARIES})
@@ -161,43 +158,20 @@ macro(include_dependencies)
   list(APPEND DEPENDENCY_LIBRARY_DIRS ${DATACRUMBS_INSTALL_LIB_DIR})
   list(REMOVE_DUPLICATES DEPENDENCY_LIBRARY_DIRS)
 
-  # print found packages
-  message(
-    STATUS
-      "             - Found libbpf:${LIBBPF_VERSION} at include:${LIBBPF_INCLUDEDIR} lib:${LIBBPF_LIBRARY_DIRS}"
-  )
-  message(
-    STATUS
-      "             - Found yaml-cpp:${yaml-cpp_VERSION} at include:${YAML_CPP_INCLUDE_DIR} lib:${YAML_CPP_LIBRARY_DIR}"
-  )
-  message(
-    STATUS
-      "             - Found llvm:${LLVM_VERSION} at include:${LLVM_INCLUDE_DIRS} lib:${LLVM_LIBRARY_DIRS} clang:${CLANG_EXECUTABLE}"
-  )
-  message(
-    STATUS
-      "             - Found json-c:${json-c_CONSIDERED_VERSIONS} at include:${json-c_INCLUDE_DIR} lib:${json-c_LIBRARY_DIR}"
-  )
-  message(
-    STATUS
-      "             - Found zlib:${ZLIB_VERSION} at include:${ZLIB_INCLUDE_DIRS} lib:${ZLIB_LIBRARY_DIRS}"
-  )
-  message(
-    STATUS
-      "             - Found mpi:${MPI_CXX_VERSION} at include:${MPI_CXX_INCLUDE_DIRS} lib:${MPI_CXX_LIBRARY_DIR}"
-  )
-  message(STATUS "             - DEPENDENCY_LIBRARY_DIRS for RPATH:${DEPENDENCY_LIBRARY_DIRS}")
-  message(STATUS "             - DEPENDENCY_LIB for linking :${DEPENDENCY_LIB}")
-  string(
-    REPLACE ";"
-            ":"
-            DEPENDENCY_LIBRARY_DIRS_COLON
-            "${DEPENDENCY_LIBRARY_DIRS}"
-  )
-  set(CMAKE_INSTALL_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
-  set(CMAKE_BUILD_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
+    # print found packages
+    message(STATUS "             - Found libbpf:${LIBBPF_VERSION} at include:${LIBBPF_INCLUDEDIR} lib:${LIBBPF_LIBRARY_DIRS}")
+    message(STATUS "             - Found yaml-cpp:${yaml-cpp_VERSION} at include:${YAML_CPP_INCLUDE_DIR} lib:${YAML_CPP_LIBRARY_DIR}")
+    message(STATUS "             - Found llvm:${LLVM_VERSION} at include:${LLVM_INCLUDE_DIRS} lib:${LLVM_LIBRARY_DIRS} clang:${CLANG_EXECUTABLE}")
+    message(STATUS "             - Found json-c:${json-c_CONSIDERED_VERSIONS} at include:${json-c_INCLUDE_DIR} lib:${json-c_LIBRARY_DIR}")
+    message(STATUS "             - Found zlib:${ZLIB_VERSION} at include:${ZLIB_INCLUDE_DIRS} lib:${ZLIB_LIBRARY_DIRS}")
+    message(STATUS "             - Found mpi:${MPI_CXX_VERSION} at include:${MPI_CXX_INCLUDE_DIRS} lib:${MPI_CXX_LIBRARY_DIR}")
+    message(STATUS "             - DEPENDENCY_LIBRARY_DIRS for RPATH:${DEPENDENCY_LIBRARY_DIRS}")
+    message(STATUS "             - DEPENDENCY_LIB for linking :${DEPENDENCY_LIB}")
+    string(REPLACE ";" ":" DEPENDENCY_LIBRARY_DIRS_COLON "${DEPENDENCY_LIBRARY_DIRS}")
+    set(CMAKE_INSTALL_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
+    set(CMAKE_BUILD_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
 
-  # print_all_variables()
+    # print_all_variables()
 endmacro(include_dependencies)
 
 macro(derive_configurations)
