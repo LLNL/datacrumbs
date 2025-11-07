@@ -45,7 +45,7 @@ class DatacrumbsPlugin(CLIPlugin):
                     # user = jobspec.attributes["system"]["environment"].get("USER", "")
                     # if user == "":
                     #     raise ValueError("USER environment variable is required for datacrumbs composite validation")
-                    # file = f"@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXEC_DIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/{user}/datacrumbs_{composite_name}"
+                    # file = f"@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/{user}/datacrumbs_{composite_name}"
                     # if not os.path.exists(file):
                     #     raise ValueError(f"Datacrumbs composite: {composite_name} does not exist")
         except KeyError:

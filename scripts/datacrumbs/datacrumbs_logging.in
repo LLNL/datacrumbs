@@ -1,14 +1,14 @@
 #! /usr/bin/env bash
 
 log() {
-  if [ "${QUIET:-0}" -eq 0 ]; then
+  if [[ "${QUIET:-0}" == "0" ]]; then
     printf "[INFO $(date '+%Y-%m-%d %H:%M:%S')] $@"
     printf "\n"
   fi
 }
 
 debug() {
-  if [ "${VERBOSE:-0}" -eq 1 ] && [ "${QUIET:-1}" -eq 0 ]; then
+  if [[ "${VERBOSE:-0}" == "1" ]] && [[ "${QUIET:-1}" == "0" ]]; then
     printf "[DEBUG $(date '+%Y-%m-%d %H:%M:%S')] $@"
     printf "\n"
   fi
@@ -20,7 +20,7 @@ error() {
 }
 
 warn() {
-  if [ "${QUIET:-1}" != "" ] && [ "${QUIET:-1}" -eq 0 ]; then
+  if [[ "${QUIET:-1}" != "" ]] && [[ "${QUIET:-1}" == "0" ]]; then
     printf "[WARN $(date '+%Y-%m-%d %H:%M:%S')] $@" >&2
     printf "\n" >&2
   fi

@@ -519,7 +519,8 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
   // Main event polling loop
   signal(SIGINT, sig_handler);
   if (event_processor->configManager_->mpi_rank == 0) {
-    std::string ready_file = "/tmp/datacrumbs_" + event_processor->configManager_->user + "_" +
+    std::string ready_file = std::string(DATACRUMBS_INSTALL_RUNSTATEDIR) + "/datacrumbs_" +
+                             event_processor->configManager_->user + "_" +
                              event_processor->configManager_->run_id + ".ready";
     std::ofstream ofs_ready(ready_file);
     ofs_ready << "ready" << std::endl;

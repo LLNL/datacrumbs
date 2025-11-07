@@ -31,7 +31,7 @@ print_error() {
 }
 
 # Check if we're in the correct directory
-if [ ! -f "$DOCKERFILE_PATH" ]; then
+if [[ ! -f "$DOCKERFILE_PATH" ]]; then
     print_error "Dockerfile not found at $DOCKERFILE_PATH"
     print_error "Please run this script from the datacrumbs root directory"
     exit 1
@@ -86,7 +86,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate Docker Hub username if pushing
-if [ "$PUSH_TO_HUB" = true ] && [ "$DOCKER_HUB_USERNAME" = "your-dockerhub-username" ]; then
+if [[ "$PUSH_TO_HUB" = true ]] && [[ "$DOCKER_HUB_USERNAME" = "your-dockerhub-username" ]]; then
     print_error "Please provide a valid Docker Hub username with -u or set DOCKER_HUB_USERNAME environment variable"
     exit 1
 fi
@@ -121,7 +121,7 @@ else
 fi
 
 # Tag for Docker Hub if pushing
-if [ "$PUSH_TO_HUB" = true ]; then
+if [[ "$PUSH_TO_HUB" = true ]]; then
     print_status "Tagging image for Docker Hub..."
     
     # Tag with version
@@ -133,7 +133,7 @@ if [ "$PUSH_TO_HUB" = true ]; then
     fi
     
     # Tag as latest if version is not already latest
-    if [ "$VERSION" != "latest" ]; then
+    if [[ "$VERSION" != "latest" ]]; then
         if $CONTAINER_CMD tag "$LOCAL_TAG" "$HUB_LATEST_TAG"; then
             print_status "✅ Tagged as $HUB_LATEST_TAG"
         else
@@ -162,7 +162,7 @@ if [ "$PUSH_TO_HUB" = true ]; then
     fi
     
     # Push latest tag if different from version
-    if [ "$VERSION" != "latest" ]; then
+    if [[ "$VERSION" != "latest" ]]; then
         if $PUSH_CMD "$HUB_LATEST_TAG"; then
             print_status "✅ Pushed $HUB_LATEST_TAG"
         else
@@ -175,7 +175,7 @@ if [ "$PUSH_TO_HUB" = true ]; then
     echo ""
     echo "Your image is now available at:"
     echo "  docker pull $HUB_TAG"
-    if [ "$VERSION" != "latest" ]; then
+    if [[ "$VERSION" != "latest" ]]; then
         echo "  docker pull $HUB_LATEST_TAG"
     fi
 else
