@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+set -eo pipefail
+
 SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
 # Check if datacrumbs_args exists in scripts directory

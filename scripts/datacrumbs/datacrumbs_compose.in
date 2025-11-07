@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+set -eo pipefail
+
 SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
 # Load argument parser
@@ -92,7 +94,7 @@ elif [[ "$ACTION" == "compose" ]]; then
     done
 
     log "Composing $COMPOSABLE_NAME for: ${DATACRUMBS_USER}"
-    BUILD_DIR="/tmp/datacrumbs_${DATACRUMBS_USER}_$(date +%s%N)"
+    BUILD_DIR="@DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs_${DATACRUMBS_USER}_$(date +%s%N)"
     if [[ -d "${BUILD_DIR}" ]]; then
         warn "Cleaning existing build directory: ${BUILD_DIR}"
         run rm -rf "${BUILD_DIR}"
@@ -102,35 +104,20 @@ elif [[ "$ACTION" == "compose" ]]; then
     run mkdir -p "${BUILD_DIR}"
     run chown "${DATACRUMBS_USER}:${DATACRUMBS_USER}" "${BUILD_DIR}"
 
-    log "Copying composable files to build directory"
-    run cp -r "${DATACRUMBS_INSTALL_COMPOSABLE_DIR}/"* "${BUILD_DIR}/"
-
-    CMAKE_ARGS=(
-        -DDATACRUMBS_NAME="${COMPOSABLE_NAME}"
-        -DDATACRUMBS_PROBES="${PROBES}"
-        -DDATACRUMBS_CLIENT_OBJECTS_DIR="${DATACRUMBS_INSTALL_PROBE_OBJECTS_DIR}"
-    )
-
-    log "Running CMake configuration on ${BUILD_DIR}/build"
-    run @CMAKE_COMMAND@ -B"${BUILD_DIR}/build" -DCMAKE_INSTALL_PREFIX="${BUILD_DIR}/install" "${CMAKE_ARGS[@]}" "${BUILD_DIR}"
+    log "Running build process as ${DATACRUMBS_USER}"
+    run su - ${DATACRUMBS_USER} << 'EOF'
+        set -e
+        cp -r '${DATACRUMBS_INSTALL_COMPOSABLE_DIR}/'* '${BUILD_DIR}/'
+        @CMAKE_COMMAND@ -B'${BUILD_DIR}/build' -DCMAKE_INSTALL_PREFIX='${BUILD_DIR}/install' \
+            -DDATACRUMBS_NAME='${COMPOSABLE_NAME}' \
+            -DDATACRUMBS_PROBES='${PROBES}' \
+            -DDATACRUMBS_CLIENT_OBJECTS_DIR='${DATACRUMBS_INSTALL_PROBE_OBJECTS_DIR}' \
+            '${BUILD_DIR}'
+        @CMAKE_COMMAND@ --build '${BUILD_DIR}/build' --target all -- -j
+        @CMAKE_COMMAND@ --install '${BUILD_DIR}/build'
+EOF
     if [[ $? -ne 0 ]]; then
-        error "CMake configuration failed"
-        run rm -rf "${BUILD_DIR}"
-        exit 1
-    fi
-
-    log "Building project"
-    run @CMAKE_COMMAND@ --build "${BUILD_DIR}/build" --target all -- -j
-    if [[ $? -ne 0 ]]; then
-        error "Build failed"
-        run rm -rf "${BUILD_DIR}"
-        exit 1
-    fi
-
-    log "Installing build"
-    run @CMAKE_COMMAND@ --install "${BUILD_DIR}/build"
-    if [[ $? -ne 0 ]]; then
-        error "Install failed"
+        error "Build process failed"
         run rm -rf "${BUILD_DIR}"
         exit 1
     fi
@@ -139,8 +126,8 @@ elif [[ "$ACTION" == "compose" ]]; then
     run sudo -u ${DATACRUMBS_INSTALL_USER} mkdir -p "${DATACRUMBS_CLIENT_BIN}"
     run rm -f "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
     run cp "${BUILD_DIR}/install/sbin/datacrumbs_${COMPOSABLE_NAME}" "${DATACRUMBS_CLIENT_BIN}"
-    run sudo chown ${DATACRUMBS_USER}:${DATACRUMBS_USER} "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
-    run sudo chmod u+xr,o-rwx,g-rwx "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
+    run chown ${DATACRUMBS_USER}:${DATACRUMBS_USER} "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
+    run chmod u+xr,o-rwx,g-rwx "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
     run rm -rf "${BUILD_DIR}"
     debug "Created composable binary at ${DATACRUMBS_CLIENT_BIN}/datacrumbs_${COMPOSABLE_NAME}"
     log "Compose action completed successfully"

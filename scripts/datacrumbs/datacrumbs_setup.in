@@ -1,24 +1,31 @@
 #! /usr/bin/env bash
 
+set -eo pipefail
+
+if [[ -z "${BASH_VERSION}" ]]; then
+    error "This script requires bash"
+    exit 1
+fi
+
 SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
-CONFIG_FILE=@DATACRUMBS_INSTALL_ETC_CONFIGSDIR@/project.yaml
+CONFIG_FILE=@DATACRUMBS_INSTALL_ETC_CONFIGSDIR@/project.env.local
 
 
 source ${SCRIPT_DIR}/datacrumbs_utility
 
-if [ "${DATACRUMBS_ENV_LOADED:-0}" -eq 0 ]; then
-    if [ "$EUID" -ne 0 ]; then
+if [[ "${DATACRUMBS_ENV_LOADED:-0}" == "0" ]]; then
+    if [[ "$(id -u)" != "0" ]]; then
         export DATACRUMBS_IS_ROOT=0
         export DATACRUMBS_USER=$(id -un)
     else
         export DATACRUMBS_IS_ROOT=1
         export DATACRUMBS_USER=$SUDO_USER
-        if [ -z "$DATACRUMBS_USER" ]; then
+        if [[ -z "$DATACRUMBS_USER" ]]; then
             DATACRUMBS_USER=$USER
             debug "User is root."
         fi
-        if [ -z "$DATACRUMBS_USER" ] || [ "$DATACRUMBS_USER" = "root" ]; then
-            if [ -n "$FLUX_JOB_USERID" ]; then
+        if [[ -z "$DATACRUMBS_USER" ]] || [[ "$DATACRUMBS_USER" = "root" ]]; then
+            if [[ -n "$FLUX_JOB_USERID" ]]; then
             DATACRUMBS_USER=$(id -nu $FLUX_JOB_USERID)
             fi
         fi
@@ -26,8 +33,12 @@ if [ "${DATACRUMBS_ENV_LOADED:-0}" -eq 0 ]; then
     
     readonly DATACRUMBS_IS_ROOT
     readonly DATACRUMBS_USER
-    eval $(datacrumbs_parse_yaml ${CONFIG_FILE} "DATACRUMBS_")
-    log "After loading yaml for $DATACRUMBS_USER"
+    if command -v direnv &> /dev/null; then
+        eval "$(direnv exec ${CONFIG_FILE%/*} bash -c 'source ${CONFIG_FILE}; env')"
+    else
+        source ${CONFIG_FILE}
+    fi
+    log "After loading env file for $DATACRUMBS_USER"
     YEAR=$(date +%y)
     MONTH=$(date +%m)
     DAY=$(date +%d)
@@ -40,7 +51,7 @@ if [ "${DATACRUMBS_ENV_LOADED:-0}" -eq 0 ]; then
     eval $DATACRUMBS_SERVER_PREAMBLE
 fi
 
-if [ "$DATACRUMBS_MODULE_AVAILABLE" -eq 1 ] && [ "$DATACRUMBS_SERVER_MODULE" == "1" ]; then
+if [[ "$DATACRUMBS_MODULE_AVAILABLE" == "1" ]] && [[ "$DATACRUMBS_SERVER_MODULE" == "1" ]]; then
     if ! module is-loaded datacrumbs/@DATACRUMBS_RELEASE_VERSION_STRING@; then
         module use @DATACRUMBS_INSTALL_ETC_MODULESDIR@
         module load datacrumbs/@DATACRUMBS_RELEASE_VERSION_STRING@

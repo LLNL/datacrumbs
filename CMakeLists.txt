@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0075 NEW)
 project(datacrumbs LANGUAGES C CXX)
 
@@ -92,7 +92,6 @@ set(DATACRUMBS_KERNEL_HEADERS_PATH "" CACHE STRING "Path to the kernel headers d
 option(DATACRUMBS_BUILD_ONLY "Build only the datacrumbs library without installation" OFF)
 set(DATACRUMBS_KERNEL_PATH "" CACHE STRING "Path to the kernel source directory")
 
-
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
 # ------------------------------------------------------------------------------
@@ -144,6 +143,7 @@ message(STATUS "             - DATACRUMBS_CONFIGURED_LOG_DIR: ${DATACRUMBS_CONFI
 if(NOT EXISTS "${DATACRUMBS_CONFIGURED_TRACE_DIR}")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] DATACRUMBS_CONFIGURED_TRACE_DIR does not exist: ${DATACRUMBS_CONFIGURED_TRACE_DIR}")
 endif()
+
 if(NOT EXISTS "${DATACRUMBS_CONFIGURED_LOG_DIR}")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] DATACRUMBS_CONFIGURED_LOG_DIR does not exist: ${DATACRUMBS_CONFIGURED_LOG_DIR}")
 endif()
@@ -563,10 +563,10 @@ datacrumbs_composable_install_headers("${DATACRUMBS_PUBLIC_HEADER_FILES}")
 datacrumbs_composable_install_src("${DATACRUMBS_PUBLIC_SRC_FILES}")
 
 # Install project configuration file
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs/project.yaml.in ${CMAKE_CONFIG_OUTPUT_DIRECTORY}/project.yaml @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/configs/project.env.local.in ${CMAKE_CONFIG_OUTPUT_DIRECTORY}/project.env.local @ONLY)
 install(
     FILES
-    ${CMAKE_CONFIG_OUTPUT_DIRECTORY}/project.yaml
+    ${CMAKE_CONFIG_OUTPUT_DIRECTORY}/project.env.local
     DESTINATION
     ${DATACRUMBS_INSTALL_ETC_CONFIGSDIR}
 )

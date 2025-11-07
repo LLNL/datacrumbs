@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e pipefail
+
 FLUX_DATACRUMBS=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs)
 
 warn_user() {
@@ -23,10 +25,10 @@ if [[ ${FLUX_DATACRUMBS_COMPOSE} == "null"  || ${FLUX_DATACRUMBS_COMPOSE} == "" 
     logger "User hasn't requested datacrumbs' composite feature using ${DATACRUMBS_COMPOSABLE_NAME}."
 else
     DATACRUMBS_COMPOSABLE_NAME=${FLUX_DATACRUMBS_COMPOSE}
-    if [ -n "$FLUX_JOB_USERID" ]; then
+    if [[ -n "$FLUX_JOB_USERID" ]]; then
         DATACRUMBS_USER=$(id -nu $FLUX_JOB_USERID)
     fi
-    if [[ ! -f "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXEC_DIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/${DATACRUMBS_USER}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME}" ]]; then
+    if [[ ! -f "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/${DATACRUMBS_USER}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME}" ]]; then
         warn_user "Error: Composable name ${DATACRUMBS_COMPOSABLE_NAME} does not exist."
         return 1
     fi

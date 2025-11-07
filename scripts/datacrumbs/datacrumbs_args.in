@@ -1,6 +1,8 @@
 #! /usr/bin/env bash
 # datacrumbs_args.in - reusable getopt-based argument parsing helpers
 
+set -eo pipefail
+
 SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 # Fallback to script directory if placeholder wasn't substituted
 if [[ -z "$SCRIPT_DIR" || "$SCRIPT_DIR" == @DATACRUMBS_INSTALL_BINARYDIR@ ]]; then

@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+set -eo pipefail
+
 SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
 # Load logging script
@@ -10,33 +12,16 @@ else
     exit 1
 fi
 
-function datacrumbs_parse_yaml {
-    local prefix=$2
-    local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @ | tr @ '\034')
-    sed -ne "s|^\($s\):|\1|" -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
-        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p" $1 |
-        awk -F$fs '{
-    indent = length($1)/2;
-    vname[indent] = toupper($2);
-    for (i in vname) {if (i > indent) {delete vname[i]}}
-    if (length($3) > 0) {
-       vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-       printf("export %s%s%s=\"%s\";", "'$prefix'",vn, toupper($2), $3);
-       printf("readonly %s%s%s;", "'$prefix'",vn, toupper($2));
-    }
-  }'
-}
-
 function datacrumbs_run_command() {
   local err_msg="$1"
   shift
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would run: $*"
     return 0
   fi
   "$@"
   local status=$?
-  if [ $status -ne 0 ]; then
+  if [[ $status -ne 0 ]]; then
     log "Error: $err_msg"
     exit $status
   fi
@@ -46,20 +31,20 @@ function datacrumbs_run_command() {
 # datacrumbs_run_command "Failed to list directory" ls /nonexistent/path
 
 function datacrumbs_finalize() {
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would finalize for user: $DATACRUMBS_USER, log path: $DATACRUMBS_TRACE_DIR"
     return 0
   fi
 }
 
 function datacrumbs_init() {
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would create log directory: ${DATACRUMBS_TRACE_DIR}"
     return 0
   fi
-  if [ ! -d "${DATACRUMBS_TRACE_DIR}" ]; then
+  if [[ ! -d "${DATACRUMBS_TRACE_DIR}" ]]; then
     mkdir -p "${DATACRUMBS_TRACE_DIR}"
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
       error "Failed to create trace directory: ${DATACRUMBS_TRACE_DIR}"
       exit 1
     fi
@@ -68,13 +53,13 @@ function datacrumbs_init() {
 }
 
 function datacrumbs_start_server() {
-  if [ "$RUNID" == "1000" ]; then
+  if [[ "$RUNID" == "1000" ]]; then
     RUNID=$(date +"%Y-%m-%d-%H-%M-%S")
   fi
-  READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
+  READY_FILE="@DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
   exec=$1
   exec=($exec)
-  if [ -z "$DATACRUMBS_TRACE_DIR" ]; then
+  if [[ -z "$DATACRUMBS_TRACE_DIR" ]]; then
     error "DATACRUMBS_TRACE_DIR is empty. Please set the trace directory."
     exit 1
   fi
@@ -84,7 +69,7 @@ function datacrumbs_start_server() {
   ELAPSED=0
 
   log "Starting Server: ${cmd[*]}"
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     server_launch "${cmd[@]}"
   else
    server_launch "${cmd[@]}" > $DATACRUMBS_LOG_FILE 2>&1 &
@@ -94,17 +79,17 @@ function datacrumbs_start_server() {
    chown ${DATACRUMBS_USER}:${DATACRUMBS_USER} $DATACRUMBS_LOG_FILE
   fi
 
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would wait for ready file: $READY_FILE (DATACRUMBS_SERVER_LOAD_TIMEOUT: $DATACRUMBS_SERVER_LOAD_TIMEOUT seconds)"
     return 0
   fi
 
 
-  while [ ! -f "$READY_FILE" ]; do
+  while [[ ! -f "$READY_FILE" ]]; do
       sleep $WAIT_INTERVAL
       log "Waiting for ${ELAPSED} seconds $Server..."
       ELAPSED=$((ELAPSED + WAIT_INTERVAL))
-      if [ $ELAPSED -ge $DATACRUMBS_SERVER_LOAD_TIMEOUT ]; then
+      if [[ $ELAPSED -ge $DATACRUMBS_SERVER_LOAD_TIMEOUT ]]; then
           log "DATACRUMBS_SERVER_LOAD_TIMEOUT waiting for $READY_FILE"
           server_launch $DATACRUMBS_INSTALL_SBIN_DIR/datacrumbs_stop
           cat $DATACRUMBS_LOG_FILE
@@ -118,30 +103,30 @@ function datacrumbs_start_server() {
 function datacrumbs_stop_server() {
   exec=$1
   prog_name=$2
-  if [ "$RUNID" == "1000" ] && [ -f "$DATACRUMBS_SERVER_RUNID_FILE" ]; then
+  if [[ "$RUNID" == "1000" ]] && [[ -f "$DATACRUMBS_SERVER_RUNID_FILE" ]]; then
     RUNID=$(cat "$DATACRUMBS_SERVER_RUNID_FILE" 2>/dev/null)
   fi
-  READY_FILE="/tmp/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
+  READY_FILE="@DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
   exec=($exec)
   common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_TRACE_DIR" --run_id "$RUNID")
   cmd=("${exec[@]}" "stop" "${common_cmd[@]}")
   
 
   log "Stopping Server: ${cmd[*]}"
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     server_launch "${cmd[@]}"
   else
    server_launch "${cmd[@]}" >> $DATACRUMBS_LOG_FILE 2>&1
   fi
-  
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would find and kill process(es) with RUNID ${RUNID}"
     log "[DRY RUN] Would remove ready file: $READY_FILE"
     return 0
   fi
   SERVER_PID=$(cat "$DATACRUMBS_SERVER_PID_FILE")
   # SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | grep -v "${prog_name}" | awk '{print $2}')
-  if [ -n "$SERVER_PID" ]; then
+  if [[ -n "$SERVER_PID" ]]; then
       log "Found process(es) with RUNID ${RUNID}: $SERVER_PID. Killing them."
       if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
         ${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_stop "${prog_name}"
@@ -156,17 +141,17 @@ function datacrumbs_stop_server() {
 }
 
 function datacrumbs_print_status() {
-  if [ "$RUNID" == "1000" ] && [ -f "$DATACRUMBS_SERVER_RUNID_FILE" ]; then
+  if [[ "$RUNID" == "1000" ]] && [[ -f "$DATACRUMBS_SERVER_RUNID_FILE" ]]; then
     RUNID=$(cat "$DATACRUMBS_SERVER_RUNID_FILE" 2>/dev/null)
   fi
   local status_file="/tmp/datacrumbs_${DATACRUMBS_USER}_status_${RUNID}.json"
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would print status from: $status_file"
     log "[DRY RUN] Would remove status file: $status_file"
     return 0
   fi
 
-  if [ ! -f "$status_file" ]; then
+  if [[ ! -f "$status_file" ]]; then
     log "Status file not found: $status_file"
     return 1
   fi
@@ -212,7 +197,7 @@ function job_launch() {
     debug "Launching job without MPI"
     cmd=("$@")
   fi
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
       log "[DRY RUN] Would launch job: ${cmd[*]}"
       return 0
     fi
@@ -241,7 +226,7 @@ function server_launch() {
     debug "Launching server without MPI"
     cmd=( "${cmd[@]}" --disable_mpi)
   fi
-  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
     log "[DRY RUN] Would launch server: ${cmd[*]}"
     return 0
   fi
