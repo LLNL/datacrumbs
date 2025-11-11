@@ -795,15 +795,15 @@ if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
     set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
 endif()
 
-add_test(NAME datacrumbs_start COMMAND ${DATACRUMBS_PATH}/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_start COMMAND ${DATACRUMBCMAKE_RUNTIME_OUTPUT_DIRECTORYS_PATH}/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_run COMMAND ${DATACRUMBS_PATH}/datacrumbs run ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_run COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs run ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_run PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_run PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_stop COMMAND ${DATACRUMBS_PATH}/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_stop COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS ${PROJECT_NAME})
 

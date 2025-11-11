@@ -53,7 +53,7 @@ sudo ssh lead${i} << 'EOF'
 rm /etc/systemd/system/datacrumbs.service
 EOF
 done
-for i in 2 {4..6} {9..11}; do
+for i in 2; do
 sudo ssh lead${i} << 'EOF'
 /admin/scripts/flux_reconfig.sh
 flux config reload
@@ -61,10 +61,10 @@ EOF
 done
 ```
 ```bash
-for i in 2 {4..6} {9..11}; do
+for i in {2..6} {9..11}; do
 echo Checking lead${i}
 sudo ssh lead${i} << 'EOF'
-systemctl daemon-reload
+chmod 777 /p/ssd
 EOF
 done
 ```
@@ -119,4 +119,11 @@ DIR=/p/ssd
 pdsh -g compute mkdir -p $DIR
 pdsh -g compute 'mount /dev/sda $DIR'
 pdsh -g compute 'chmod 777 $DIR'
+```
+
+```bash
+for i in {0..16}; do
+done
+flux run -n 1 ~/software/ior/install/bin/ior -o /p/ssd/test -t 1g -b 64g
+flux run -n 16 ~/software/ior/install/bin/ior -o /p/ssd/test -t 32m -b 4g
 ```
