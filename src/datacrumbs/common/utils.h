@@ -164,7 +164,7 @@ inline std::string remove_non_utf8(const std::string& input) {
       // Only keep characters valid for filenames/paths
       if ((byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') ||
           (byte >= '0' && byte <= '9') || byte == '_' || byte == '-' || byte == '.' ||
-          byte == '/' || byte == '\\') {
+          byte == '/') {
         result += input[i];
       } else {
         DC_LOG_DEBUG("Skipping invalid filename character 0x%02X at position %zu", byte, i);

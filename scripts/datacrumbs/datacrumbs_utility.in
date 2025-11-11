@@ -31,7 +31,6 @@ function datacrumbs_run_command() {
   local err_msg="$1"
   shift
   if [[ "${DRY_RUN:-0}" == "1" ]]; then
-  if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would run: $*"
     return 0
   fi
@@ -47,7 +46,6 @@ function datacrumbs_run_command() {
 # datacrumbs_run_command "Failed to list directory" ls /nonexistent/path
 
 function datacrumbs_finalize() {
-  if [[ "${DRY_RUN:-0}" == "1" ]]; then
   if [[ "${DRY_RUN:-0}" == "1" ]]; then
     log "[DRY RUN] Would finalize for user: $DATACRUMBS_USER, log path: $DATACRUMBS_TRACE_DIR"
     return 0
