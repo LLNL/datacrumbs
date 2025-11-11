@@ -2,6 +2,14 @@
 
 SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
+# Source argument parser
+source "$SCRIPT_DIR/datacrumbs_args"
+
+dc_args_init "DATACRUMBS_VALIDATOR"
+dc_args_add_subcommand "DATACRUMBS_VALIDATOR" "enable_mpi" "1" "nodes" "ppn"
+
+dc_args_parse "DATACRUMBS_VALIDATOR" "datacrumbs_run_validator" "$@"
+
 source $SCRIPT_DIR/datacrumbs_setup
 
 check_root_user

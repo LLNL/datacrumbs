@@ -150,20 +150,40 @@ namespace datacrumbs::logging_internal {
 inline void log_progress(const std::string& message, size_t current, size_t total) {
   using namespace std::chrono;
   static auto start_time = steady_clock::now();
+  static size_t last_printed = 0;
+  constexpr size_t PRINT_INTERVAL = 10000;  // Print every 10K events
+
+  // Only print every PRINT_INTERVAL events or when done
+  if (current != total && (current - last_printed) < PRINT_INTERVAL) {
+    return;
+  }
+
+  last_printed = current;
 
   float percent = (total > 0) ? (100.0f * current / total) : 0.0f;
   auto now = steady_clock::now();
   double elapsed = duration_cast<duration<double>>(now - start_time).count();
   double rate = (elapsed > 0.0) ? (current / elapsed) : 0.0;
 
+#ifdef LOG_TO_FILE
+  // For file logging, write complete lines without \r to avoid log file bloat
+  DC_LOG_PRINT("%s [%zu/%zu] %d%% completed | %.2fs elapsed | %.2f events/s", message.c_str(),
+               current, total, static_cast<int>(percent), elapsed, rate);
+#else
+  // For console logging, use \r for in-place updates
   DC_LOG_PRINT_NO_NEW_LINE("\r%s [%zu/%zu] %d%% completed | %.2fs elapsed | %.2f events/s",
                            message.c_str(), current, total, static_cast<int>(percent), elapsed,
                            rate);
+#endif
 
   if (current == total) {
+#ifndef LOG_TO_FILE
+    DC_LOG_PRINT("");  // Print newline to finish the progress line
+#endif
     DC_LOG_PRINT("%s done. Total time: %.2fs, Avg rate: %.2f events/s", message.c_str(), elapsed,
                  rate);
     start_time = steady_clock::now();  // Reset for next progress
+    last_printed = 0;
   }
 }
 
@@ -171,6 +191,16 @@ inline void log_progress(const std::string& message, size_t current) {
   using namespace std::chrono;
   static auto start_time = steady_clock::now();
   static std::mutex mtx;
+  static size_t last_printed = 0;
+  constexpr size_t PRINT_INTERVAL = 10000;  // Print every 10K events
+
+  // Only print every PRINT_INTERVAL events
+  if ((current - last_printed) < PRINT_INTERVAL) {
+    return;
+  }
+
+  last_printed = current;
+
   auto now = steady_clock::now();
   double elapsed = duration_cast<duration<double>>(now - start_time).count();
   double rate = (elapsed > 0.0) ? (current / elapsed) : 0.0;
@@ -220,10 +250,17 @@ inline void log_progress(const std::string& message, size_t current) {
   current_str.resize(current_str.find('.') != std::string::npos ? current_str.find('.') + 3
                                                                 : current_str.size());
   current_str += multiplier;
+
+#ifdef LOG_TO_FILE
+  // For file logging, write complete lines without \r to avoid log file bloat
+  DC_LOG_PRINT("%s [%s events] | %s elapsed | %s events/s", message.c_str(), current_str.c_str(),
+               elapsed_str, rate_str.c_str());
+#else
+  // For console logging, use \r for in-place updates
   DC_LOG_PRINT_NO_NEW_LINE(
       "\r                            \r%s [%s events] | %s elapsed | %s events/s    ",
       message.c_str(), current_str.c_str(), elapsed_str, rate_str.c_str());
-  // Optionally, print newline if desired when called with a special value
+#endif
 }
 }  // namespace datacrumbs::logging_internal
 // Progress logging macro

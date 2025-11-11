@@ -92,7 +92,6 @@ set(DATACRUMBS_KERNEL_HEADERS_PATH "" CACHE STRING "Path to the kernel headers d
 option(DATACRUMBS_BUILD_ONLY "Build only the datacrumbs library without installation" OFF)
 set(DATACRUMBS_KERNEL_PATH "" CACHE STRING "Path to the kernel source directory")
 
-
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
 # ------------------------------------------------------------------------------
@@ -144,6 +143,7 @@ message(STATUS "             - DATACRUMBS_CONFIGURED_LOG_DIR: ${DATACRUMBS_CONFI
 if(NOT EXISTS "${DATACRUMBS_CONFIGURED_TRACE_DIR}")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] DATACRUMBS_CONFIGURED_TRACE_DIR does not exist: ${DATACRUMBS_CONFIGURED_TRACE_DIR}")
 endif()
+
 if(NOT EXISTS "${DATACRUMBS_CONFIGURED_LOG_DIR}")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] DATACRUMBS_CONFIGURED_LOG_DIR does not exist: ${DATACRUMBS_CONFIGURED_LOG_DIR}")
 endif()
@@ -795,15 +795,15 @@ if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
     set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
 endif()
 
-add_test(NAME datacrumbs_start COMMAND ${DATACRUMBS_PATH}/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_start COMMAND ${DATACRUMBCMAKE_RUNTIME_OUTPUT_DIRECTORYS_PATH}/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_run COMMAND ${DATACRUMBS_PATH}/datacrumbs run ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_run COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs run ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_run PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_run PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_stop COMMAND ${DATACRUMBS_PATH}/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_stop COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS ${PROJECT_NAME})
 

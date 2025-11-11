@@ -93,7 +93,7 @@ std::vector<std::string> ElfSymbolExtractor::extract_symbols() {
         if (symbols_map.find(name) == symbols_map.end()) {
           symbols_map[name] = std::unordered_set<std::string>();
         }
-        if (!name.empty()) {
+        if (!name.empty() && name.find(':') == std::string::npos) {
           char buffer[32];
           unsigned long offset = static_cast<unsigned long>(
               syms[j].st_value);  // TODO(Hari): Explore if i have to relocate for virtual address
