@@ -121,7 +121,6 @@ function datacrumbs_stop_server() {
   exec=($exec)
   common_cmd=("$DATACRUMBS_INSTALL_HOST" "--user" "$DATACRUMBS_USER" "--config_path" "$DATACRUMBS_INSTALL_CONFIGS_DIR" "--data_dir" "$DATACRUMBS_INSTALL_DATA_DIR" "--trace_log_dir" "$DATACRUMBS_TRACE_DIR" --run_id "$DATACRUMBS_SERVER_RUN_ID")
   cmd=("${exec[@]}" "stop" "${common_cmd[@]}")
-  
 
   log "Stopping Server: ${cmd[*]}"
   if [[ "${DRY_RUN:-0}" == "1" ]]; then
@@ -275,6 +274,15 @@ function check_composite_location() {
     echo "${selected_location}"
 }
 
+function validate_datacrumbs_enable_value() {
+  local value="$1"
+  if [[ "$value" == "yes" || "$value" == "no" ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 function validate_datacrumbs_composite_name() {
     local name="$1"
     return_code=0
@@ -289,4 +297,8 @@ function validate_datacrumbs_composite_name() {
     fi
     log_system "validate_datacrumbs_composite_name validated name:${name} return_code:${return_code}"
     return ${return_code}
+}
+
+function get_default_datacrumbs_composite_name() {
+  echo "NONE"
 }
