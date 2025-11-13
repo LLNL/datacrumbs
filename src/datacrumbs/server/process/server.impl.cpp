@@ -519,17 +519,27 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
   // Main event polling loop
   signal(SIGINT, sig_handler);
   if (event_processor->configManager_->mpi_rank == 0) {
-    std::string ready_file = std::string(DATACRUMBS_INSTALL_RUNSTATEDIR) + "/datacrumbs_" +
-                             event_processor->configManager_->user + "_" +
-                             event_processor->configManager_->run_id + ".ready";
+    std::string ready_file;
+    const char* env_ready_file = getenv("DATACRUMBS_SERVER_READY_FILE");
+    if (env_ready_file) {
+      ready_file = std::string(env_ready_file);
+    } else {
+      ready_file = std::string(DATACRUMBS_INSTALL_RUNSTATEDIR) + "/datacrumbs-" +
+                   event_processor->configManager_->run_id + ".ready";
+    }
     std::ofstream ofs_ready(ready_file);
     ofs_ready << "ready" << std::endl;
     ofs_ready.close();
-    auto pwd = getpwnam(event_processor->configManager_->user.c_str());
-    uid_t uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
-    gid_t gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
-    chown(ready_file.c_str(), uid, gid);
-    chmod(ready_file.c_str(), 0660);
+    if (ready_file.substr(0, 4) != "/run" && ready_file.substr(0, 8) != "/var/run") {
+      auto pwd = getpwnam(event_processor->configManager_->user.c_str());
+      auto uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+      auto gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+      chown(ready_file.c_str(), uid, gid);
+      chmod(ready_file.c_str(), 0660);
+    }
+    DC_LOG_INFO("Ready file created: %s for user:%s on %d nodes", ready_file.c_str(),
+                event_processor->configManager_->user.c_str(),
+                event_processor->configManager_->mpi_size);
     DC_LOG_PRINT("Server running on %d nodes. Ready to run the code.",
                  event_processor->configManager_->mpi_size);
   }
@@ -777,8 +787,14 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
     DC_LOG_PRINT("Total events: sum=%d, min=%d, max=%d", global_total_events_sum,
                  global_total_events_min, global_total_events_max);
     // Write status info to JSON file for postprocessing
-    std::string status_file = "/tmp/datacrumbs_" + event_processor->configManager_->user +
-                              "_status_" + event_processor->configManager_->run_id + ".json";
+    std::string status_file;
+    const char* env_statusfile = getenv("DATACRUMBS_SERVER_STATUS_FILE");
+    if (env_statusfile) {
+      status_file = std::string(env_statusfile);
+    } else {
+      status_file = std::string(DATACRUMBS_INSTALL_RUNSTATEDIR) + "/datacrumbs-" +
+                    event_processor->configManager_->run_id + ".json";
+    }
     struct json_object* status_json = json_object_new_object();
     json_object_object_add(
         status_json, "trace_file",
@@ -792,11 +808,13 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
       DC_LOG_ERROR("Failed to write status file: %s", status_file.c_str());
     }
     json_object_put(status_json);
-    auto pwd = getpwnam(event_processor->configManager_->user.c_str());
-    auto uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
-    auto gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
-    chown(status_file.c_str(), uid, gid);
-    chmod(status_file.c_str(), 0660);
+    if (status_file.substr(0, 4) != "/run" && status_file.substr(0, 8) != "/var/run") {
+      auto pwd = getpwnam(event_processor->configManager_->user.c_str());
+      auto uid = pwd ? pwd->pw_uid : static_cast<uid_t>(-1);
+      auto gid = pwd ? pwd->pw_gid : static_cast<gid_t>(-1);
+      chown(status_file.c_str(), uid, gid);
+      chmod(status_file.c_str(), 0660);
+    }
   }
 
   DC_LOG_TRACE("main: end");
@@ -810,9 +828,14 @@ static int main_call(int argc, char** argv) {
     event_processor.configManager_->load_mpi_configurations();
   }
 
-  std::string hostname = get_hostname();
-  std::string pidfile = event_processor.configManager_->log_dir + "/datacrumbs_" + hostname + "_" +
-                        event_processor.configManager_->run_id + ".pid";
+  std::string pidfile;
+  const char* env_pidfile = getenv("DATACRUMBS_SERVER_PID_FILE");
+  if (env_pidfile) {
+    pidfile = std::string(env_pidfile);
+  } else {
+    pidfile = std::string(DATACRUMBS_INSTALL_RUNSTATEDIR) + "/datacrumbs-" +
+              event_processor.configManager_->run_id + ".pid";
+  }
 
   int return_code = 0;
   if (event_processor.configManager_->mpi_rank == 0 &&
@@ -824,6 +847,7 @@ static int main_call(int argc, char** argv) {
     return_code = main_process(argc, argv, &event_processor, false);
   } else if (event_processor.configManager_->exe_mode == datacrumbs::ExecutableMode::START) {
     daemonize();
+    std::string hostname = get_hostname();
     std::string logfile = event_processor.configManager_->log_dir + "/datacrumbs_" +
                           event_processor.configManager_->user + "_" + hostname + "_" +
                           event_processor.configManager_->run_id + ".log";
