@@ -56,6 +56,11 @@ if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSABLE_NAME}"; then
 	exit 1
 fi
 
+if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSABLE_NAME}"; then
+    error "Invalid composable name: ${DATACRUMBS_COMPOSABLE_NAME}"
+    exit 1
+fi
+
 # Convert APP_CMD string into array, splitting on spaces
 read -ra APP_CMD <<<"${DATACRUMBS_COMPOSE_RUN_APP}"
 
