@@ -31,26 +31,31 @@ function get_flux_datacrumbs_enabled() {
     echo "${enabled_value}"
 }
 
-
-function get_slurm_datacrumbs_enabled() {
-    enabled_value=$(get_general_datacrumbs_enabled)
-    if [[ "${enabled_value}" == "no" ]]; then
-        if [[ ${SLURM_JOB_PARTITION} != "datacrumbs" ]]; then
-            enabled_value="no"
-        else
-            enabled_value="yes"
-        fi
-    fi
-    log_system "get_slurm_datacrumbs_enabled returned enabled:${enabled_value}"
-    echo "${enabled_value}"
+function get_slurm_comment() {
+  local slurm_job_comment=$(scontrol show job $SLURM_JOB_ID | grep -i comment | awk -F'=' '{print $2}')
+  echo $slurm_job_comment
 }
 
+function get_slurm_datacrumbs_enabled() {
+  enabled_value="no"
+  local slurm_job_comment=$(get_slurm_comment)
+  # NOTE: If SLURM_JOB_COMMENT which is a JSON
+  # of format {datacrumbs: {enable: "yes|no", composite: name}}.
+  # says datacrumbs enable is yes, else remains the same.
+  if [[ $(echo ${slurm_job_comment} | jq -r .datacrumbs.enable 2>/dev/null) == "yes" ]]; then
+    enabled_value="yes"
+  fi
+  log_system "get_slurm_datacrumbs_enabled returned enabled:${enabled_value}"
+  echo "${enabled_value}"
+}
 
 function get_datacrumbs_enabled() {
     local enabled="no"
     if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
         enabled=$(get_flux_datacrumbs_enabled)
     elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
+        local slurm_job_comment=$(get_slurm_comment)
+        log_system "Slurm comment: $slurm_job_comment"
         enabled=$(get_slurm_datacrumbs_enabled)
     else
         enabled=$(get_general_datacrumbs_enabled)
@@ -59,12 +64,8 @@ function get_datacrumbs_enabled() {
     echo "${enabled}"
 }
 
-function get_default_datacrumbs_composite_name() {
-    echo "NONE"
-}
-
 function get_flux_datacrumbs_composite_name() {
-    local composite_name=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs.composite)
+    local composite_name=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs.composite 2>/dev/null)
     if [[ ${composite_name} == "null"  || ${composite_name} == "" ]]; then
         log_system "User hasn't requested datacrumbs' composite feature using ${composite_name}.""ERROR"
     else
@@ -74,22 +75,33 @@ function get_flux_datacrumbs_composite_name() {
     echo "${composite_name}"
 }
 
-function get_general_datacrumbs_composite_name() {
-    local composite_name=$(get_default_datacrumbs_composite_name)
-    if [[ ${DATACRUMBS_COMPOSITE_NAME} == "null"  || ${composite_name} == "" ]]; then
-        log_system "User hasn't requested datacrumbs' composite feature using ${composite_name}."
-    else
-        log_system "User has requested datacrumbs' composite feature using ${composite_name}."
-    fi
-    log_system "get_general_datacrumbs_composite_name returned composite_name:${composite_name}"
-    echo "${composite_name}"
+function get_slurm_datacrumbs_composite_name() {
+  local composite_name=$(get_default_datacrumbs_composite_name)
+  local slurm_job_comment=$(get_slurm_comment)
+  local slurm_composite="$(echo ${slurm_job_comment} | jq -r .datacrumbs.composite 2>/dev/null)"
+  if [[
+    ${slurm_composite} == "" ||
+    ${slurm_composite} == "NONE" ||
+    ${slurm_composite} == "null" ||
+    ${slurm_composite} == $(get_default_datacrumbs_composite_name) ]] \
+    ; then
+    log_system "User hasn't requested datacrumbs' composite feature using ${composite_name}"
+  else
+    log_system "User has requested datacrumbs' composite feature using ${composite_name}."
+  fi
+  log_system "get_slurm_datacrumbs_composite_name returned composite_name:${composite_name}"
+  echo "${composite_name}"
 }
 
-
-function get_slurm_datacrumbs_composite_name() {
-    local composite_name=$(get_general_datacrumbs_composite_name)
-    log_system "get_slurm_datacrumbs_composite_name returned composite_name:${composite_name}"
-    echo "${composite_name}"
+function get_general_datacrumbs_composite_name() {
+  local composite_name=$(get_default_datacrumbs_composite_name)
+  if [[ ${DATACRUMBS_COMPOSITE_NAME} == "null" || ${composite_name} == "" ]]; then
+    log_system "User hasn't requested datacrumbs' composite feature using ${composite_name}."
+  else
+    log_system "User has requested datacrumbs' composite feature using ${composite_name}."
+  fi
+  log_system "get_general_datacrumbs_composite_name returned composite_name:${composite_name}"
+  echo "${composite_name}"
 }
 
 function get_datacrumbs_composite_name() {

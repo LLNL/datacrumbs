@@ -792,6 +792,15 @@ install(
     ${DATACRUMBS_INSTALL_SBINARYDIR}
 )
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_salloc.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_salloc @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_salloc
+    DESTINATION
+    ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+
 # Create an empty directory at install time
 install(CODE "file(MAKE_DIRECTORY \"\${DATACRUMBS_INSTALL_LIBEXEC}/sbin\")")
 
