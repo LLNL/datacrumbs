@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# NOTE: This can be added to the slurm prologue
+
+warn_user() {
+  ## post exception to flux log, cancel job
+  echo "[WARN] ${SLURM_JOB_ID} datacrumbs-prolog: $@"
+}
+
+# NOTE: This should match with the name of the slurm partition
+if [[ ${SLURM_JOB_PARTITION} != "datacrumbs" ]]; then
+  SLURM_DATACRUMBS="yes"
+else
+  SLURM_DATACRUMBS="null"
+  logger "User hasn't requested datacrumbs feature, exiting."
+  return 1
+fi
+
+# NOTE: Redundant safety check
+if [[ ${SLURM_DATACRUMBS} == "null" || "${SLURM_DATACRUMBS}" != "yes" || $SLURM_DATACRUMBS == "" ]]; then
+  logger "User hasn't requested datacrumbs feature, exiting."
+  return 1
+fi
+
+# NOTE: User should `export DATACRUMBS_SLURM_COMPOSE="sys"` of as needed
+SLURM_DATACRUMBS_COMPOSE=${DATACRUMBS_SLURM_COMPOSE:-"null"}
+
+if [[ ${SLURM_DATACRUMBS_COMPOSE} == "null" || ${SLURM_DATACRUMBS_COMPOSE} == "" ]]; then
+  DATACRUMBS_COMPOSABLE_NAME="NONE"
+  logger "User hasn't requested datacrumbs' composite feature using ${DATACRUMBS_COMPOSABLE_NAME}."
+else
+  DATACRUMBS_COMPOSABLE_NAME=${SLURM_DATACRUMBS_COMPOSE}
+  if [[ -n "$SLURM_JOB_USERID" ]]; then
+    DATACRUMBS_USER=$(id -nu $SLURM_JOB_USERID)
+  fi
+  if [[ ! -f "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/${DATACRUMBS_USER}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME}" ]]; then
+    warn_user "Error: Composable name ${DATACRUMBS_COMPOSABLE_NAME} does not exist."
+    return 1
+  fi
+  logger "User has requested datacrumbs' composite feature using ${DATACRUMBS_COMPOSABLE_NAME}."
+fi
+
+if [[ ! ${DATACRUMBS_COMPOSABLE_NAME} =~ ^[a-zA-Z_]+$ ]]; then
+  warn_user "Error: DATACRUMBS_COMPOSABLE_NAME: ${DATACRUMBS_COMPOSABLE_NAME} contains invalid characters. Only alphabets and underscores are allowed."
+  return 1
+fi
+
+export DATACRUMBS_COMPOSABLE_NAME
+
