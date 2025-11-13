@@ -25,9 +25,7 @@ if [[ "${DATACRUMBS_ENV_LOADED:-0}" == "0" ]]; then
             debug "User is root."
         fi
         if [[ -z "$DATACRUMBS_USER" ]] || [[ "$DATACRUMBS_USER" = "root" ]]; then
-            if [[ -n "$FLUX_JOB_USERID" ]]; then
-            DATACRUMBS_USER=$(id -nu $FLUX_JOB_USERID)
-            fi
+            DATACRUMBS_USER=$(get_actual_user)
         fi
     fi
     
@@ -45,10 +43,21 @@ if [[ "${DATACRUMBS_ENV_LOADED:-0}" == "0" ]]; then
     export DATACRUMBS_TRACE_DIR=$(echo "$DATACRUMBS_TRACE_DIR_PATTERN" | sed "s|%YY%|$YEAR|g; s|%MM%|$MONTH|g; s|%DD%|$DAY|g")
     readonly DATACRUMBS_TRACE_DIR
     debug "Log directory set to $DATACRUMBS_TRACE_DIR"
+
+    mkdir -p "${DATACRUMBS_SERVER_RUN_DIR}" 2> /dev/null
+
     export DATACRUMBS_ENV_LOADED=1
     readonly DATACRUMBS_ENV_LOADED
 
+    if command -v module &> /dev/null; then
+        export DATACRUMBS_MODULE_AVAILABLE=1
+    else
+        export DATACRUMBS_MODULE_AVAILABLE=0
+    fi
+    readonly DATACRUMBS_MODULE_AVAILABLE
+
     eval $DATACRUMBS_SERVER_PREAMBLE
+
 fi
 
 if [[ "$DATACRUMBS_MODULE_AVAILABLE" == "1" ]] && [[ "$DATACRUMBS_SERVER_MODULE" == "1" ]]; then

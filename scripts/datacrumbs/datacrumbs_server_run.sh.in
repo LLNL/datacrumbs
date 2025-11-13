@@ -14,7 +14,7 @@ fi
 source "$SCRIPT_DIR/datacrumbs_args"
 
 dc_args_init "DATACRUMBS"
-dc_args_add_option "DATACRUMBS" "composite-name" "OPTIONAL" "Composable name" "string"
+dc_args_add_option "DATACRUMBS" "composite-name" "OPTIONAL" "Composable name" "string" "$DATACRUMBS_COMPOSABLE_NAME"
 dc_args_add_option "DATACRUMBS" "enable-mpi" "OPTIONAL" "switch to enable MPI" "bool" "0"
 dc_args_add_option "DATACRUMBS" "nodes" "OPTIONAL" "Set number of nodes" "int" "1"
 dc_args_add_option "DATACRUMBS" "ppn" "OPTIONAL" "Set processes per node" "int" "1"
@@ -37,24 +37,20 @@ PROG_NAME=$(basename "$0")
 source $SCRIPT_DIR/datacrumbs_setup
 
 if [[ "$DATACRUMBS_COMPOSITE_NAME" != "" ]] && [[ "$DATACRUMBS_COMPOSITE_NAME" != "NONE" ]]; then
-    if [[ ! -f "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSITE_NAME}" ]]; then
-        error "Composite ${DATACRUMBS_COMPOSITE_NAME} not found for ${DATACRUMBS_USER}"
+    if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSITE_NAME}"; then
+        error "Invalid composable name: ${DATACRUMBS_COMPOSITE_NAME}"
         exit 1
     fi
 fi
 
 
 check_sudo_user
-
-RUNID=${!DATACRUMBS_JOB_ID_VAR}
-RUNID=${RUNID:-1000}
-DATACRUMBS_LOG_FILE=${DATACRUMBS_LOG_DIR}/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
-READY_FILE="@DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
-debug "RUNID: $RUNID"
+    
+debug "DATACRUMBS_SERVER_RUN_ID: $DATACRUMBS_SERVER_RUN_ID"
 debug "DATACRUMBS_JOB_ID_VAR: $DATACRUMBS_JOB_ID_VAR"
 debug "value DATACRUMBS_JOB_ID_VAR: ${!DATACRUMBS_JOB_ID_VAR}"
 debug "DATACRUMBS_LOG_FILE: $DATACRUMBS_LOG_FILE"
-debug "READY_FILE: $READY_FILE"
+debug "DATACRUMBS_SERVER_READY_FILE: $DATACRUMBS_SERVER_READY_FILE"
 log "Running as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_TRACE_DIR and log file $DATACRUMBS_LOG_FILE"
 datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_TRACE_DIR
 exec=()

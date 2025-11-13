@@ -14,7 +14,7 @@ fi
 source "$SCRIPT_DIR/datacrumbs_args"
 
 dc_args_init "DATACRUMBS"
-dc_args_add_option "DATACRUMBS" "composite-name" "OPTIONAL" "Composable name" "string"
+dc_args_add_option "DATACRUMBS" "composite-name" "OPTIONAL" "Composable name" "string" "$DATACRUMBS_COMPOSABLE_NAME"
 dc_args_add_option "DATACRUMBS" "enable-mpi" "OPTIONAL" "switch to enable MPI" "bool" "0"
 dc_args_add_option "DATACRUMBS" "nodes" "OPTIONAL" "Set number of nodes" "int" "1"
 dc_args_add_option "DATACRUMBS" "ppn" "OPTIONAL" "Set processes per node" "int" "1"
@@ -51,15 +51,11 @@ read -ra APP_CMD <<< "${DATACRUMBS_APP}"
 check_sudo_user
 
 
-RUNID=${!DATACRUMBS_JOB_ID_VAR}
-RUNID=${RUNID:-1000}
-DATACRUMBS_LOG_FILE=${DATACRUMBS_LOG_DIR:-/tmp}/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
-READY_FILE="@DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
-debug "RUNID: $RUNID"
+debug "DATACRUMBS_SERVER_RUN_ID: $DATACRUMBS_SERVER_RUN_ID"
 debug "DATACRUMBS_JOB_ID_VAR: $DATACRUMBS_JOB_ID_VAR"
 debug "value DATACRUMBS_JOB_ID_VAR: ${!DATACRUMBS_JOB_ID_VAR}"
 debug "DATACRUMBS_LOG_FILE: $DATACRUMBS_LOG_FILE"
-debug "READY_FILE: $READY_FILE"
+debug "DATACRUMBS_SERVER_READY_FILE: $DATACRUMBS_SERVER_READY_FILE"
 echo "Running cmd: ${APP_CMD[*]} as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_TRACE_DIR and log file $DATACRUMBS_LOG_FILE"
 
 exec=()
