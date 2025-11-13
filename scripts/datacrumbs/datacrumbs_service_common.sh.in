@@ -1,41 +1,152 @@
 #!/bin/bash
 
-FLUX_DATACRUMBS=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs)
+source @DATACRUMBS_INSTALL_BINARYDIR@/datacrumbs_setup
 
-warn_user() {
-    ## post exception to flux log, cancel job
-    flux job raise --severity=1 ${FLUX_JOB_ID}  "datacrumbs-prolog: $@"
+log_user() {
+    logger "[LOG] datacrumbs-prolog: $@"
 }
 
-if [[ ${FLUX_DATACRUMBS} == "null" ]]; then
+warn_user() {
+    if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
+        flux job raise --severity=1 ${FLUX_JOB_ID}  "datacrumbs-prolog: $@" 
+    elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
+        logger "[WARN] ${SLURM_JOB_ID} datacrumbs-prolog: $@"
+    else
+        logger "[WARN] datacrumbs-prolog: $@"
+    fi
+}
+function get_general_datacrumbs_enabled() {
+    local enabled=${DATACRUMBS_ENABLED:-0}
+    enabled_value="no"
+    if [[ "${enabled}" -eq "1" ]]; then
+        enabled_value="yes"
+    fi
+    log_user "get_general_datacrumbs_enabled returned enabled:${enabled_value}"
+    echo "${enabled_value}"
+}
+
+function get_flux_datacrumbs_enabled() {
+    local enabled=$(flux job info $FLUX_JOB_ID jobspec 2>/dev/null | jq -r .attributes.system.datacrumbs 2>/dev/null)
+    enabled_value="no"
+    if [[ ${enabled} == "null" ]]; then
+        logger "User hasn't requested datacrumbs feature  enabled:${enabled}, exiting."
+    else
+        FLUX_DATACRUMBS=$(flux job info $FLUX_JOB_ID jobspec 2>/dev/null | jq -r .attributes.system.datacrumbs.enable 2>/dev/null)
+        if [[ ${FLUX_DATACRUMBS} == "null" || "${FLUX_DATACRUMBS}" != "yes" ]]; then
+            logger "User hasn't requested datacrumbs feature  FLUX_DATACRUMBS:${FLUX_DATACRUMBS}, exiting."
+        else 
+            enabled_value="yes"
+        fi
+    fi
+    log_user "get_flux_datacrumbs_enabled returned enabled:${enabled_value}"
+    echo "${enabled_value}"
+}
+
+
+function get_slurm_datacrumbs_enabled() {
+    enabled_value=$(get_general_datacrumbs_enabled)
+    if [[ "${enabled_value}" == "no" ]]; then
+        if [[ ${SLURM_JOB_PARTITION} != "datacrumbs" ]]; then
+            enabled_value="no"
+        else
+            enabled_value="yes"
+        fi
+    fi
+    log_user "get_slurm_datacrumbs_enabled returned enabled:${enabled_value}"
+    echo "${enabled_value}"
+}
+
+
+function get_datacrumbs_enabled() {
+    local enabled="no"
+    if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
+        enabled=$(get_flux_datacrumbs_enabled)
+    elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
+        enabled=$(get_slurm_datacrumbs_enabled)
+    else
+        enabled=$(get_general_datacrumbs_enabled)
+    fi
+    log_user "get_datacrumbs_enabled returned enabled:${enabled}"
+    echo "${enabled}"
+}
+
+
+function validate_datacrumbs_composite_name() {
+    local name="$1"
+    return_code=0
+    if [[ ! ${name} =~ ^[a-zA-Z_]+$ ]]; then
+        warn_user "Error: DATACRUMBS_COMPOSABLE_NAME: ${name} contains invalid characters. Only alphabets and underscores are allowed."
+        return_code=1
+    fi
+    if [[ ${return_code} -eq 0 && ! -f "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/${DATACRUMBS_USER}/datacrumbs_${name}" ]]; then
+        warn_user "Error: Composable name ${name} does not exist."
+        return_code=1
+    fi
+    log_user "validate_datacrumbs_composite_name validated name:${name} return_code:${return_code}"
+    return ${return_code}
+}
+
+function get_default_datacrumbs_composite_name() {
+    echo "NONE"
+}
+
+function get_flux_datacrumbs_composite_name() {
+    local composite_name=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs.composite)
+    if [[ ${composite_name} == "null"  || ${composite_name} == "" ]]; then
+        logger "User hasn't requested datacrumbs' composite feature using ${composite_name}.""ERROR"
+    else
+        logger "User has requested datacrumbs' composite feature using ${composite_name}."
+    fi
+    log_user "get_flux_datacrumbs_composite_name returned composite_name:${composite_name}"
+    echo "${composite_name}"
+}
+
+function get_general_datacrumbs_composite_name() {
+    local composite_name=$(get_default_datacrumbs_composite_name)
+    if [[ ${DATACRUMBS_COMPOSITE_NAME} == "null"  || ${composite_name} == "" ]]; then
+        logger "User hasn't requested datacrumbs' composite feature using ${composite_name}."
+    else
+        logger "User has requested datacrumbs' composite feature using ${composite_name}."
+    fi
+    log_user "get_general_datacrumbs_composite_name returned composite_name:${composite_name}"
+    echo "${composite_name}"
+}
+
+
+function get_slurm_datacrumbs_composite_name() {
+    local composite_name=$(get_general_datacrumbs_composite_name)
+    log_user "get_slurm_datacrumbs_composite_name returned composite_name:${composite_name}"
+    echo "${composite_name}"
+}
+
+function get_datacrumbs_composite_name() {
+    local name=$(get_default_datacrumbs_composite_name)
+    if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
+        name=$(get_flux_datacrumbs_composite_name)
+    elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
+        name=$(get_slurm_datacrumbs_composite_name)
+    else
+        name=$(get_general_datacrumbs_composite_name)
+    fi
+    if [[ "${name}" != "$(get_default_datacrumbs_composite_name)" && "${name}" != "ERROR" ]]; then  
+        if ! validate_datacrumbs_composite_name "${name}"; then
+            name="ERROR"
+        fi
+    fi
+    log_user "get_datacrumbs_composite_name returned name:${name}"
+    echo "${name}"
+}
+
+DATACRUMBS_ENABLED=$(get_datacrumbs_enabled)
+if [[ "${DATACRUMBS_ENABLED}" != "yes" ]]; then
     logger "User hasn't requested datacrumbs feature, exiting."
     return 1
 fi
-FLUX_DATACRUMBS=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs.enable)
-if [[ ${FLUX_DATACRUMBS} == "null" || "${FLUX_DATACRUMBS}" != "yes" ]]; then
-    logger "User hasn't requested datacrumbs feature, exiting."
+DATACRUMBS_COMPOSABLE_NAME=$(get_datacrumbs_composite_name)
+if [[ "${DATACRUMBS_COMPOSABLE_NAME}" == "ERROR" ]]; then
     return 1
 fi
 
-FLUX_DATACRUMBS_COMPOSE=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs.composite)
-if [[ ${FLUX_DATACRUMBS_COMPOSE} == "null"  || ${FLUX_DATACRUMBS_COMPOSE} == "" ]]; then
-    DATACRUMBS_COMPOSABLE_NAME="NONE"
-    logger "User hasn't requested datacrumbs' composite feature using ${DATACRUMBS_COMPOSABLE_NAME}."
-else
-    DATACRUMBS_COMPOSABLE_NAME=${FLUX_DATACRUMBS_COMPOSE}
-    if [[ -n "$FLUX_JOB_USERID" ]]; then
-        DATACRUMBS_USER=$(id -nu $FLUX_JOB_USERID)
-    fi
-    if [[ ! -f "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/${DATACRUMBS_USER}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME}" ]]; then
-        warn_user "Error: Composable name ${DATACRUMBS_COMPOSABLE_NAME} does not exist."
-        return 1
-    fi
-    logger "User has requested datacrumbs' composite feature using ${DATACRUMBS_COMPOSABLE_NAME}."
-fi
-
-if [[ ! ${DATACRUMBS_COMPOSABLE_NAME} =~ ^[a-zA-Z_]+$ ]]; then
-    warn_user "Error: DATACRUMBS_COMPOSABLE_NAME: ${DATACRUMBS_COMPOSABLE_NAME} contains invalid characters. Only alphabets and underscores are allowed."
-    return 1
-fi
-
+readonly DATACRUMBS_COMPOSABLE_NAME
 export DATACRUMBS_COMPOSABLE_NAME
+export DATACRUMBS_USER

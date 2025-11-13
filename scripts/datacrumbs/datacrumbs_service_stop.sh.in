@@ -1,7 +1,8 @@
 #!/bin/bash
 source @DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_service_common.sh
 if [[ $? -eq 0 ]]; then
-    sudo systemctl stop datacrumbs@$DATACRUMBS_COMPOSABLE_NAME.service 
+    sudo systemctl stop datacrumbs@${DATACRUMBS_SERVER_RUN_ID}.service 
+    sudo rm ${DATACRUMBS_SERVER_ENV_FILE}
 fi
 exit 0
 
