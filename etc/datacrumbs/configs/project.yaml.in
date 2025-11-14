@@ -19,17 +19,25 @@ client:
   bin: ${DATACRUMBS_INSTALL_LIBEXEC_DIR}/@CMAKE_INSTALL_SBINDIR@/${DATACRUMBS_USER}
 trace:
   dir_pattern: @DATACRUMBS_CONFIGURED_TRACE_DIR@/%YY%/%MM%/%DD%
-log:
-  dir: @DATACRUMBS_CONFIGURED_LOG_DIR@
+job:
+  scheduler: @DATACRUMBS_SCHEDULER_TYPE@
+  run: @DATACRUMBS_SCHEDULER_RUN_CMD@
+  node_flag: @DATACRUMBS_SCHEDULER_NODES_CMD_OPT@
+  ppn_flag: @DATACRUMBS_SCHEDULER_PPN_CMD_OPT@
+  other_flags: @DATACRUMBS_SCHEDULER_RUN_EXTRA_ARGS@
+  id_var: @DATACRUMBS_SCHEDULER_JOBID_ENV_VAR@
 server:
   load_timeout: ${DATACRUMBS_SERVER_TIMEOUT_USER:-600}
-  pid_file: @DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs.pid
-  runid_file: @DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs.runid
+  run_dir: @DATACRUMBS_INSTALL_RUNSTATEDIR@/@PROJECT_NAME@
+  run_id_file: ${DATACRUMBS_SERVER_RUN_DIR}/datacrumbs.runid
+  run_id: $(if [ "${!DATACRUMBS_JOB_ID_VAR}" == "" ]; then if [[ -f "${DATACRUMBS_SERVER_RUN_ID_FILE}" ]]; then cat "$DATACRUMBS_SERVER_RUN_ID_FILE" 2>/dev/null; else echo $(date +"%Y%m%d%H%M%S"); fi else echo ${!DATACRUMBS_JOB_ID_VAR}; fi)
+  pid_file: ${DATACRUMBS_SERVER_RUN_DIR}/datacrumbs-${DATACRUMBS_SERVER_RUN_ID}.pid
+  systemd_pid_file: ${DATACRUMBS_SERVER_RUN_DIR}/datacrumbs-systemd-${DATACRUMBS_SERVER_RUN_ID}.pid
+  ready_file: ${DATACRUMBS_SERVER_RUN_DIR}/datacrumbs-${DATACRUMBS_SERVER_RUN_ID}.ready
+  status_file: ${DATACRUMBS_SERVER_RUN_DIR}/datacrumbs-${DATACRUMBS_SERVER_RUN_ID}.json
+  env_file: ${DATACRUMBS_SERVER_RUN_DIR}/datacrumbs-${DATACRUMBS_SERVER_RUN_ID}.env
   module: 0
-  preamble:  
-job:
-  run: flux run
-  node_flag: -N
-  ppn_flag: --tasks-per-node
-  other_flags:
-  id_var: FLUX_JOB_ID
+  preamble:
+log:
+  dir: @DATACRUMBS_CONFIGURED_LOG_DIR@
+  file: ${DATACRUMBS_LOG_DIR}/datacrumbs_${DATACRUMBS_USER}_${DATACRUMBS_SERVER_RUN_ID}.log  

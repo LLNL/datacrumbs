@@ -23,19 +23,31 @@ done
 ```bash
 for i in {2..6} {9..11}; do
 echo "Copying prolog and epilog files into server:lead${i}"
-sudo ssh lead${i} rm /etc/flux/system/prolog-job-manager.d/datacrumbs*
-sudo ssh lead${i} rm /etc/flux/system/epilog.d/datacrumbs*
-sudo scp -p ./bin/datacrumbs_service_run.sh lead${i}:/etc/flux/system/prolog-job-manager.d/
-sudo scp -p ./bin/datacrumbs_service_stop.sh lead${i}:/etc/flux/system/epilog.d/
-sudo scp -p ./etc/datacrumbs/systemd/datacrumbs@.service lead${i}:/etc/systemd/system/
 sudo ssh lead${i} << 'EOF'
+DATACRUMBS_INSTALL=/home/haridev/datacrumbs/install
+rm /etc/flux/system/prolog-job-manager.d/datacrumbs*
+rm /etc/flux/system/epilog.d/datacrumbs*
+rm  /etc/systemd/system/datacrumbs*
+ln -s ${DATACRUMBS_INSTALL}/sbin/datacrumbs_service_run.sh /etc/flux/system/prolog-job-manager.d/datacrumbs_service_run.sh
+ln -s ${DATACRUMBS_INSTALL}/sbin/datacrumbs_service_stop.sh /etc/flux/system/epilog.d/datacrumbs_service_stop.sh
+ln -s ${DATACRUMBS_INSTALL}/etc/datacrumbs/systemd/datacrumbs@.service /etc/systemd/system/datacrumbs@.service
 chmod u+x /etc/flux/system/prolog-job-manager.d/datacrumbs*
 chmod u+x /etc/flux/system/epilog.d//datacrumbs*
 rm -r /tmp/datacrumbs*
+rm -rf /var/run/datacrumbs*
+systemctl daemon-reload
+EOF
+done
+for i in {2..6} {9..11}; do
+echo "Copying prolog and epilog files into server:lead${i}"
+sudo ssh lead${i} << 'EOF'
 systemctl daemon-reload
 EOF
 done
 ```
+```
+
+
 ```bash
 for i in 2 {4..6} {9..11}; do
 sudo scp -p /etc/flux/system/conf.d/job-manager.toml lead${i}:/etc/flux/system/conf.d/
