@@ -37,8 +37,8 @@ PROG_NAME=$(basename "$0")
 source $SCRIPT_DIR/datacrumbs_setup
 
 if [[ "$DATACRUMBS_COMPOSITE_NAME" != "" ]] && [[ "$DATACRUMBS_COMPOSITE_NAME" != "NONE" ]]; then
-    if [[ ! -f "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSITE_NAME}" ]]; then
-        error "Composite ${DATACRUMBS_COMPOSITE_NAME} not found for ${DATACRUMBS_USER}"
+    if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSITE_NAME}"; then
+        error "Invalid composable name: ${DATACRUMBS_COMPOSITE_NAME}"
         exit 1
     fi
 fi
