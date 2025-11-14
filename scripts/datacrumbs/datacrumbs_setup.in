@@ -43,7 +43,15 @@ if [[ "${DATACRUMBS_ENV_LOADED:-0}" == "0" ]]; then
     export DATACRUMBS_ENV_LOADED=1
     readonly DATACRUMBS_ENV_LOADED
 
+    if command -v module &> /dev/null; then
+        export DATACRUMBS_MODULE_AVAILABLE=1
+    else
+        export DATACRUMBS_MODULE_AVAILABLE=0
+    fi
+    readonly DATACRUMBS_MODULE_AVAILABLE
+
     eval $DATACRUMBS_SERVER_PREAMBLE
+
 fi
 
 if [[ "$DATACRUMBS_MODULE_AVAILABLE" == "1" ]] && [[ "$DATACRUMBS_SERVER_MODULE" == "1" ]]; then
