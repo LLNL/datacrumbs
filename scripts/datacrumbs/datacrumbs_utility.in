@@ -255,12 +255,38 @@ function get_actual_user() {
             user=$(id -nu $SLURM_JOB_UID)
         fi
     fi
+    log_system "get_actual_user returned user:${user}"
     echo "${user}"
 }
 
-if command -v module &> /dev/null
-then
-   export DATACRUMBS_MODULE_AVAILABLE=1
-else
-   export DATACRUMBS_MODULE_AVAILABLE=0
-fi
+function check_composite_location() {
+    local name="$1"
+    local selected_location=""
+    local user_location=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/${DATACRUMBS_USER}/datacrumbs_${name}
+    local system_location=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@PROJECT_NAME@/@CMAKE_INSTALL_SBINDIR@/${DATACRUMBS_INSTALL_USER}/datacrumbs_${name}
+    if [[ -f "${user_location}" ]]; then
+      selected_location="${user_location}"
+    elif [[ -f "${system_location}" ]]; then
+      selected_location="${system_location}"
+    else
+      selected_location="NA"
+    fi
+    log_system "check_composite_location for name:${name} selected_location:${selected_location}"
+    echo "${selected_location}"
+}
+
+function validate_datacrumbs_composite_name() {
+    local name="$1"
+    return_code=0
+    if [[ ! ${name} =~ ^[a-zA-Z_]+$ ]]; then
+        warn_user "Error: DATACRUMBS_COMPOSABLE_NAME: ${name} contains invalid characters. Only alphabets and underscores are allowed."
+        return_code=1
+    fi
+    local selected_location=$(check_composite_location "${name}")
+    if [[ ${return_code} -eq 0 && "${selected_location}" == "NA" ]]; then
+      warn_user "Error: Composable name ${name} does not exist."
+      return_code=1
+    fi
+    log_system "validate_datacrumbs_composite_name validated name:${name} return_code:${return_code}"
+    return ${return_code}
+}
