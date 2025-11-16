@@ -31,7 +31,6 @@ DATACRUMBS_TRIE_EXTERN(inclusion_path_trie, struct string_t, struct string_t);
 
 static inline __attribute__((always_inline)) u32 hash_str(const char* str, size_t len) {
   u32 hash = 5381;
-#pragma unroll
   for (int i = 0; i < 128; ++i) {
     if (i >= len) break;
     hash = ((hash << 5) + hash) + str[i];
