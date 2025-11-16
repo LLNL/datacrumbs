@@ -42,6 +42,9 @@ class ProbeExplorer {
   // Returns a vector of shared pointers to Probe objects
   std::vector<std::shared_ptr<Probe>> writeProbesToJson();
 
+  // Loads existing probes from a JSON file
+  std::unordered_map<std::string, std::shared_ptr<Probe>> loadExistingProbes();
+
   bool has_invalid_probes_ = false;  // Flag to indicate if any invalid probes were found
 
  private:

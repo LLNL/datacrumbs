@@ -220,6 +220,8 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
 
           std::shared_ptr<CaptureProbe> probe;
 
+          DC_LOG_DEBUG("[ConfigurationManager] Capture probe enable_explorer set to: %s",
+                       probe->enable_explorer ? "true" : "false");
           // Handle each capture probe type
           switch (type) {
             case CaptureType::HEADER: {
@@ -342,6 +344,11 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
                            probe_node["type"].as<std::string>().c_str());
               throw std::invalid_argument("Unknown CaptureType in configuration: " +
                                           probe_node["type"].as<std::string>());
+          }
+          if (probe_node["enable_explorer"]) {
+            probe->enable_explorer = probe_node["enable_explorer"].as<bool>();
+          } else {
+            probe->enable_explorer = true;  // Default to true if not specified
           }
           // Parse probe type
           if (probe_node["probe"]) {
