@@ -16,6 +16,7 @@ PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 # Parse command line arguments
 PUSH=false
 LOAD=false
+RUN=false
 
 print_usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -23,6 +24,7 @@ print_usage() {
     echo "Options:"
     echo "  --push              Push the built images to the registry"
     echo "  --load              Load the image into local Docker (only works for single platform)"
+    echo "  --run               Run the container after loading (implies --load)"
     echo "  --platform ARCH     Comma-separated list of platforms (default: linux/amd64,linux/arm64)"
     echo "  --tag TAG           Image tag (default: latest)"
     echo "  --name NAME         Image name (default: datacrumbs)"
@@ -33,6 +35,7 @@ print_usage() {
     echo "Examples:"
     echo "  $0 --push                                    # Build and push multi-arch images"
     echo "  $0 --load --platform linux/amd64             # Build and load amd64 only"
+    echo "  $0 --run --platform linux/amd64              # Build, load and run container"
     echo "  $0 --push --tag v1.0.0 --name myimage        # Custom tag and name"
 }
 
@@ -43,6 +46,11 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --load)
+            LOAD=true
+            shift
+            ;;
+        --run)
+            RUN=true
             LOAD=true
             shift
             ;;
@@ -173,8 +181,37 @@ if [ $? -eq 0 ]; then
     elif [ "$LOAD" = true ]; then
         echo ""
         echo "Image has been loaded into local Docker."
-        echo "You can run it with:"
-        echo "  docker run -it ${FULL_IMAGE_NAME}"
+        
+        if [ "$RUN" = true ]; then
+            echo ""
+            echo "Starting container with workspace mounted at /opt/datacrumbs..."
+            docker run -ti --privileged --cap-add sys_admin --cap-add sys_ptrace \
+                --net=host --pid=host --hostname docker \
+                -v /lib/modules/:/lib/modules:ro \
+                -v /sys/kernel/debug/:/sys/kernel/debug:rw \
+                -v /sys/fs/bpf:/sys/fs/bpf \
+                -v "$(pwd):/opt/datacrumbs" -w /opt/datacrumbs \
+                ${FULL_IMAGE_NAME}
+        else
+            echo ""
+            echo "To run with current workspace mounted (replaces built version in container):"
+            echo "  docker run -ti --privileged --cap-add sys_admin --cap-add sys_ptrace \\"
+            echo "    --net=host --pid=host --hostname docker \\"
+            echo "    -v /lib/modules/:/lib/modules:ro \\"
+            echo "    -v /sys/kernel/debug/:/sys/kernel/debug:rw \\"
+            echo "    -v /sys/fs/bpf:/sys/fs/bpf \\"
+            echo "    -v \"\$(pwd):/opt/datacrumbs\" -w /opt/datacrumbs \\"
+            echo "    ${FULL_IMAGE_NAME}"
+            echo ""
+            echo "To run with workspace mounted at /workspace (keeps built version):"
+            echo "  docker run -ti --privileged --cap-add sys_admin --cap-add sys_ptrace \\"
+            echo "    --net=host --pid=host --hostname docker \\"
+            echo "    -v /lib/modules/:/lib/modules:ro \\"
+            echo "    -v /sys/kernel/debug/:/sys/kernel/debug:rw \\"
+            echo "    -v /sys/fs/bpf:/sys/fs/bpf \\"
+            echo "    -v \"\$(pwd):/workspace\" -w /workspace \\"
+            echo "    ${FULL_IMAGE_NAME}"
+        fi
     fi
 else
     echo ""
