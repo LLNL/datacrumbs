@@ -135,6 +135,8 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
     }
   }
 
+  auto existingProbesMap = loadExistingProbes();
+
   static std::unordered_set<std::string> global_function_names;
   std::vector<std::shared_ptr<Probe>> probes;
   // Iterate over all capture probes from configuration
@@ -163,7 +165,65 @@ std::vector<std::shared_ptr<Probe>> ProbeExplorer::extractProbes() {
         DC_LOG_ERROR("Unknown probe type encountered in extractProbes()");
         throw std::runtime_error("Unknown probe type encountered in extractProbes()");
     }
+    if (!capture_probe->enable_explorer) {
+      // Check if probe already exists and can be reused
+      auto existingProbeIt = existingProbesMap.find(capture_probe->name);
+      if (existingProbeIt != existingProbesMap.end()) {
+        DC_LOG_INFO("Found existing probe '%s', reusing it", capture_probe->name.c_str());
+        auto existingProbe = existingProbeIt->second;
 
+        // Copy fields from existing probe to new probe
+        probe->name = existingProbe->name;
+        probe->functions = existingProbe->functions;
+
+        // Copy type-specific fields based on probe type
+        switch (capture_probe->probe_type) {
+          case ProbeType::UPROBE:
+            if (auto existingUprobe = std::dynamic_pointer_cast<UProbe>(existingProbe)) {
+              if (auto uprobe = std::dynamic_pointer_cast<UProbe>(probe)) {
+                uprobe->binary_path = existingUprobe->binary_path;
+                uprobe->include_offsets = existingUprobe->include_offsets;
+              }
+            }
+            break;
+          case ProbeType::USDT:
+            if (auto existingUsdtProbe = std::dynamic_pointer_cast<USDTProbe>(existingProbe)) {
+              if (auto usdtProbe = std::dynamic_pointer_cast<USDTProbe>(probe)) {
+                usdtProbe->binary_path = existingUsdtProbe->binary_path;
+                usdtProbe->provider = existingUsdtProbe->provider;
+              }
+            }
+            break;
+          case ProbeType::CUSTOM:
+            if (auto existingCustomProbe = std::dynamic_pointer_cast<CustomProbe>(existingProbe)) {
+              if (auto customProbe = std::dynamic_pointer_cast<CustomProbe>(probe)) {
+                customProbe->bpf_path = existingCustomProbe->bpf_path;
+                customProbe->start_event_id = existingCustomProbe->start_event_id;
+                customProbe->process_header = existingCustomProbe->process_header;
+                customProbe->event_type = existingCustomProbe->event_type;
+              }
+            }
+            break;
+          default:
+            // For SYSCALLS and KPROBE, no additional fields to copy
+            break;
+        }
+        DC_LOG_INFO("Reused existing probe: %s", probe->name.c_str());
+
+        // Validate the existing probe and add it to the list
+        if (probe->validate()) {
+          DC_LOG_INFO("Valid probe reused: %s", probe->name.c_str());
+          probes.push_back(probe);
+          continue;  // Skip the rest of the processing for this probe
+        } else {
+          DC_LOG_WARN("Existing probe '%s' failed validation, will extract fresh",
+                      probe->name.c_str());
+        }
+      } else {
+        DC_LOG_INFO("No existing probe found for '%s', will extract fresh",
+                    capture_probe->name.c_str());
+      }
+    }
     // Extract function names based on capture type
     switch (capture_probe->type) {
       case CaptureType::HEADER:
@@ -503,6 +563,173 @@ void ProbeExplorer::create_exclusion_file(std::vector<std::shared_ptr<Probe>> pr
   }
 
   DC_LOG_TRACE("ProbeExplorer::create_exclusion_file - end");
+}
+
+// Loads existing probes from JSON file and builds a map for querying
+std::unordered_map<std::string, std::shared_ptr<Probe>> ProbeExplorer::loadExistingProbes() {
+  DC_LOG_TRACE("ProbeExplorer::loadExistingProbes - start");
+  std::unordered_map<std::string, std::shared_ptr<Probe>> existingProbesMap;
+
+  if (!configManager_->probe_file_path.empty() &&
+      std::filesystem::exists(configManager_->probe_file_path)) {
+    std::ifstream ifs(configManager_->probe_file_path);
+    if (ifs.is_open()) {
+      std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+      json_object* jobj = json_tokener_parse(content.c_str());
+
+      if (jobj && json_object_get_type(jobj) == json_type_array) {
+        int arr_len = json_object_array_length(jobj);
+        for (int i = 0; i < arr_len; ++i) {
+          json_object* probe_obj = json_object_array_get_idx(jobj, i);
+          if (!probe_obj) {
+            DC_LOG_WARN("Probe object at index %d is null", i);
+            continue;
+          }
+
+          json_object* name_obj = nullptr;
+          json_object* type_obj = nullptr;
+
+          if (json_object_object_get_ex(probe_obj, "name", &name_obj) &&
+              json_object_object_get_ex(probe_obj, "type", &type_obj) &&
+              json_object_get_type(name_obj) == json_type_string &&
+              json_object_get_type(type_obj) == json_type_int) {
+            std::string probe_name = json_object_get_string(name_obj);
+            ProbeType probe_type = static_cast<ProbeType>(json_object_get_int(type_obj));
+
+            std::shared_ptr<Probe> probe;
+
+            // Create appropriate probe type based on the type field
+            switch (probe_type) {
+              case ProbeType::UPROBE:
+                probe = std::make_shared<UProbe>();
+                probe->type = ProbeType::UPROBE;
+                break;
+              case ProbeType::SYSCALLS:
+                probe = std::make_shared<SysCallProbe>();
+                probe->type = ProbeType::SYSCALLS;
+                break;
+              case ProbeType::USDT:
+                probe = std::make_shared<USDTProbe>();
+                probe->type = ProbeType::USDT;
+                break;
+              case ProbeType::KPROBE:
+                probe = std::make_shared<KProbe>();
+                probe->type = ProbeType::KPROBE;
+                break;
+              case ProbeType::CUSTOM:
+                probe = std::make_shared<CustomProbe>();
+                probe->type = ProbeType::CUSTOM;
+                break;
+              default:
+                DC_LOG_WARN("Unknown probe type '%d' for probe '%s'", static_cast<int>(probe_type),
+                            probe_name.c_str());
+                continue;
+            }
+
+            probe->name = probe_name;
+
+            // Load functions array if present
+            json_object* funcs_obj = nullptr;
+            if (json_object_object_get_ex(probe_obj, "functions", &funcs_obj) &&
+                json_object_get_type(funcs_obj) == json_type_array) {
+              int func_len = json_object_array_length(funcs_obj);
+              for (int j = 0; j < func_len; ++j) {
+                json_object* func_obj = json_object_array_get_idx(funcs_obj, j);
+                if (func_obj && json_object_get_type(func_obj) == json_type_string) {
+                  probe->functions.push_back(json_object_get_string(func_obj));
+                }
+              }
+            }
+
+            // Load type-specific fields
+            switch (probe_type) {
+              case ProbeType::UPROBE:
+                if (auto uprobe = std::dynamic_pointer_cast<UProbe>(probe)) {
+                  json_object* binary_path_obj = nullptr;
+                  json_object* include_offsets_obj = nullptr;
+                  if (json_object_object_get_ex(probe_obj, "binary_path", &binary_path_obj) &&
+                      json_object_get_type(binary_path_obj) == json_type_string) {
+                    uprobe->binary_path = json_object_get_string(binary_path_obj);
+                  }
+                  if (json_object_object_get_ex(probe_obj, "include_offsets",
+                                                &include_offsets_obj) &&
+                      json_object_get_type(include_offsets_obj) == json_type_boolean) {
+                    uprobe->include_offsets = json_object_get_boolean(include_offsets_obj);
+                  }
+                }
+                break;
+              case ProbeType::USDT:
+                if (auto usdtProbe = std::dynamic_pointer_cast<USDTProbe>(probe)) {
+                  json_object* binary_path_obj = nullptr;
+                  json_object* provider_obj = nullptr;
+                  if (json_object_object_get_ex(probe_obj, "binary_path", &binary_path_obj) &&
+                      json_object_get_type(binary_path_obj) == json_type_string) {
+                    usdtProbe->binary_path = json_object_get_string(binary_path_obj);
+                  }
+                  if (json_object_object_get_ex(probe_obj, "provider", &provider_obj) &&
+                      json_object_get_type(provider_obj) == json_type_string) {
+                    usdtProbe->provider = json_object_get_string(provider_obj);
+                  }
+                }
+                break;
+              case ProbeType::CUSTOM:
+                if (auto customProbe = std::dynamic_pointer_cast<CustomProbe>(probe)) {
+                  json_object* bpf_path_obj = nullptr;
+                  json_object* start_event_id_obj = nullptr;
+                  json_object* process_header_obj = nullptr;
+                  json_object* event_type_obj = nullptr;
+
+                  if (json_object_object_get_ex(probe_obj, "bpf_path", &bpf_path_obj) &&
+                      json_object_get_type(bpf_path_obj) == json_type_string) {
+                    customProbe->bpf_path = json_object_get_string(bpf_path_obj);
+                  }
+                  if (json_object_object_get_ex(probe_obj, "start_event_id", &start_event_id_obj) &&
+                      json_object_get_type(start_event_id_obj) == json_type_int) {
+                    customProbe->start_event_id = json_object_get_int(start_event_id_obj);
+                  }
+                  if (json_object_object_get_ex(probe_obj, "process_header", &process_header_obj) &&
+                      json_object_get_type(process_header_obj) == json_type_string) {
+                    customProbe->process_header = json_object_get_string(process_header_obj);
+                  }
+                  if (json_object_object_get_ex(probe_obj, "event_type", &event_type_obj) &&
+                      json_object_get_type(event_type_obj) == json_type_int) {
+                    customProbe->event_type = json_object_get_int(event_type_obj);
+                  }
+                }
+                break;
+              case ProbeType::SYSCALLS:
+              case ProbeType::KPROBE:
+                // No additional fields to load for these types
+                break;
+              default:
+                // Already handled above, should not reach here
+                break;
+            }
+
+            existingProbesMap[probe_name] = probe;
+            DC_LOG_DEBUG("Loaded existing probe: %s with %zu functions", probe_name.c_str(),
+                         probe->functions.size());
+          } else {
+            DC_LOG_WARN("Probe at index %d missing required 'name' or 'type' field", i);
+          }
+        }
+      } else {
+        DC_LOG_WARN("Existing probe file is not a valid JSON array");
+      }
+
+      if (jobj) json_object_put(jobj);
+    } else {
+      DC_LOG_ERROR("Failed to open existing probe file: %s",
+                   configManager_->probe_file_path.string().c_str());
+    }
+  } else {
+    DC_LOG_INFO("No existing probe file found at: %s",
+                configManager_->probe_file_path.string().c_str());
+  }
+
+  DC_LOG_INFO("Loaded %zu existing probes", existingProbesMap.size());
+  DC_LOG_TRACE("ProbeExplorer::loadExistingProbes - end");
+  return existingProbesMap;
 }
 
 // Writes extracted probes to a JSON file and returns the probe list

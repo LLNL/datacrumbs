@@ -47,25 +47,39 @@ source $SCRIPT_DIR/datacrumbs_setup
 
 check_regular_user
 
+# Build args to pass to server scripts
+server_args=()
+if [[ "${DATACRUMBS_JOB_ENABLE_MPI}" == "1" ]]; then
+    server_args+=("--enable-mpi")
+    server_args+=("--nodes" "${DATACRUMBS_JOB_NODES}")
+    server_args+=("--ppn" "${DATACRUMBS_JOB_PPN}")
+fi
+if [[ "${VERBOSE:-0}" == "1" ]]; then
+    server_args+=("--verbose")
+fi
+if [[ "${QUIET:-0}" == "1" ]]; then
+    server_args+=("--quiet")
+fi
+if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    server_args+=("--dry-run")
+fi
 
+SERVER_RUN_BIN=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs_server_run.sh
+SERVER_STOP_BIN=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs_server_stop.sh
 
-debug "DATACRUMBS_SERVER_RUN_ID: $DATACRUMBS_SERVER_RUN_ID"
-debug "DATACRUMBS_JOB_ID_VAR: $DATACRUMBS_JOB_ID_VAR"
-debug "value DATACRUMBS_JOB_ID_VAR: ${!DATACRUMBS_JOB_ID_VAR}"
-debug "DATACRUMBS_LOG_FILE: $DATACRUMBS_LOG_FILE"
-debug "DATACRUMBS_SERVER_READY_FILE: $DATACRUMBS_SERVER_READY_FILE"
-datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_TRACE_DIR
-
-
-echo "Running cmd: ${APP_CMD[*]} as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_TRACE_DIR and log file $DATACRUMBS_LOG_FILE"
-datacrumbs_start_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs
-
+echo "Starting DataCrumbs server via: $SERVER_RUN_BIN ${server_args[*]}"
+sudo "$SERVER_RUN_BIN" "${server_args[@]}"
+if [[ $? -ne 0 ]]; then
+    echo "Error: Failed to start DataCrumbs server"
+    exit 1
+fi
 log "Running App: ${APP_CMD[*]}"
 job_launch "${APP_CMD[@]}"
 log "Finished App"
 
-datacrumbs_stop_server @CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs $PROG_NAME
-
-datacrumbs_print_status
-
-datacrumbs_finalize $DATACRUMBS_USER $DATACRUMBS_TRACE_DIR
+echo "Stopping DataCrumbs server via: $SERVER_STOP_BIN ${server_args[*]}"
+sudo "$SERVER_STOP_BIN" "${server_args[@]}"
+if [[ $? -ne 0 ]]; then
+    echo "Error: Failed to stop DataCrumbs server"
+    exit 1
+fi
