@@ -439,7 +439,7 @@ add_dependencies(datacrumbs_obj datacrumbs_bpf_skel)
 
 # Build the final executable by linking server.cpp and the object library
 add_executable(${PROJECT_NAME} ${DATACRUMBS_SERVER_SRC})
-target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB} datacrumbs_obj)
+target_link_libraries(${PROJECT_NAME} datacrumbs_obj ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel datacrumbs_obj)
 
 # Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
