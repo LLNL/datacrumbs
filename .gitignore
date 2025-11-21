@@ -78,3 +78,7 @@ data/file_0_0.dat
 *.csv
 *.pfw*
 poc/bpf-core/vmlinux.h
+deps
+
+#nfs
+*.nfs*

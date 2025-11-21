@@ -182,8 +182,8 @@
   event->ts = fn->ts;                  \
   event->dur = (te - fn->ts);
 
-#define DATACRUMBS_EVENT_SUBMIT(event) \
-  bpf_ringbuf_submit(event, 0);        \
-  DBG_PRINTK("Pushed pid:%d, event_id:%llu to output\n", (u32)key.id, event_id);
+#define DATACRUMBS_EVENT_SUBMIT(event, pid_tgid, event_id) \
+  bpf_ringbuf_submit(event, 0);                            \
+  DBG_PRINTK("Pushed pid:%d, event_id:%llu to output\n", (u32)pid_tgid, event_id);
 
 #endif  // DATACRUMBS_SERVER_BPF_MACROS_BPF_H

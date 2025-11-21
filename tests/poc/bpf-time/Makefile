@@ -22,7 +22,7 @@ VMLINUX_H_PATH = ./vmlinux.h
 BPFTOOL ?= bpftool
 
 # libbpf and headers location
-LIBBPF_DIR ?= /usr
+LIBBPF_DIR ?= $(PREFIX)
 LIBBPF_INCLUDE = $(LIBBPF_DIR)/include
 LIBBPF_LIB = $(LIBBPF_DIR)/lib64
 ARCH        := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/')
