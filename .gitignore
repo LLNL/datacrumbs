@@ -79,3 +79,7 @@ deps
 
 #nfs
 *.nfs*
+
+# Sphinx documentation builds
+docs/_build/
+docs/_static/__pycache__/

@@ -1,0 +1,58 @@
+/* Bullet lists in content area only */
+.rst-content ul.simple,
+.rst-content .section ul {
+    list-style: disc outside !important;
+    margin-left: 0 !important;
+    padding-left: 1.2em !important;
+    margin-bottom: 12px !important;
+}
+
+.rst-content ul.simple li,
+.rst-content .section ul li {
+    display: list-item !important;
+    list-style: disc outside !important;
+    margin-left: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.rst-content ul.simple li p,
+.rst-content .section ul li p {
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+    display: inline !important;
+}
+
+/* Numbered lists in content area only */
+.rst-content ol,
+.rst-content .section ol {
+    list-style: decimal outside !important;
+    padding-left: 1.5em !important;
+    margin-bottom: 12px !important;
+    margin-left: 0 !important;
+}
+
+.rst-content ol li,
+.rst-content .section ol li {
+    display: list-item !important;
+    list-style: decimal outside !important;
+    margin-bottom: 0 !important;
+    margin-left: 0 !important;
+}
+
+.rst-content ol li p,
+.rst-content .section ol li p {
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+    display: inline !important;
+}
+
+/* Ensure navigation lists have no bullets */
+.wy-menu-vertical ul,
+.wy-menu-vertical li,
+nav ul,
+nav li,
+.toctree-l1,
+.toctree-l2,
+.toctree-l3 {
+    list-style: none !important;
+}
