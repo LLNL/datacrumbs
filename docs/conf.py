@@ -19,14 +19,14 @@
 
 # -- Project information -----------------------------------------------------
 
-project = u'dftracer'
-copyright = u'2018, Lawrence Livermore National Security, LLC'
+project = u'DataCrumbs'
+copyright = u'2024, Lawrence Livermore National Security, LLC'
 author = u'Hariharan Devarajan'
 
 # The short X.Y version
 version = u'0.0'
 # The full version, including alpha/beta/rc tags
-release = u'1.0.2'
+release = u'0.0.4'
 
 
 # -- General configuration ---------------------------------------------------
@@ -90,9 +90,12 @@ html_theme_path  = ["_themes"]
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+# Add custom CSS
+html_css_files = ['custom.css']
+
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = 'images/dftracer-logo.png'
+# html_logo = 'images/datacrumbs-logo.png'  # Update when logo is available
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -110,7 +113,7 @@ todo_include_todos = False
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'dftracer-doc'
+htmlhelp_basename = 'datacrumbs-doc'
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -137,13 +140,13 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'dftracer.tex', u'DFTracer Documentation',
+    (master_doc, 'datacrumbs.tex', u'DataCrumbs Documentation',
      author, 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-latex_logo = 'images/dftracer-logo.png'
+# latex_logo = 'images/datacrumbs-logo.png'
 
 
 # -- Options for manual page output ------------------------------------------
@@ -151,7 +154,7 @@ latex_logo = 'images/dftracer-logo.png'
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'dftracer', u'DFTracer Documentation',
+    (master_doc, 'datacrumbs', u'DataCrumbs Documentation',
      [author], 1)
 ]
 
@@ -162,7 +165,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'dftracer', u'DFTracer Documentation',
-     author, 'dftracer', 'DFTracer is a library for wrapping function calls in shared libraries.',
+    (master_doc, 'datacrumbs', u'DataCrumbs Documentation',
+     author, 'datacrumbs', 'DataCrumbs is an eBPF-based I/O profiling and tracing tool for HPC applications.',
      'Miscellaneous'),
 ]
