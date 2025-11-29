@@ -5,30 +5,30 @@ set -e pipefail
 source @DATACRUMBS_INSTALL_BINARYDIR@/datacrumbs_setup
 
 function get_general_datacrumbs_enabled() {
-    local enabled=${DATACRUMBS_ENABLED:-0}
-    enabled_value="no"
-    if [[ "${enabled}" -eq "1" ]]; then
-        enabled_value="yes"
-    fi
-    log_system "get_general_datacrumbs_enabled returned enabled:${enabled_value}"
-    echo "${enabled_value}"
+  local enabled=${DATACRUMBS_ENABLED:-0}
+  enabled_value="no"
+  if [[ "${enabled}" -eq "1" ]]; then
+    enabled_value="yes"
+  fi
+  log_system "get_general_datacrumbs_enabled returned enabled:${enabled_value}"
+  echo "${enabled_value}"
 }
 
 function get_flux_datacrumbs_enabled() {
-    local enabled=$(flux job info $FLUX_JOB_ID jobspec 2>/dev/null | jq -r .attributes.system.datacrumbs 2>/dev/null)
-    enabled_value="no"
-    if [[ ${enabled} == "null" ]]; then
-        log_system "User hasn't requested datacrumbs feature  enabled:${enabled}, exiting."
+  local enabled=$(flux job info $FLUX_JOB_ID jobspec 2>/dev/null | jq -r .attributes.system.datacrumbs 2>/dev/null)
+  enabled_value="no"
+  if [[ ${enabled} == "null" ]]; then
+    log_system "User hasn't requested datacrumbs feature  enabled:${enabled}, exiting."
+  else
+    FLUX_DATACRUMBS=$(flux job info $FLUX_JOB_ID jobspec 2>/dev/null | jq -r .attributes.system.datacrumbs.enable 2>/dev/null)
+    if [[ ${FLUX_DATACRUMBS} == "null" || "${FLUX_DATACRUMBS}" != "yes" ]]; then
+      log_system "User hasn't requested datacrumbs feature  FLUX_DATACRUMBS:${FLUX_DATACRUMBS}, exiting."
     else
-        FLUX_DATACRUMBS=$(flux job info $FLUX_JOB_ID jobspec 2>/dev/null | jq -r .attributes.system.datacrumbs.enable 2>/dev/null)
-        if [[ ${FLUX_DATACRUMBS} == "null" || "${FLUX_DATACRUMBS}" != "yes" ]]; then
-            log_system "User hasn't requested datacrumbs feature  FLUX_DATACRUMBS:${FLUX_DATACRUMBS}, exiting."
-        else 
-            enabled_value="yes"
-        fi
+      enabled_value="yes"
     fi
-    log_system "get_flux_datacrumbs_enabled returned enabled:${enabled_value}"
-    echo "${enabled_value}"
+  fi
+  log_system "get_flux_datacrumbs_enabled returned enabled:${enabled_value}"
+  echo "${enabled_value}"
 }
 
 function get_slurm_comment() {
@@ -50,36 +50,36 @@ function get_slurm_datacrumbs_enabled() {
 }
 
 function get_datacrumbs_enabled() {
-    local enabled="no"
-    if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
-        enabled=$(get_flux_datacrumbs_enabled)
-    elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
-        local slurm_job_comment=$(get_slurm_comment)
-        log_system "Slurm comment: $slurm_job_comment"
-        enabled=$(get_slurm_datacrumbs_enabled)
-    else
-        enabled=$(get_general_datacrumbs_enabled)
-    fi
-    log_system "get_datacrumbs_enabled returned enabled:${enabled}"
-    echo "${enabled}"
+  local enabled="no"
+  if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
+    enabled=$(get_flux_datacrumbs_enabled)
+  elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
+    local slurm_job_comment=$(get_slurm_comment)
+    log_system "Slurm comment: $slurm_job_comment"
+    enabled=$(get_slurm_datacrumbs_enabled)
+  else
+    enabled=$(get_general_datacrumbs_enabled)
+  fi
+  log_system "get_datacrumbs_enabled returned enabled:${enabled}"
+  echo "${enabled}"
 }
 
 function get_flux_datacrumbs_composite_name() {
-    local composite_name=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs.composite 2>/dev/null)
-    if [[ ${composite_name} == "null"  || ${composite_name} == "" ]]; then
-        log_system "User hasn't requested datacrumbs' composite feature using ${composite_name}.""ERROR"
-    else
-        log_system "User has requested datacrumbs' composite feature using ${composite_name}."
-    fi
-    log_system "get_flux_datacrumbs_composite_name returned composite_name:${composite_name}"
-    echo "${composite_name}"
+  local composite_name=$(flux job info $FLUX_JOB_ID jobspec | jq -r .attributes.system.datacrumbs.composite 2>/dev/null)
+  if [[ ${composite_name} == "null" || ${composite_name} == "" ]]; then
+    log_system "User hasn't requested datacrumbs' composite feature using ${composite_name}.""ERROR"
+  else
+    log_system "User has requested datacrumbs' composite feature using ${composite_name}."
+  fi
+  log_system "get_flux_datacrumbs_composite_name returned composite_name:${composite_name}"
+  echo "${composite_name}"
 }
 
 function get_slurm_datacrumbs_composite_name() {
   local composite_name=$(get_default_datacrumbs_composite_name)
   local slurm_job_comment=$(get_slurm_comment)
   local slurm_composite="$(echo ${slurm_job_comment} | jq -r .datacrumbs.composite 2>/dev/null)"
-  if [[
+  if [[ 
     ${slurm_composite} == "" ||
     ${slurm_composite} == "NONE" ||
     ${slurm_composite} == "null" ||
@@ -105,36 +105,36 @@ function get_general_datacrumbs_composite_name() {
 }
 
 function get_datacrumbs_composite_name() {
-    local name=$(get_default_datacrumbs_composite_name)
-    if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
-        name=$(get_flux_datacrumbs_composite_name)
-    elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
-        name=$(get_slurm_datacrumbs_composite_name)
-    else
-        name=$(get_general_datacrumbs_composite_name)
+  local name=$(get_default_datacrumbs_composite_name)
+  if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
+    name=$(get_flux_datacrumbs_composite_name)
+  elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
+    name=$(get_slurm_datacrumbs_composite_name)
+  else
+    name=$(get_general_datacrumbs_composite_name)
+  fi
+  if [[ "${name}" != "$(get_default_datacrumbs_composite_name)" && "${name}" != "ERROR" ]]; then
+    if ! validate_datacrumbs_composite_name "${name}"; then
+      name="ERROR"
     fi
-    if [[ "${name}" != "$(get_default_datacrumbs_composite_name)" && "${name}" != "ERROR" ]]; then  
-        if ! validate_datacrumbs_composite_name "${name}"; then
-            name="ERROR"
-        fi
-    fi
-    log_system "get_datacrumbs_composite_name returned name:${name}"
-    echo "${name}"
+  fi
+  log_system "get_datacrumbs_composite_name returned name:${name}"
+  echo "${name}"
 }
 
 DATACRUMBS_ENABLED=$(get_datacrumbs_enabled)
 if [[ "${DATACRUMBS_ENABLED}" != "yes" ]]; then
-    log_system "User hasn't requested datacrumbs feature, exiting."
-    return 1
+  log_system "User hasn't requested datacrumbs feature, exiting."
+  return 1
 fi
 DATACRUMBS_COMPOSABLE_NAME=$(get_datacrumbs_composite_name)
 if [[ "${DATACRUMBS_COMPOSABLE_NAME}" == "ERROR" ]]; then
-    return 1
+  return 1
 fi
 if [[ "${DATACRUMBS_COMPOSABLE_NAME}" == "$(get_default_datacrumbs_composite_name)" ]]; then
-    log_user "Running system datacrumbs"
+  log_user "Running system datacrumbs"
 else
-    log_user "Running a composite datacrumbs with name: ${DATACRUMBS_COMPOSABLE_NAME}"
+  log_user "Running a composite datacrumbs with name: ${DATACRUMBS_COMPOSABLE_NAME}"
 fi
 
 readonly DATACRUMBS_COMPOSABLE_NAME

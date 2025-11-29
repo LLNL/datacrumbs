@@ -54,14 +54,14 @@ if [[ -n "${DRY_RUN}" && "${DRY_RUN}" != "0" ]]; then
 fi
 
 run() {
-    if [[ "$DRY_RUN_MODE" == "1" ]]; then
-        printf "[DRY-RUN]"
-        printf " %q" "$@"
-        printf "\n"
-        return 0
-    else
-        "$@"
-    fi
+	if [[ "$DRY_RUN_MODE" == "1" ]]; then
+		printf "[DRY-RUN]"
+		printf " %q" "$@"
+		printf "\n"
+		return 0
+	else
+		"$@"
+	fi
 }
 
 PROBE_OBJECTS_DIR="$DATACRUMBS_INSTALL_PROBE_OBJECTS_DIR"

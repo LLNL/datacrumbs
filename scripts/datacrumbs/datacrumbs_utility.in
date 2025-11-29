@@ -53,11 +53,6 @@ function datacrumbs_init() {
 }
 
 function datacrumbs_start_server() {
-	if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
-		mkdir -p "$DATACRUMBS_SERVER_RUN_DIR"
-	else
-		sudo mkdir -p "$DATACRUMBS_SERVER_RUN_DIR"
-	fi
 	if [[ ! -w "$DATACRUMBS_SERVER_RUN_DIR" ]]; then
 		warn "Cannot write to DATACRUMBS_SERVER_RUN_DIR: $DATACRUMBS_SERVER_RUN_DIR. Trying sudo."
 		sudo mkdir -p "$DATACRUMBS_SERVER_RUN_DIR"
@@ -123,7 +118,7 @@ function datacrumbs_stop_server() {
 		log "[DRY RUN] Would remove ready file: $DATACRUMBS_SERVER_READY_FILE"
 		return 0
 	fi
-	SERVER_PID=$(cat "$DATACRUMBS_SERVER_PID_FILE" 2>/dev/null || true)
+	SERVER_PID=$(cat "$DATACRUMBS_SERVER_PID_FILE")
 	# SERVER_PID=$(ps aux | grep "${RUNID}" | grep -v grep | grep -v "${prog_name}" | awk '{print $2}')
 	if [[ -n "$SERVER_PID" ]]; then
 		log "Found process(es) with DATACRUMBS_SERVER_RUN_ID ${DATACRUMBS_SERVER_RUN_ID}: $SERVER_PID. Killing them."
@@ -204,41 +199,41 @@ function job_launch() {
 }
 
 function server_launch() {
-  local mpi_cmd=()
-  if [[ -z "${DATACRUMBS_JOB_ENABLE_MPI}" || "${DATACRUMBS_JOB_ENABLE_MPI}" == "1" ]]; then
-    debug "Launching server with MPI"
-    mpi_cmd=(${DATACRUMBS_JOB_RUN} "${DATACRUMBS_JOB_NODE_FLAG}" "${DATACRUMBS_JOB_NODES}" "${DATACRUMBS_JOB_PPN_FLAG}" "1" ${DATACRUMBS_JOB_OTHER_FLAGS})
-  else
-    debug "Launching server without MPI"
-    mpi_cmd=()
-  fi
-  if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
-    cmd=("${mpi_cmd[@]}"  "$@")
-  else 
-    cmd=("${mpi_cmd[@]}" "sudo"  "$@")
-  fi
-  if [[ -z "${DATACRUMBS_JOB_ENABLE_MPI}" || "${DATACRUMBS_JOB_ENABLE_MPI}" == "1" ]]; then
-    debug "Launching server with MPI"
-    cmd=( "${cmd[@]}" )
-  else
-    debug "Launching server without MPI"
-    cmd=( "${cmd[@]}" --disable-mpi)
-  fi
-  if [[ "${DRY_RUN:-0}" == "1" ]]; then
-    log "[DRY RUN] Would launch server: ${cmd[*]}"
-    return 0
-  fi
-  log "Launching server command: ${cmd[*]}"
-  "${cmd[@]}"
+	local mpi_cmd=()
+	if [[ -z "${DATACRUMBS_JOB_ENABLE_MPI}" || "${DATACRUMBS_JOB_ENABLE_MPI}" == "1" ]]; then
+		debug "Launching server with MPI"
+		mpi_cmd=(${DATACRUMBS_JOB_RUN} "${DATACRUMBS_JOB_NODE_FLAG}" "${DATACRUMBS_JOB_NODES}" "${DATACRUMBS_JOB_PPN_FLAG}" "1" ${DATACRUMBS_JOB_OTHER_FLAGS})
+	else
+		debug "Launching server without MPI"
+		mpi_cmd=()
+	fi
+	if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
+		cmd=("${mpi_cmd[@]}" "$@")
+	else
+		cmd=("${mpi_cmd[@]}" "sudo" "$@")
+	fi
+	if [[ -z "${DATACRUMBS_JOB_ENABLE_MPI}" || "${DATACRUMBS_JOB_ENABLE_MPI}" == "1" ]]; then
+		debug "Launching server with MPI"
+		cmd=("${cmd[@]}")
+	else
+		debug "Launching server without MPI"
+		cmd=("${cmd[@]}" --disable-mpi)
+	fi
+	if [[ "${DRY_RUN:-0}" == "1" ]]; then
+		log "[DRY RUN] Would launch server: ${cmd[*]}"
+		return 0
+	fi
+	log "Launching server command: ${cmd[*]}"
+	"${cmd[@]}"
 }
 
 function get_actual_user() {
 	local user=$(whoami)
-	if [[ "FLUX" == "@DATACRUMBS_LAUNCHER_TYPE@" ]]; then
+	if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
 		if [[ -n "$FLUX_JOB_USERID" ]]; then
 			user=$(id -nu $FLUX_JOB_USERID)
 		fi
-	elif [[ "SLURM" == "@DATACRUMBS_LAUNCHER_TYPE@" ]]; then
+	elif [[ "SLURM" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
 		if [[ -n "$SLURM_JOB_UID" ]]; then
 			user=$(id -nu $SLURM_JOB_UID)
 		fi
