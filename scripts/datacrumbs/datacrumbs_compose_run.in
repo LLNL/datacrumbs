@@ -4,8 +4,8 @@ SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
 # Check if datacrumbs_args exists in scripts directory
 if [[ ! -f "$SCRIPT_DIR/datacrumbs_args" ]]; then
-    echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
-    exit 1
+	echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
+	exit 1
 fi
 
 # Source argument parser
@@ -21,14 +21,13 @@ dc_args_add_option "DATACRUMBS_COMPOSE_RUN" "ppn" "OPTIONAL" "Set processes per 
 dc_args_add_subcommand "DATACRUMBS_COMPOSE_RUN" "enable_mpi" "1" "nodes" "ppn"
 # The rest of the arguments are arbitrary and will be captured as APP_ARGS
 
-
 # Parse arguments
 dc_args_parse "DATACRUMBS_COMPOSE_RUN" "$0" "$@"
 
 if [[ $? -ne 0 ]]; then
-    echo "Error: Argument parsing failed."
-    show_help
-    exit 1
+	echo "Error: Argument parsing failed."
+	show_help
+	exit 1
 fi
 
 DATACRUMBS_COMPOSABLE_NAME="${DATACRUMBS_COMPOSE_RUN_COMPOSITE_NAME:-}"
@@ -39,68 +38,63 @@ export DATACRUMBS_JOB_NODES=${DATACRUMBS_COMPOSE_RUN_NODES:-1}
 export DATACRUMBS_JOB_PPN=${DATACRUMBS_COMPOSE_RUN_PPN:-1}
 
 if [[ -z "$DATACRUMBS_COMPOSABLE_NAME" || "$DATACRUMBS_COMPOSABLE_NAME" == "NONE" ]]; then
-    echo "Error: COMPOSITE_NAME argument is required."
-    show_help
-    exit 1
+	echo "Error: COMPOSITE_NAME argument is required."
+	show_help
+	exit 1
 fi
 
 if [[ -z "${DATACRUMBS_COMPOSE_RUN_APP}" ]]; then
-    echo "Error: APP command is required."
-    show_help
-    exit 1
+	echo "Error: APP command is required."
+	show_help
+	exit 1
+fi
+
+if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSABLE_NAME}"; then
+	error "Invalid composable name: ${DATACRUMBS_COMPOSABLE_NAME}"
+	exit 1
 fi
 
 # Convert APP_CMD string into array, splitting on spaces
-read -ra APP_CMD <<< "${DATACRUMBS_COMPOSE_RUN_APP}"
+read -ra APP_CMD <<<"${DATACRUMBS_COMPOSE_RUN_APP}"
 
 # Load environment
 source "$SCRIPT_DIR/datacrumbs_setup"
 
 if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSABLE_NAME}"; then
-    error "Invalid composable name: ${DATACRUMBS_COMPOSABLE_NAME}"
-    exit 1
+	error "Invalid composable name: ${DATACRUMBS_COMPOSABLE_NAME}"
+	exit 1
 fi
 
 check_regular_user
 
 log "Running cmd: ${APP_CMD[*]} as USER = $DATACRUMBS_USER using composable $DATACRUMBS_COMPOSABLE_NAME"
 
-# Build args to pass to server scripts
-server_args=()
-if [[ -n "${DATACRUMBS_COMPOSABLE_NAME}" && "${DATACRUMBS_COMPOSABLE_NAME}" != "NONE" ]]; then
-    server_args+=("--composite-name" "${DATACRUMBS_COMPOSABLE_NAME}")
-fi
-if [[ "${DATACRUMBS_JOB_ENABLE_MPI}" == "1" ]]; then
-    server_args+=("--enable-mpi")
-    server_args+=("--nodes" "${DATACRUMBS_JOB_NODES}")
-    server_args+=("--ppn" "${DATACRUMBS_JOB_PPN}")
-fi
-if [[ "${VERBOSE:-0}" == "1" ]]; then
-    server_args+=("--verbose")
-fi
-if [[ "${QUIET:-0}" == "1" ]]; then
-    server_args+=("--quiet")
-fi
-if [[ "${DRY_RUN:-0}" == "1" ]]; then
-    server_args+=("--dry-run")
+if [[ -z "$DRY_RUN" ]]; then
+	datacrumbs_init "$DATACRUMBS_USER" "$DATACRUMBS_TRACE_DIR"
 fi
 
-SERVER_RUN_BIN=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs_server_run.sh
-SERVER_STOP_BIN=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs_server_stop.sh
+debug "DATACRUMBS_SERVER_RUN_ID: $DATACRUMBS_SERVER_RUN_ID"
+debug "DATACRUMBS_JOB_ID_VAR: $DATACRUMBS_JOB_ID_VAR"
+debug "value DATACRUMBS_JOB_ID_VAR: ${!DATACRUMBS_JOB_ID_VAR}"
+debug "DATACRUMBS_LOG_FILE: $DATACRUMBS_LOG_FILE"
+debug "DATACRUMBS_SERVER_READY_FILE: $DATACRUMBS_SERVER_READY_FILE"
 
-echo "Starting DataCrumbs server via: $SERVER_RUN_BIN ${server_args[*]}"
-sudo "$SERVER_RUN_BIN" "${server_args[@]}"
-if [[ $? -ne 0 ]]; then
-    echo "Error: Failed to start DataCrumbs server"
-    exit 1
-fi
+exec=("${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_compose_wrapper" "${DATACRUMBS_COMPOSABLE_NAME}")
+debug "Starting datacrumbs server with exec: ${exec[*]}"
+datacrumbs_start_server "${exec[*]}"
+
 log "Running App: ${APP_CMD[*]}"
 job_launch "${APP_CMD[@]}"
 log "Finished App"
 
-echo "Stopping DataCrumbs server via: $SERVER_STOP_BIN ${server_args[*]}"
-sudo "$SERVER_STOP_BIN" "${server_args[@]}"
-if [[ $? -ne 0 ]]; then
-    echo "Error: Failed to stop DataCrumbs server"
-    exit 1
+debug "Stopping datacrumbs server with exec: ${exec[*]}"
+datacrumbs_stop_server "${exec[*]}" $PROG_NAME
+if [[ "$DRY_RUN" == "1" ]]; then
+	debug "[DRY_RUN] Would print datacrumbs status"
+	debug "[DRY_RUN] Would finalize datacrumbs for user: $DATACRUMBS_USER"
+else
+	debug "Printing datacrumbs status"
+	datacrumbs_print_status
+	debug "Finalizing datacrumbs for user: $DATACRUMBS_USER"
+	datacrumbs_finalize "$DATACRUMBS_USER"
 fi

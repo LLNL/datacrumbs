@@ -4,8 +4,8 @@ SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
 # Check if datacrumbs_args exists in scripts directory
 if [[ ! -f "$SCRIPT_DIR/datacrumbs_args" ]]; then
-    echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
-    exit 1
+  echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
+  exit 1
 fi
 
 # Source argument parser
@@ -21,9 +21,9 @@ dc_args_add_subcommand "DATACRUMBS" "enable-mpi" "1" "nodes" "ppn"
 dc_args_parse "DATACRUMBS" "datacrumbs_run" "$@"
 
 if [[ $? -ne 0 ]]; then
-    echo "Error: Argument parsing failed."
-    show_help
-    exit 1
+  echo "Error: Argument parsing failed."
+  show_help
+  exit 1
 fi
 
 export DATACRUMBS_JOB_ENABLE_MPI=${DATACRUMBS_ENABLE_MPI:-0}
@@ -35,15 +35,14 @@ PROG_NAME=$(basename "$0")
 source $SCRIPT_DIR/datacrumbs_setup
 
 if [[ "$DATACRUMBS_COMPOSITE_NAME" != "" ]] && [[ "$DATACRUMBS_COMPOSITE_NAME" != "NONE" ]]; then
-    if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSITE_NAME}"; then
-        error "Invalid composable name: ${DATACRUMBS_COMPOSITE_NAME}"
-        exit 1
-    fi
+  if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSITE_NAME}"; then
+    error "Invalid composable name: ${DATACRUMBS_COMPOSITE_NAME}"
+    exit 1
+  fi
 fi
 
-
 check_sudo_user
-    
+
 debug "DATACRUMBS_SERVER_RUN_ID: $DATACRUMBS_SERVER_RUN_ID"
 debug "DATACRUMBS_JOB_ID_VAR: $DATACRUMBS_JOB_ID_VAR"
 debug "value DATACRUMBS_JOB_ID_VAR: ${!DATACRUMBS_JOB_ID_VAR}"
@@ -53,9 +52,9 @@ log "Running as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_TRACE_
 datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_TRACE_DIR
 exec=()
 if [[ "$DATACRUMBS_COMPOSITE_NAME" != "" ]] && [[ "$DATACRUMBS_COMPOSITE_NAME" != "NONE" ]]; then
-    exec=("${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_compose_wrapper" "${DATACRUMBS_COMPOSITE_NAME}")
+  exec=("${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_compose_wrapper" "${DATACRUMBS_COMPOSITE_NAME}")
 else
-    exec=(@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs)
+  exec=(@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs)
 fi
 
 datacrumbs_start_server "${exec[*]}"
