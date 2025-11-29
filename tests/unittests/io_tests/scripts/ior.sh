@@ -1,5 +1,5 @@
 #!/bin/bash
-SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" &>/dev/null && pwd 2>/dev/null)"
 echo $SCRIPT_DIR
 TEST_DIR=$(dirname $SCRIPT_DIR)
 PROJECT_DIR=$(dirname $TEST_DIR)
@@ -68,8 +68,7 @@ for i in {1..10}; do
   elapsed_time=$((end_time - start_time))
   echo "Time taken for write iteration:$i: ${elapsed_time} seconds"
   sleep 10
-  if [ "$DROP_CACHES" -eq "1" ];
-  then
+  if [ "$DROP_CACHES" -eq "1" ]; then
     echo "Clean Cache"
     sudo sh -c "/usr/bin/echo 3 > /proc/sys/vm/drop_caches"
   fi

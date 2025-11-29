@@ -13,8 +13,8 @@ DATACRUMBS_COMPOSABLE_NAME=$1
 shift
 
 if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSABLE_NAME}"; then
-    error "Invalid composable name: ${DATACRUMBS_COMPOSABLE_NAME}"
-    exit 1
+	error "Invalid composable name: ${DATACRUMBS_COMPOSABLE_NAME}"
+	exit 1
 fi
 
 ${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSABLE_NAME} $@
