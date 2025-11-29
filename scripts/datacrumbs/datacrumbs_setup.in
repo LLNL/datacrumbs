@@ -11,24 +11,22 @@ CONFIG_FILE=@DATACRUMBS_INSTALL_ETC_CONFIGSDIR@/project.yaml
 
 source ${SCRIPT_DIR}/datacrumbs_utility
 
-if [[ "${DATACRUMBS_ENV_LOADED:-0}" == "0" ]]; then
-    if [[ "$(id -u)" != "0" ]]; then
-        export DATACRUMBS_IS_ROOT=0
-        export DATACRUMBS_USER=$(id -un)
-    else
-        export DATACRUMBS_IS_ROOT=1
-        export DATACRUMBS_USER=$SUDO_USER
-        if [[ -z "$DATACRUMBS_USER" ]]; then
-            DATACRUMBS_USER=$USER
-            debug "User is root."
-        fi
-        if [[ -z "$DATACRUMBS_USER" ]] || [[ "$DATACRUMBS_USER" = "root" ]]; then
-            DATACRUMBS_USER=$(get_actual_user)
-        fi
+if [[ "$(id -u)" != "0" ]]; then
+    export DATACRUMBS_IS_ROOT=0
+    export DATACRUMBS_USER=$(id -un)
+else
+    export DATACRUMBS_IS_ROOT=1
+    export DATACRUMBS_USER=$SUDO_USER
+    if [[ -z "$DATACRUMBS_USER" ]]; then
+        DATACRUMBS_USER=$USER
+        debug "User is root."
     fi
-    
-    readonly DATACRUMBS_IS_ROOT
-    readonly DATACRUMBS_USER
+    if [[ -z "$DATACRUMBS_USER" ]] || [[ "$DATACRUMBS_USER" = "root" ]]; then
+        DATACRUMBS_USER=$(get_actual_user)
+    fi
+fi
+
+if [[ "${DATACRUMBS_ENV_LOADED:-0}" == "0" ]]; then
     eval $(datacrumbs_parse_yaml ${CONFIG_FILE} "DATACRUMBS_")
     log "After loading yaml for $DATACRUMBS_USER"
     YEAR=$(date +%y)
