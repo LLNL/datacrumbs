@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 function usage() {
 	echo "Usage: $0 [SLURM_OPTIONS] [--datacrumbs-composite NAME]"
 	echo ""

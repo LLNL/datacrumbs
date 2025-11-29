@@ -6,7 +6,7 @@ source @DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_service_common.sh
 if [[ $? -eq 0 ]]; then
     umask 022
     printenv > /run/datacrumbs.env
-    echo datacrumbs_service_run "Starting datacrumbs service run script on job ${FLUX_JOB_ID}"
-    sudo systemctl start datacrumbs@$DATACRUMBS_COMPOSABLE_NAME.service
+    echo datacrumbs_service_run "Starting datacrumbs service run script on job ${DATACRUMBS_SERVER_RUN_ID}"
+    sudo systemctl start datacrumbs@${DATACRUMBS_SERVER_RUN_ID}.service
 fi
 exit 0
