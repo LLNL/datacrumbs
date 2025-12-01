@@ -670,6 +670,72 @@ Lima setup includes Spack for dependency management:
     spack install openmpi@5.0.5
     spack load openmpi
 
+Building in Chameleon
+======================
+Chameleon is a configurable experimental environment for large-scale edge to cloud research.
+Only registered users by/as PIs have access Chameleon resources.
+
+Setting up Chameleon Instance
+-----------------
+Pick a hardware type and site using Chameleon resource catalouge. Go to the the chosen site’s “Reservations → Leases” page and create a lease with one floating IP.
+Once the lease becomes ACTIVE, open “Compute → Instances,” launch a new instance by selecting your lease.
+Select UBUNTU-22.04.04_DATACRUMBS image when launching your instance and attach sharednet1 network.
+Finally associate a floating IP in the “Network → Floating IPs” section, then connect from your terminal with SSH using the cc user and your private key.
+
+
+Build DataCrumbs for Chameleon
+------------------------------
+Inside the instance:
+
+Make sure the package config can find libbpf, you can set the PKG_CONFIG_PATH if needed:
+
+.. code-block:: bash
+
+    export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH
+
+Set Installation Directory:
+
+.. code-block:: bash
+
+    export DATACRUMBS_DIR=/home/$USER/datacrumbs/install
+
+Create host configuration:
+
+.. code-block:: bash
+
+    cp $DATACRUMBS_DIR/docs/example/example.yaml \
+       $DATACRUMBS_DIR/etc/datacrumbs/configs/chameleon.yaml
+    # Edit chameleon.yaml as needed for your system
+
+Configure CMake arguments:
+
+.. code-block:: bash
+    cmake_args=(
+        -DCMAKE_INSTALL_PREFIX=$DATACRUMBS_DIR
+        -DDATACRUMBS_HOST=chameleon
+        -DDATACRUMBS_USER=$USER
+        -DDATACRUMBS_CONFIGURED_TRACE_DIR=$DATACRUMBS_DIR/traces
+        -DDATACRUMBS_CONFIGURED_LOG_DIR=$DATACRUMBS_DIR/logs
+    )
+Build and install:
+
+.. code-block:: bash
+    pushd $DATACRUMBS_DIR
+    mkdir -p build && cd build
+    cmake "${cmake_args[@]}" ..
+    make -j16
+    make install
+    popd
+
+Running DataCrumbs on Chameleon
+-------------------------------
+For a standard usage (without BPFTime):
+
+.. code-block:: bash
+    # See Usage section for complete examples
+    datacrumbs_server_run.sh
+    datacrumbs_run --help
+
 Building for Tuolumne Supercomputer
 ====================================
 

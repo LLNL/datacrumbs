@@ -1,0 +1,260 @@
+Found 8 instance(s) of 'H5Dwrite_async'.
+
+============================================================
+Call graph for 'H5Dwrite_async' (Instance #1)
+Total time for this instance: 25765
+============================================================
+└── H5Dwrite_async (dur: 25765 [inclusive], depth: 0) [100.00% of self]
+    └── H5D__write_api_common (dur: 25734 [inclusive], depth: 1) [99.88% of parent]
+        └── H5VL_dataset_write_direct (dur: 25710 [inclusive], depth: 2) [99.91% of parent]
+            └── H5VL__dataset_write (dur: 25692 [inclusive], depth: 3) [99.93% of parent]
+                └── H5VL__native_dataset_write (dur: 25677 [inclusive], depth: 4) [99.94% of parent]
+                    └── H5D__write (dur: 25654 [inclusive], depth: 5) [99.91% of parent]
+                        ├── H5D__typeinfo_init (dur: 42 [inclusive], depth: 6) [0.16% of parent]
+                        │   └── H5T_path_find (dur: 19 [inclusive], depth: 7) [45.24% of parent]
+                        ├── H5D__chunk_io_init (dur: 127 [inclusive], depth: 6) [0.50% of parent]
+                        │   └── H5D__chunk_io_init_selections (dur: 100 [inclusive], depth: 7) [78.74% of parent]
+                        │       ├── H5D__create_piece_file_map_hyper (dur: 54 [inclusive], depth: 8) [54.00% of parent]
+                        │       └── H5D__create_piece_mem_map_hyper (dur: 26 [inclusive], depth: 8) [26.00% of parent]
+                        ├── H5D__ioinfo_adjust (dur: 35 [inclusive], depth: 6) [0.14% of parent]
+                        ├── H5D__chunk_mdio_init (dur: 112 [inclusive], depth: 6) [0.44% of parent]
+                        │   └── H5D__chunk_lookup (dur: 14 [inclusive], depth: 7) [12.50% of parent]
+                        └── H5D__collective_write (dur: 25245 [inclusive], depth: 6) [98.41% of parent]
+                            └── H5D__piece_io (dur: 25231 [inclusive], depth: 7) [99.94% of parent]
+                                ├── H5F_mpi_get_rank (dur: 19 [inclusive], depth: 8) [0.08% of parent]
+                                ├── H5F_mpi_get_size (dur: 19 [inclusive], depth: 8) [0.08% of parent]
+                                └── H5D__link_piece_collective_io (dur: 25167 [inclusive], depth: 8) [99.75% of parent]
+                                    └── H5D__final_collective_io (dur: 25044 [inclusive], depth: 9) [99.51% of parent]
+                                        └── H5D__mpio_select_write (dur: 25029 [inclusive], depth: 10) [99.94% of parent]
+                                            └── H5F_shared_block_write (dur: 25015 [inclusive], depth: 11) [99.94% of parent]
+                                                └── H5F__accum_write (dur: 25001 [inclusive], depth: 12) [99.94% of parent]
+                                                    └── H5FD_write (dur: 24987 [inclusive], depth: 13) [99.94% of parent]
+                                                        └── H5FD__mpio_write (dur: 24963 [inclusive], depth: 14) [99.90% of parent]
+============================================================
+
+============================================================
+Call graph for 'H5Dwrite_async' (Instance #2)
+Total time for this instance: 24068
+============================================================
+└── H5Dwrite_async (dur: 24068 [inclusive], depth: 0) [100.00% of self]
+    └── H5D__write_api_common (dur: 24032 [inclusive], depth: 1) [99.85% of parent]
+        └── H5VL_dataset_write_direct (dur: 24014 [inclusive], depth: 2) [99.93% of parent]
+            └── H5VL__dataset_write (dur: 23997 [inclusive], depth: 3) [99.93% of parent]
+                └── H5VL__native_dataset_write (dur: 23984 [inclusive], depth: 4) [99.95% of parent]
+                    └── H5D__write (dur: 23967 [inclusive], depth: 5) [99.93% of parent]
+                        ├── H5D__typeinfo_init (dur: 38 [inclusive], depth: 6) [0.16% of parent]
+                        │   └── H5T_path_find (dur: 20 [inclusive], depth: 7) [52.63% of parent]
+                        ├── H5D__chunk_io_init (dur: 105 [inclusive], depth: 6) [0.44% of parent]
+                        │   └── H5D__chunk_io_init_selections (dur: 81 [inclusive], depth: 7) [77.14% of parent]
+                        │       ├── H5D__create_piece_file_map_hyper (dur: 41 [inclusive], depth: 8) [50.62% of parent]
+                        │       └── H5D__create_piece_mem_map_hyper (dur: 21 [inclusive], depth: 8) [25.93% of parent]
+                        ├── H5D__ioinfo_adjust (dur: 27 [inclusive], depth: 6) [0.11% of parent]
+                        ├── H5D__chunk_mdio_init (dur: 109 [inclusive], depth: 6) [0.45% of parent]
+                        │   └── H5D__chunk_lookup (dur: 18 [inclusive], depth: 7) [16.51% of parent]
+                        └── H5D__collective_write (dur: 23614 [inclusive], depth: 6) [98.53% of parent]
+                            └── H5D__piece_io (dur: 23602 [inclusive], depth: 7) [99.95% of parent]
+                                ├── H5F_mpi_get_rank (dur: 19 [inclusive], depth: 8) [0.08% of parent]
+                                ├── H5F_mpi_get_size (dur: 17 [inclusive], depth: 8) [0.07% of parent]
+                                └── H5D__link_piece_collective_io (dur: 23544 [inclusive], depth: 8) [99.75% of parent]
+                                    └── H5D__final_collective_io (dur: 23455 [inclusive], depth: 9) [99.62% of parent]
+                                        └── H5D__mpio_select_write (dur: 23442 [inclusive], depth: 10) [99.94% of parent]
+                                            └── H5F_shared_block_write (dur: 23428 [inclusive], depth: 11) [99.94% of parent]
+                                                └── H5F__accum_write (dur: 23416 [inclusive], depth: 12) [99.95% of parent]
+                                                    └── H5FD_write (dur: 23404 [inclusive], depth: 13) [99.95% of parent]
+                                                        └── H5FD__mpio_write (dur: 23381 [inclusive], depth: 14) [99.90% of parent]
+============================================================
+
+============================================================
+Call graph for 'H5Dwrite_async' (Instance #3)
+Total time for this instance: 23695
+============================================================
+└── H5Dwrite_async (dur: 23695 [inclusive], depth: 0) [100.00% of self]
+    └── H5D__write_api_common (dur: 23664 [inclusive], depth: 1) [99.87% of parent]
+        └── H5VL_dataset_write_direct (dur: 23647 [inclusive], depth: 2) [99.93% of parent]
+            └── H5VL__dataset_write (dur: 23632 [inclusive], depth: 3) [99.94% of parent]
+                └── H5VL__native_dataset_write (dur: 23619 [inclusive], depth: 4) [99.94% of parent]
+                    └── H5D__write (dur: 23603 [inclusive], depth: 5) [99.93% of parent]
+                        ├── H5D__typeinfo_init (dur: 36 [inclusive], depth: 6) [0.15% of parent]
+                        │   └── H5T_path_find (dur: 20 [inclusive], depth: 7) [55.56% of parent]
+                        ├── H5D__chunk_io_init (dur: 103 [inclusive], depth: 6) [0.44% of parent]
+                        │   └── H5D__chunk_io_init_selections (dur: 80 [inclusive], depth: 7) [77.67% of parent]
+                        │       ├── H5D__create_piece_file_map_hyper (dur: 41 [inclusive], depth: 8) [51.25% of parent]
+                        │       └── H5D__create_piece_mem_map_hyper (dur: 19 [inclusive], depth: 8) [23.75% of parent]
+                        ├── H5D__ioinfo_adjust (dur: 27 [inclusive], depth: 6) [0.11% of parent]
+                        ├── H5D__chunk_mdio_init (dur: 113 [inclusive], depth: 6) [0.48% of parent]
+                        │   └── H5D__chunk_lookup (dur: 21 [inclusive], depth: 7) [18.58% of parent]
+                        └── H5D__collective_write (dur: 23252 [inclusive], depth: 6) [98.51% of parent]
+                            └── H5D__piece_io (dur: 23240 [inclusive], depth: 7) [99.95% of parent]
+                                ├── H5F_mpi_get_rank (dur: 19 [inclusive], depth: 8) [0.08% of parent]
+                                ├── H5F_mpi_get_size (dur: 18 [inclusive], depth: 8) [0.08% of parent]
+                                └── H5D__link_piece_collective_io (dur: 23184 [inclusive], depth: 8) [99.76% of parent]
+                                    └── H5D__final_collective_io (dur: 23086 [inclusive], depth: 9) [99.58% of parent]
+                                        └── H5D__mpio_select_write (dur: 23074 [inclusive], depth: 10) [99.95% of parent]
+                                            └── H5F_shared_block_write (dur: 23062 [inclusive], depth: 11) [99.95% of parent]
+                                                └── H5F__accum_write (dur: 23048 [inclusive], depth: 12) [99.94% of parent]
+                                                    └── H5FD_write (dur: 23035 [inclusive], depth: 13) [99.94% of parent]
+                                                        └── H5FD__mpio_write (dur: 23014 [inclusive], depth: 14) [99.91% of parent]
+============================================================
+
+============================================================
+Call graph for 'H5Dwrite_async' (Instance #4)
+Total time for this instance: 24066
+============================================================
+└── H5Dwrite_async (dur: 24066 [inclusive], depth: 0) [100.00% of self]
+    └── H5D__write_api_common (dur: 24037 [inclusive], depth: 1) [99.88% of parent]
+        └── H5VL_dataset_write_direct (dur: 24021 [inclusive], depth: 2) [99.93% of parent]
+            └── H5VL__dataset_write (dur: 24008 [inclusive], depth: 3) [99.95% of parent]
+                └── H5VL__native_dataset_write (dur: 23995 [inclusive], depth: 4) [99.95% of parent]
+                    └── H5D__write (dur: 23980 [inclusive], depth: 5) [99.94% of parent]
+                        ├── H5D__typeinfo_init (dur: 33 [inclusive], depth: 6) [0.14% of parent]
+                        │   └── H5T_path_find (dur: 18 [inclusive], depth: 7) [54.55% of parent]
+                        ├── H5D__chunk_io_init (dur: 92 [inclusive], depth: 6) [0.38% of parent]
+                        │   └── H5D__chunk_io_init_selections (dur: 69 [inclusive], depth: 7) [75.00% of parent]
+                        │       ├── H5D__create_piece_file_map_hyper (dur: 34 [inclusive], depth: 8) [49.28% of parent]
+                        │       └── H5D__create_piece_mem_map_hyper (dur: 18 [inclusive], depth: 8) [26.09% of parent]
+                        ├── H5D__ioinfo_adjust (dur: 24 [inclusive], depth: 6) [0.10% of parent]
+                        ├── H5D__chunk_mdio_init (dur: 109 [inclusive], depth: 6) [0.45% of parent]
+                        │   └── H5D__chunk_lookup (dur: 17 [inclusive], depth: 7) [15.60% of parent]
+                        └── H5D__collective_write (dur: 23658 [inclusive], depth: 6) [98.66% of parent]
+                            └── H5D__piece_io (dur: 23647 [inclusive], depth: 7) [99.95% of parent]
+                                ├── H5F_mpi_get_rank (dur: 16 [inclusive], depth: 8) [0.07% of parent]
+                                ├── H5F_mpi_get_size (dur: 15 [inclusive], depth: 8) [0.06% of parent]
+                                └── H5D__link_piece_collective_io (dur: 23595 [inclusive], depth: 8) [99.78% of parent]
+                                    └── H5D__final_collective_io (dur: 23506 [inclusive], depth: 9) [99.62% of parent]
+                                        └── H5D__mpio_select_write (dur: 23495 [inclusive], depth: 10) [99.95% of parent]
+                                            └── H5F_shared_block_write (dur: 23483 [inclusive], depth: 11) [99.95% of parent]
+                                                └── H5F__accum_write (dur: 23470 [inclusive], depth: 12) [99.94% of parent]
+                                                    └── H5FD_write (dur: 23458 [inclusive], depth: 13) [99.95% of parent]
+                                                        └── H5FD__mpio_write (dur: 23439 [inclusive], depth: 14) [99.92% of parent]
+============================================================
+
+============================================================
+Call graph for 'H5Dwrite_async' (Instance #5)
+Total time for this instance: 24109
+============================================================
+└── H5Dwrite_async (dur: 24109 [inclusive], depth: 0) [100.00% of self]
+    └── H5D__write_api_common (dur: 24079 [inclusive], depth: 1) [99.88% of parent]
+        └── H5VL_dataset_write_direct (dur: 24063 [inclusive], depth: 2) [99.93% of parent]
+            └── H5VL__dataset_write (dur: 24048 [inclusive], depth: 3) [99.94% of parent]
+                └── H5VL__native_dataset_write (dur: 24035 [inclusive], depth: 4) [99.95% of parent]
+                    └── H5D__write (dur: 24019 [inclusive], depth: 5) [99.93% of parent]
+                        ├── H5D__typeinfo_init (dur: 36 [inclusive], depth: 6) [0.15% of parent]
+                        │   └── H5T_path_find (dur: 19 [inclusive], depth: 7) [52.78% of parent]
+                        ├── H5D__chunk_io_init (dur: 93 [inclusive], depth: 6) [0.39% of parent]
+                        │   └── H5D__chunk_io_init_selections (dur: 72 [inclusive], depth: 7) [77.42% of parent]
+                        │       ├── H5D__create_piece_file_map_hyper (dur: 35 [inclusive], depth: 8) [48.61% of parent]
+                        │       └── H5D__create_piece_mem_map_hyper (dur: 19 [inclusive], depth: 8) [26.39% of parent]
+                        ├── H5D__ioinfo_adjust (dur: 25 [inclusive], depth: 6) [0.10% of parent]
+                        ├── H5D__chunk_mdio_init (dur: 106 [inclusive], depth: 6) [0.44% of parent]
+                        │   └── H5D__chunk_lookup (dur: 14 [inclusive], depth: 7) [13.21% of parent]
+                        └── H5D__collective_write (dur: 23689 [inclusive], depth: 6) [98.63% of parent]
+                            └── H5D__piece_io (dur: 23678 [inclusive], depth: 7) [99.95% of parent]
+                                ├── H5F_mpi_get_rank (dur: 18 [inclusive], depth: 8) [0.08% of parent]
+                                ├── H5F_mpi_get_size (dur: 16 [inclusive], depth: 8) [0.07% of parent]
+                                └── H5D__link_piece_collective_io (dur: 23621 [inclusive], depth: 8) [99.76% of parent]
+                                    └── H5D__final_collective_io (dur: 23534 [inclusive], depth: 9) [99.63% of parent]
+                                        └── H5D__mpio_select_write (dur: 23521 [inclusive], depth: 10) [99.94% of parent]
+                                            └── H5F_shared_block_write (dur: 23509 [inclusive], depth: 11) [99.95% of parent]
+                                                └── H5F__accum_write (dur: 23496 [inclusive], depth: 12) [99.94% of parent]
+                                                    └── H5FD_write (dur: 23484 [inclusive], depth: 13) [99.95% of parent]
+                                                        └── H5FD__mpio_write (dur: 23464 [inclusive], depth: 14) [99.91% of parent]
+============================================================
+
+============================================================
+Call graph for 'H5Dwrite_async' (Instance #6)
+Total time for this instance: 24693
+============================================================
+└── H5Dwrite_async (dur: 24693 [inclusive], depth: 0) [100.00% of self]
+    └── H5D__write_api_common (dur: 24661 [inclusive], depth: 1) [99.87% of parent]
+        └── H5VL_dataset_write_direct (dur: 24644 [inclusive], depth: 2) [99.93% of parent]
+            └── H5VL__dataset_write (dur: 24629 [inclusive], depth: 3) [99.94% of parent]
+                └── H5VL__native_dataset_write (dur: 24616 [inclusive], depth: 4) [99.95% of parent]
+                    └── H5D__write (dur: 24600 [inclusive], depth: 5) [99.94% of parent]
+                        ├── H5D__typeinfo_init (dur: 36 [inclusive], depth: 6) [0.15% of parent]
+                        │   └── H5T_path_find (dur: 19 [inclusive], depth: 7) [52.78% of parent]
+                        ├── H5D__chunk_io_init (dur: 101 [inclusive], depth: 6) [0.41% of parent]
+                        │   └── H5D__chunk_io_init_selections (dur: 78 [inclusive], depth: 7) [77.23% of parent]
+                        │       ├── H5D__create_piece_file_map_hyper (dur: 38 [inclusive], depth: 8) [48.72% of parent]
+                        │       └── H5D__create_piece_mem_map_hyper (dur: 22 [inclusive], depth: 8) [28.21% of parent]
+                        ├── H5D__ioinfo_adjust (dur: 27 [inclusive], depth: 6) [0.11% of parent]
+                        ├── H5D__chunk_mdio_init (dur: 110 [inclusive], depth: 6) [0.45% of parent]
+                        │   └── H5D__chunk_lookup (dur: 18 [inclusive], depth: 7) [16.36% of parent]
+                        └── H5D__collective_write (dur: 24256 [inclusive], depth: 6) [98.60% of parent]
+                            └── H5D__piece_io (dur: 24244 [inclusive], depth: 7) [99.95% of parent]
+                                ├── H5F_mpi_get_rank (dur: 19 [inclusive], depth: 8) [0.08% of parent]
+                                ├── H5F_mpi_get_size (dur: 18 [inclusive], depth: 8) [0.07% of parent]
+                                └── H5D__link_piece_collective_io (dur: 24187 [inclusive], depth: 8) [99.76% of parent]
+                                    └── H5D__final_collective_io (dur: 24089 [inclusive], depth: 9) [99.59% of parent]
+                                        └── H5D__mpio_select_write (dur: 24076 [inclusive], depth: 10) [99.95% of parent]
+                                            └── H5F_shared_block_write (dur: 24064 [inclusive], depth: 11) [99.95% of parent]
+                                                └── H5F__accum_write (dur: 24049 [inclusive], depth: 12) [99.94% of parent]
+                                                    └── H5FD_write (dur: 24037 [inclusive], depth: 13) [99.95% of parent]
+                                                        └── H5FD__mpio_write (dur: 24016 [inclusive], depth: 14) [99.91% of parent]
+============================================================
+
+============================================================
+Call graph for 'H5Dwrite_async' (Instance #7)
+Total time for this instance: 24902
+============================================================
+└── H5Dwrite_async (dur: 24902 [inclusive], depth: 0) [100.00% of self]
+    └── H5D__write_api_common (dur: 24869 [inclusive], depth: 1) [99.87% of parent]
+        └── H5VL_dataset_write_direct (dur: 24852 [inclusive], depth: 2) [99.93% of parent]
+            └── H5VL__dataset_write (dur: 24837 [inclusive], depth: 3) [99.94% of parent]
+                └── H5VL__native_dataset_write (dur: 24824 [inclusive], depth: 4) [99.95% of parent]
+                    └── H5D__write (dur: 24808 [inclusive], depth: 5) [99.94% of parent]
+                        ├── H5D__typeinfo_init (dur: 37 [inclusive], depth: 6) [0.15% of parent]
+                        │   └── H5T_path_find (dur: 19 [inclusive], depth: 7) [51.35% of parent]
+                        ├── H5D__chunk_io_init (dur: 100 [inclusive], depth: 6) [0.40% of parent]
+                        │   └── H5D__chunk_io_init_selections (dur: 76 [inclusive], depth: 7) [76.00% of parent]
+                        │       ├── H5D__create_piece_file_map_hyper (dur: 37 [inclusive], depth: 8) [48.68% of parent]
+                        │       └── H5D__create_piece_mem_map_hyper (dur: 20 [inclusive], depth: 8) [26.32% of parent]
+                        ├── H5D__ioinfo_adjust (dur: 26 [inclusive], depth: 6) [0.10% of parent]
+                        ├── H5D__chunk_mdio_init (dur: 110 [inclusive], depth: 6) [0.44% of parent]
+                        │   └── H5D__chunk_lookup (dur: 18 [inclusive], depth: 7) [16.36% of parent]
+                        └── H5D__collective_write (dur: 24466 [inclusive], depth: 6) [98.62% of parent]
+                            └── H5D__piece_io (dur: 24455 [inclusive], depth: 7) [99.96% of parent]
+                                ├── H5F_mpi_get_rank (dur: 19 [inclusive], depth: 8) [0.08% of parent]
+                                ├── H5F_mpi_get_size (dur: 17 [inclusive], depth: 8) [0.07% of parent]
+                                └── H5D__link_piece_collective_io (dur: 24399 [inclusive], depth: 8) [99.77% of parent]
+                                    └── H5D__final_collective_io (dur: 24309 [inclusive], depth: 9) [99.63% of parent]
+                                        └── H5D__mpio_select_write (dur: 24297 [inclusive], depth: 10) [99.95% of parent]
+                                            └── H5F_shared_block_write (dur: 24284 [inclusive], depth: 11) [99.95% of parent]
+                                                └── H5F__accum_write (dur: 24271 [inclusive], depth: 12) [99.95% of parent]
+                                                    └── H5FD_write (dur: 24258 [inclusive], depth: 13) [99.95% of parent]
+                                                        └── H5FD__mpio_write (dur: 24237 [inclusive], depth: 14) [99.91% of parent]
+============================================================
+
+============================================================
+Call graph for 'H5Dwrite_async' (Instance #8)
+Total time for this instance: 23961
+============================================================
+└── H5Dwrite_async (dur: 23961 [inclusive], depth: 0) [100.00% of self]
+    └── H5D__write_api_common (dur: 23932 [inclusive], depth: 1) [99.88% of parent]
+        └── H5VL_dataset_write_direct (dur: 23916 [inclusive], depth: 2) [99.93% of parent]
+            └── H5VL__dataset_write (dur: 23902 [inclusive], depth: 3) [99.94% of parent]
+                └── H5VL__native_dataset_write (dur: 23890 [inclusive], depth: 4) [99.95% of parent]
+                    └── H5D__write (dur: 23876 [inclusive], depth: 5) [99.94% of parent]
+                        ├── H5D__typeinfo_init (dur: 35 [inclusive], depth: 6) [0.15% of parent]
+                        │   └── H5T_path_find (dur: 18 [inclusive], depth: 7) [51.43% of parent]
+                        ├── H5D__chunk_io_init (dur: 96 [inclusive], depth: 6) [0.40% of parent]
+                        │   └── H5D__chunk_io_init_selections (dur: 74 [inclusive], depth: 7) [77.08% of parent]
+                        │       ├── H5D__create_piece_file_map_hyper (dur: 34 [inclusive], depth: 8) [45.95% of parent]
+                        │       └── H5D__create_piece_mem_map_hyper (dur: 22 [inclusive], depth: 8) [29.73% of parent]
+                        ├── H5D__ioinfo_adjust (dur: 26 [inclusive], depth: 6) [0.11% of parent]
+                        ├── H5D__chunk_mdio_init (dur: 104 [inclusive], depth: 6) [0.44% of parent]
+                        │   └── H5D__chunk_lookup (dur: 14 [inclusive], depth: 7) [13.46% of parent]
+                        └── H5D__collective_write (dur: 23548 [inclusive], depth: 6) [98.63% of parent]
+                            └── H5D__piece_io (dur: 23537 [inclusive], depth: 7) [99.95% of parent]
+                                ├── H5F_mpi_get_rank (dur: 18 [inclusive], depth: 8) [0.08% of parent]
+                                ├── H5F_mpi_get_size (dur: 16 [inclusive], depth: 8) [0.07% of parent]
+                                └── H5D__link_piece_collective_io (dur: 23482 [inclusive], depth: 8) [99.77% of parent]
+                                    └── H5D__final_collective_io (dur: 23396 [inclusive], depth: 9) [99.63% of parent]
+                                        └── H5D__mpio_select_write (dur: 23384 [inclusive], depth: 10) [99.95% of parent]
+                                            └── H5F_shared_block_write (dur: 23371 [inclusive], depth: 11) [99.94% of parent]
+                                                └── H5F__accum_write (dur: 23359 [inclusive], depth: 12) [99.95% of parent]
+                                                    └── H5FD_write (dur: 23347 [inclusive], depth: 13) [99.95% of parent]
+                                                        └── H5FD__mpio_write (dur: 23327 [inclusive], depth: 14) [99.91% of parent]
+============================================================
+
+
+completed.
