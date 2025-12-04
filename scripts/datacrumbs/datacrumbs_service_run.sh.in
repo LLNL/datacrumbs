@@ -1,10 +1,10 @@
 #!/bin/bash
 source @DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_service_common.sh
 if [[ $? -eq 0 ]]; then
-    umask 022
-    printenv > ${DATACRUMBS_SERVER_ENV_FILE}
-    echo datacrumbs_service_run "Starting datacrumbs service run script on job ${DATACRUMBS_SERVER_RUN_ID}"
-    sudo systemctl enable datacrumbs@${DATACRUMBS_SERVER_RUN_ID}.service
-    sudo systemctl start datacrumbs@${DATACRUMBS_SERVER_RUN_ID}.service
+  umask 022
+  printenv >${DATACRUMBS_SERVER_ENV_FILE}
+  echo datacrumbs_service_run "Starting datacrumbs service run script on job ${DATACRUMBS_SERVER_RUN_ID}"
+  sudo systemctl enable datacrumbs@${DATACRUMBS_SERVER_RUN_ID}.service
+  sudo systemctl start datacrumbs@${DATACRUMBS_SERVER_RUN_ID}.service
 fi
 exit 0

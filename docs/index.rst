@@ -39,6 +39,7 @@ analysis of application I/O behavior at scale.
    :caption: Advanced Topics
 
    flux_integration
+   slurm_integration
 
 .. toctree::
    :maxdepth: 2

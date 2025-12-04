@@ -4,8 +4,8 @@ SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
 # Check if datacrumbs_args exists in scripts directory
 if [[ ! -f "$SCRIPT_DIR/datacrumbs_args" ]]; then
-    echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
-    exit 1
+	echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
+	exit 1
 fi
 
 # Source argument parser
@@ -15,9 +15,9 @@ dc_args_init "DATACRUMBS"
 dc_args_parse "DATACRUMBS" "datacrumbs_run" "$@"
 
 if [[ $? -ne 0 ]]; then
-    echo "Error: Argument parsing failed."
-    show_help
-    exit 1
+	echo "Error: Argument parsing failed."
+	show_help
+	exit 1
 fi
 
 PROG_NAME=$(basename "$0")
