@@ -24,11 +24,14 @@ macro(include_dependencies)
   find_package(LLVM REQUIRED CONFIG COMPONENTS Clang)
   find_package(json-c REQUIRED)
   find_package(ZLIB REQUIRED)
-  find_package(
-    MPI REQUIRED
-    COMPONENTS CXX
-    QUIET
-  )
+
+  if(DATACRUMBS_ENABLE_MPI_SUPPORT)
+    find_package(
+      MPI REQUIRED
+      COMPONENTS CXX
+      QUIET
+    )
+  endif()
 
   # all validator
   if(LIBBPF_VERSION VERSION_LESS "1.0.0")
@@ -129,33 +132,35 @@ macro(include_dependencies)
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] zlib is needed for ${PROJECT_NAME} build")
   endif()
 
-  if(${MPI_CXX_FOUND})
-    # MPI_CXX_FOUND MPI_CXX_VERSION MPI_CXX_INCLUDE_DIRS MPI_CXX_LIBRARIES
-    get_filename_component(MPI_CXX_INCLUDE_DIRS "${MPI_CXX_INCLUDE_DIRS}" ABSOLUTE)
-    include_directories(${MPI_CXX_INCLUDE_DIRS})
+  if(DATACRUMBS_ENABLE_MPI_SUPPORT)
+    if(${MPI_CXX_FOUND})
+      # MPI_CXX_FOUND MPI_CXX_VERSION MPI_CXX_INCLUDE_DIRS MPI_CXX_LIBRARIES
+      get_filename_component(MPI_CXX_INCLUDE_DIRS "${MPI_CXX_INCLUDE_DIRS}" ABSOLUTE)
+      include_directories(${MPI_CXX_INCLUDE_DIRS})
 
-    if(NOT DEFINED MPI_CXX_LIBRARY_DIR)
-      if(MPI_CXX_LIBRARIES)
-        # If MPI_CXX_LIBRARIES is a list, get parent dir of each library
-        set(MPI_CXX_LIBRARY_DIR "")
+      if(NOT DEFINED MPI_CXX_LIBRARY_DIR)
+        if(MPI_CXX_LIBRARIES)
+          # If MPI_CXX_LIBRARIES is a list, get parent dir of each library
+          set(MPI_CXX_LIBRARY_DIR "")
 
-        foreach(_lib ${MPI_CXX_LIBRARIES})
-          get_filename_component(_lib_dir "${_lib}" DIRECTORY)
-          get_filename_component(_lib_dir "${_lib_dir}" ABSOLUTE)
-          list(APPEND MPI_CXX_LIBRARY_DIR "${_lib_dir}")
-        endforeach()
+          foreach(_lib ${MPI_CXX_LIBRARIES})
+            get_filename_component(_lib_dir "${_lib}" DIRECTORY)
+            get_filename_component(_lib_dir "${_lib_dir}" ABSOLUTE)
+            list(APPEND MPI_CXX_LIBRARY_DIR "${_lib_dir}")
+          endforeach()
 
-        list(REMOVE_DUPLICATES MPI_CXX_LIBRARY_DIR)
-      else()
-        get_filename_component(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARIES}" DIRECTORY)
-        set(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARY_DIR}")
+          list(REMOVE_DUPLICATES MPI_CXX_LIBRARY_DIR)
+        else()
+          get_filename_component(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARIES}" DIRECTORY)
+          set(MPI_CXX_LIBRARY_DIR "${MPI_CXX_LIBRARY_DIR}")
+        endif()
       endif()
-    endif()
 
-    list(APPEND DEPENDENCY_LIBRARY_DIRS ${MPI_CXX_LIBRARY_DIR})
-    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${MPI_CXX_LIBRARY_DIR} ${MPI_CXX_LIBRARIES})
-  else()
-    message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] mpi is needed for ${PROJECT_NAME} build")
+      list(APPEND DEPENDENCY_LIBRARY_DIRS ${MPI_CXX_LIBRARY_DIR})
+      set(DEPENDENCY_LIB ${DEPENDENCY_LIB} -L${MPI_CXX_LIBRARY_DIR} ${MPI_CXX_LIBRARIES})
+    else()
+      message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] mpi is needed for ${PROJECT_NAME} build")
+    endif()
   endif()
 
   list(APPEND DEPENDENCY_LIBRARY_DIRS ${DATACRUMBS_INSTALL_LIB_DIR})
@@ -397,6 +402,11 @@ macro(derive_configurations)
     endif()
   endif()
 
+  if(DATACRUMBS_ENABLE_MPI_SUPPORT)
+    set(DATACRUMBS_ENABLE_MPI_SUPPORT_FLAG 1)
+  else()
+    set(DATACRUMBS_ENABLE_MPI_SUPPORT_FLAG 0)
+  endif()
 endmacro(derive_configurations)
 
 macro(find_system_details)
@@ -658,6 +668,7 @@ macro(load_build_variables)
     set(DATACRUMBS_INSTALL_LIBEXEC ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
     set(DATACRUMBS_RUNSTATEDIR "run")
   endif()
+
   set(CMAKE_INSTALL_CONFIGS_DIR configs)
   set(CMAKE_INSTALL_DATA_DIR data)
   set(CMAKE_INSTALL_MODULES_DIR lmod/modulefiles)
@@ -673,6 +684,7 @@ macro(load_build_variables)
   set(DATACRUMBS_INSTALL_ETC_CMAKE ${DATACRUMBS_INSTALL_SYSCONFDIR}/cmake)
   set(DATACRUMBS_INSTALL_ETC_SYSTEMD ${DATACRUMBS_INSTALL_SYSCONFDIR}/systemd)
   set(DATACRUMBS_INSTALL_ETC_FLUX ${DATACRUMBS_INSTALL_SYSCONFDIR}/flux)
+
   if(DATACRUMBS_CONFIGURED_RUN_DIR
      AND NOT
          DATACRUMBS_CONFIGURED_RUN_DIR

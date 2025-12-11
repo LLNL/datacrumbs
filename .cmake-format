@@ -1,7 +1,6 @@
-format:
-  tab_size: 2
-  line_width: 100
-  dangle_parens: true
-  max_pargs_hwrap: 3
-  separate_ctrl_name_with_space: false
-  separate_fn_name_with_space: false
+tab_size = 2
+line_width = 100
+dangle_parens = True
+max_pargs_hwrap = 3
+separate_ctrl_name_with_space = False
+separate_fn_name_with_space = False

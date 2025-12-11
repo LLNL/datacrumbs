@@ -176,7 +176,7 @@ function datacrumbs_print_status() {
 }
 
 function check_regular_user() {
-	if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
+	if [[ "$DATACRUMBS_IS_ROOT" == "1" && "$DATACRUMBS_USER" != "root" ]]; then
 		error "This script should be run as a regular user, not as root."
 		exit 1
 	fi

@@ -18,8 +18,6 @@
 #include <datacrumbs/server/process/generated_process.h>
 // dependency headers
 #include <json-c/json.h>
-#include <mpi.h>
-
 // std headers
 #include <fcntl.h>
 #include <limits.h>

@@ -101,6 +101,7 @@ set(DATACRUMBS_KERNEL_VERSION "" CACHE STRING "Kernel version")
 set(DATACRUMBS_KERNEL_HEADERS_PATH "" CACHE STRING "Path to the kernel headers directory")
 option(DATACRUMBS_BUILD_ONLY "Build only the datacrumbs library without installation" OFF)
 set(DATACRUMBS_KERNEL_PATH "" CACHE STRING "Path to the kernel source directory")
+option(DATACRUMBS_ENABLE_MPI_SUPPORT "Enable MPI support in datacrumbs" OFF)
 
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
@@ -602,6 +603,7 @@ set(_DATACRUMBS_DATA_FILES
     "${CMAKE_DATA_OUTPUT_DIRECTORY}/categories-${DATACRUMBS_USER}-${DATACRUMBS_HOST}.json"
     "${CMAKE_DATA_OUTPUT_DIRECTORY}/probes-${DATACRUMBS_USER}-${DATACRUMBS_HOST}.json"
 )
+
 # Ensure the data output directory exists
 file(MAKE_DIRECTORY ${CMAKE_DATA_OUTPUT_DIRECTORY})
 
@@ -799,7 +801,6 @@ install(
     DESTINATION
     ${DATACRUMBS_INSTALL_BINARYDIR}
 )
-
 
 # Create an empty directory at install time
 install(CODE "file(MAKE_DIRECTORY \"\${DATACRUMBS_INSTALL_LIBEXEC}/sbin\")")

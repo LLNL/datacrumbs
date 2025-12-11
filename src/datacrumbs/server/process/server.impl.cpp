@@ -2,7 +2,9 @@
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/server/process/event_processor.h>
 // dependent headers
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
 #include <mpi.h>
+#endif
 // std headers
 #include <algorithm>
 #include <string>
@@ -543,9 +545,11 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
     DC_LOG_PRINT("Server running on %d nodes. Ready to run the code.",
                  event_processor->configManager_->mpi_size);
   }
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
   if (!event_processor->configManager_->disable_mpi) {
     MPI_Barrier(MPI_COMM_WORLD);
   }
+#endif
   unsigned int batch_size = 1024;
 #if defined(DATACRUMBS_BPFTIME_COMPATIBLE_FLAG) && (DATACRUMBS_BPFTIME_COMPATIBLE_FLAG == 0)
 
@@ -737,6 +741,7 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
 
   double finalize_elapsed = timer.pauseTime();
   double sum_elapsed = 0.0, min_elapsed = 0.0, max_elapsed = 0.0;
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
   if (!event_processor->configManager_->disable_mpi) {
     MPI_Reduce(&finalize_elapsed, &sum_elapsed, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Reduce(&finalize_elapsed, &min_elapsed, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
@@ -746,6 +751,11 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
     min_elapsed = finalize_elapsed;
     max_elapsed = finalize_elapsed;
   }
+#else
+  sum_elapsed = finalize_elapsed;
+  min_elapsed = finalize_elapsed;
+  max_elapsed = finalize_elapsed;
+#endif
   if (event_processor->configManager_->mpi_rank == 0) {
     DC_LOG_PRINT("Finalization and cleanup of DataCrumbs: average=%f, min=%f, max=%f over %d ranks",
                  sum_elapsed / event_processor->configManager_->mpi_size, min_elapsed, max_elapsed,
@@ -755,6 +765,7 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
   // Gather failed_events and total_events across all ranks
   int local_failed_events = event_processor->failed_events;
   int global_failed_events_sum = 0, global_failed_events_min = 0, global_failed_events_max = 0;
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
   if (!event_processor->configManager_->disable_mpi) {
     MPI_Reduce(&local_failed_events, &global_failed_events_sum, 1, MPI_INT, MPI_SUM, 0,
                MPI_COMM_WORLD);
@@ -767,8 +778,14 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
     global_failed_events_min = local_failed_events;
     global_failed_events_max = local_failed_events;
   }
+#else
+  global_failed_events_sum = local_failed_events;
+  global_failed_events_min = local_failed_events;
+  global_failed_events_max = local_failed_events;
+#endif
   int local_total_events = static_cast<int>(event_processor->event_index.load());
   int global_total_events_sum = 0, global_total_events_min = 0, global_total_events_max = 0;
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
   if (!event_processor->configManager_->disable_mpi) {
     MPI_Reduce(&local_total_events, &global_total_events_sum, 1, MPI_INT, MPI_SUM, 0,
                MPI_COMM_WORLD);
@@ -781,6 +798,11 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
     global_total_events_min = local_total_events;
     global_total_events_max = local_total_events;
   }
+#else
+  global_total_events_sum = local_total_events;
+  global_total_events_min = local_total_events;
+  global_total_events_max = local_total_events;
+#endif
   if (event_processor->configManager_->mpi_rank == 0) {
     DC_LOG_PRINT("Failed events: sum=%d, min=%d, max=%d", global_failed_events_sum,
                  global_failed_events_min, global_failed_events_max);
@@ -824,7 +846,9 @@ static int main_process(int argc, char** argv, datacrumbs::EventProcessor* event
 static int main_call(int argc, char** argv) {
   auto event_processor = datacrumbs::EventProcessor(argc, argv);
   if (!event_processor.configManager_->disable_mpi) {
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
     MPI_Init(&argc, &argv);
+#endif
     event_processor.configManager_->load_mpi_configurations();
   }
 
@@ -898,9 +922,11 @@ static int main_call(int argc, char** argv) {
           }
         }
       }
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
       if (!event_processor.configManager_->disable_mpi) {
         MPI_Barrier(MPI_COMM_WORLD);
       }
+#endif
       if (access(pidfile.c_str(), F_OK) == 0) {
         remove(pidfile.c_str());
       }
@@ -909,8 +935,10 @@ static int main_call(int argc, char** argv) {
                    event_processor.configManager_->mpi_rank);
     }
   }
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
   if (!event_processor.configManager_->disable_mpi) {
     MPI_Finalize();
   }
+#endif
   return (return_code);
 }

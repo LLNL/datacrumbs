@@ -52,6 +52,9 @@ venv
 dependency
 install 
 
+# Local podman helpers
+.podman-shims
+
 # Data
 *.pfw
 *.pfw.gz
@@ -83,3 +86,14 @@ deps
 # Sphinx documentation builds
 docs/_build/
 docs/_static/__pycache__/
+
+# QEMU VM resources
+infrastructure/qemu/vm/
+
+# Build and test artifacts
+build/
+Testing/Temporary/
+deps/
+deps/logs/
+infrastructure/qemu/vm-toss4
+infrastructure/qemu/vm-centos

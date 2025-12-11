@@ -32,7 +32,9 @@
 /**
  * External headers
  */
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
 #include <mpi.h>
+#endif
 #include <yaml-cpp/yaml.h>
 
 namespace datacrumbs {
@@ -111,6 +113,10 @@ ArgumentParser::ArgumentParser(int argc, char** argv, ExecutableType exe_type) {
       DC_LOG_ERROR("[ArgumentParser] Unknown argument: %s", arg.c_str());
       throw std::invalid_argument("Unknown argument: " + arg);
     }
+
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 0
+    this->disable_mpi = true;
+#endif
   }
 }
 
@@ -446,6 +452,7 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       DC_LOG_DEBUG("[ConfigurationManager] No log directory specified, using default: %s",
                    this->log_dir.c_str());
     }
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
     // Override disable_mpi if provided as argument
     if (parser.disable_mpi) {
       this->disable_mpi = *parser.disable_mpi;
@@ -455,6 +462,9 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       this->disable_mpi = false;
       DC_LOG_DEBUG("[ConfigurationManager] No disable_mpi specified, using default: false");
     }
+#else
+    this->disable_mpi = true;
+#endif
   }
   // Derive additional configuration values and validate
   derive_configurations();
@@ -658,6 +668,7 @@ void ConfigurationManager::load_mpi_configurations() {
     this->mpi_size = 1;
     DC_LOG_DEBUG("[ConfigurationManager] MPI disabled, setting rank to 0 and size to 1.");
   } else {
+#if defined(DATACRUMBS_ENABLE_MPI_SUPPORT) && DATACRUMBS_ENABLE_MPI_SUPPORT == 1
     DC_LOG_DEBUG("[ConfigurationManager] MPI enabled, initializing rank and size.");
     int initialized;
     int status = MPI_Initialized(&initialized);
@@ -665,6 +676,10 @@ void ConfigurationManager::load_mpi_configurations() {
       MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
       MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     }
+#else
+    this->mpi_rank = 0;
+    this->mpi_size = 1;
+#endif
   }
 }
 
