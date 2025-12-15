@@ -704,6 +704,25 @@ Examples
 
 Example 1: Track HDF5 Application
 ----------------------------------
+To trace an HDF5 application, add HDF5 to your host configuration:
+
+.. code-block:: yaml
+    - name: h5
+      probe: uprobe
+      type: binary
+      file: /path/to/libhdf5.so
+      regex: H5.*
+
+Probes can be narrowed down further as needed. For example, to trace only dataset traces you can use:
+
+.. code-block:: yaml
+    - name: h5d
+      probe: uprobe
+      type: binary
+      file: /path/to/libhdf5.so
+      regex: H5D.*
+
+Then, after rebuilding DataCrumbs with the updated configuration, you can track your HDF5 application:
 
 .. code-block:: bash
 
@@ -724,6 +743,61 @@ Example 1: Track HDF5 Application
 
     # View trace files (.pfw.gz format)
     ls -lh $DATACRUMBS_TRACE_DIR/trace-*.pfw.gz
+
+The trace files can then be analyzed and visualized using DataCrumbs tools.
+
+Creating Callgraphs
+----------------------
+To create a callgraph for collected traces, use the following command:
+
+.. code-block:: bash
+
+    callgraph_creator Trace-file [OPTIONS]
+
+**Arguments:**
+
+``--show-percentage``
+    Display the percentage of time each function took 
+``--aggregate``
+    Aggregate function calls across all traces
+``--output <format>``
+    Specify the output format. <format> can be:
+                                   'text' (default): Human-readable call tree.
+                                   'dot': DOT language file for Graphviz.
+``--time-metric <type>`` 
+    Metric for time display. <type> can be 'inclusive' or 'exclusive'.
+``--focus-function <name>``
+    Focus the output on all instances of a specific function.
+``--depth_cut``
+    Set the maximum depth for the call tree (default: 20).
+
+Example of text output focusing on H5Dwrite:
+
+.. url:: https://datacrumbs.org/docs/example/hdf5-callgraph-example.txt
+   :alt: Callgraph Example Text
+
+to create a png image from the dot output, use:
+
+.. code-block:: bash
+    dot -Tpng callgraph.dot -o callgraph.png
+
+Example of created png file:
+
+.. image:: ./example/hdf5-callgraph-example.png
+   :alt: Callgraph Example
+
+To compare two callgrphs, use the following command:
+
+.. code-block:: bash
+    callgraph_compare callgraph1.dot callgraph2.dot
+
+This will create a new dot file highlighting differences between the two callgraphs, using color coding to indicate increases or decreases in function call times.
+Functions with increased time will be shown in green, while those with decreased time will be shown in red. Functions with same time will be uncolored.
+Functions added will be shown in blue, and functions removed will be shown in gray.
+For example of comparing two callgraphs:
+
+.. image:: ./example/hdf5-callgraph-compare-example.png
+   :alt: Callgraph Compare Example
 
 Example 2: Trace System Utility
 --------------------------------
