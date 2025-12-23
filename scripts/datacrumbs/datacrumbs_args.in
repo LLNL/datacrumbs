@@ -512,8 +512,8 @@ dc_args_parse() {
 		local subcmd_val
 		subcmd_val="${!subcmd_var}"
 
-		# Check if this subcommand value has specific requirements
-		if [[ -n "${SUBCMDS[$subcmd_val]+_}" ]]; then
+		# Only evaluate subcommand rules when a value was provided
+		if [[ -n "$subcmd_val" && -n "${SUBCMDS[$subcmd_val]+_}" ]]; then
 			local required_opts_str="${SUBCMDS[$subcmd_val]}"
 			IFS=',' read -ra required_opts <<<"$required_opts_str"
 

@@ -176,21 +176,21 @@ function datacrumbs_print_status() {
 }
 
 function check_regular_user() {
-	if [[ "$DATACRUMBS_IS_ROOT" == "1" ]]; then
+	if [[ "$DATACRUMBS_IS_ROOT" == "1" && "$(id -u)" -ne "0" ]]; then
 		error "This script should be run as a regular user, not as root."
 		exit 1
 	fi
 }
 
 function check_sudo_user() {
-	if [[ "$DATACRUMBS_IS_ROOT" != "1" ]]; then
+	if [[ "$DATACRUMBS_IS_ROOT" != "1" && "$(id -u)" -ne "0" ]]; then
 		error "This script should be run as root."
 		exit 1
 	fi
 }
 
 function check_install_user() {
-	if [[ "${DATACRUMBS_USER}" != "${DATACRUMBS_INSTALL_USER}" ]]; then
+	if [[ "${DATACRUMBS_USER}" != "${DATACRUMBS_INSTALL_USER}"  && "$(id -u)" -ne "0" ]]; then
 		error "DATACRUMBS_USER does not match DATACRUMBS_INSTALL_USER: ${DATACRUMBS_USER}"
 		exit 1
 	fi
