@@ -164,6 +164,39 @@ if(NOT EXISTS "${DATACRUMBS_CONFIGURED_LOG_DIR}")
 endif()
 
 # ------------------------------------------------------------------------------
+# Compile Utilities to run
+# ------------------------------------------------------------------------------
+
+add_subdirectory(src/datacrumbs/utilities)
+
+# Attempt to use the config parser utility to collect capture probe names early in configuration.
+set(_DATACRUMBS_CONFIG_PARSER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_config_parser")
+set(DATACRUMBS_CAPTURE_PROBES_LIST "")
+if(EXISTS "${_DATACRUMBS_CONFIG_PARSER}")
+    execute_process(
+        COMMAND "${_DATACRUMBS_CONFIG_PARSER}" capture_probes_names --config-path "${DATACRUMBS_CONFIG_PATH}/${DATACRUMBS_HOST}.yaml"
+        OUTPUT_VARIABLE _DATACRUMBS_CAPTURE_PROBES_RAW
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE _DATACRUMBS_CONFIG_PARSER_RESULT
+    )
+    if(_DATACRUMBS_CONFIG_PARSER_RESULT EQUAL 0)
+        string(REPLACE "\n" ";" DATACRUMBS_CAPTURE_PROBES_LIST "${_DATACRUMBS_CAPTURE_PROBES_RAW}")
+        message(STATUS "[${UPPER_PROJECT_NAME}] Capture probes (parser): ${DATACRUMBS_CAPTURE_PROBES_LIST}")
+    else()
+        message(WARNING "[${UPPER_PROJECT_NAME}] datacrumbs_config_parser failed with code ${_DATACRUMBS_CONFIG_PARSER_RESULT}; falling back to regex parsing later.")
+    endif()
+else()
+    message(WARNING "[${UPPER_PROJECT_NAME}] datacrumbs_config_parser not found at ${_DATACRUMBS_CONFIG_PARSER}; falling back to regex parsing later.")
+endif()
+
+# Build-time target to ensure capture_probes_names is executed before downstream tools.
+add_custom_target(capture_probes_names_run
+    COMMAND "${_DATACRUMBS_CONFIG_PARSER}" capture_probes_names --config-path "${DATACRUMBS_CONFIG_PATH}/${DATACRUMBS_HOST}.yaml"
+    COMMENT "Running datacrumbs_config_parser to fetch capture probe names"
+)
+add_dependencies(capture_probes_names_run datacrumbs_config_parser)
+
+# ------------------------------------------------------------------------------
 # Configure output files for build
 # ------------------------------------------------------------------------------
 configure_file("${CMAKE_SOURCE_DIR}/cmake/configure_files/datacrumbs_config.h.in"
@@ -216,6 +249,7 @@ set(DATACRUMBS_COMMON_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/configuration_manager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/data_structures.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/enumerations.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/utilities/config/yaml_utils.cpp
 )
 
 # Datacrumbs client
@@ -258,7 +292,7 @@ else()
     )
 endif()
 
-add_dependencies(run_explorer ${PROJECT_NAME}_client)
+add_dependencies(run_explorer ${PROJECT_NAME}_client capture_probes_names_run)
 
 # Datacrumbs generator
 set(DATACRUMBS_GENERATOR_SRC
@@ -320,36 +354,6 @@ set(DATACRUMBS_BPF_INCLUDE_FLAGS "")
 foreach(path IN LISTS DATACRUMBS_BPF_INCLUDE_PATHS)
     list(APPEND DATACRUMBS_BPF_INCLUDE_FLAGS -I${path})
 endforeach()
-
-# Read the YAML config file and extract the list of probe names under capture_probes
-file(READ "${DATACRUMBS_CONFIG_PATH}/${DATACRUMBS_HOST}.yaml" DATACRUMBS_CONFIG_YAML)
-
-# Extract the capture_probes block and get all names under it
-set(DATACRUMBS_CAPTURE_PROBES_LIST "")
-
-# Find the capture_probes block
-string(REGEX MATCH "capture_probes:[^\n]*\n([^\n]*\n)*" _CAPTURE_PROBES_BLOCK "${DATACRUMBS_CONFIG_YAML}")
-
-# Split the _CAPTURE_PROBES_BLOCK into lines
-string(REPLACE "\n" ";" _CAPTURE_PROBES_LINES "${_CAPTURE_PROBES_BLOCK}")
-
-# If any line in _CAPTURE_PROBES_LINES contains 'name:', add it to _CAPTURE_PROBES_NAME_LINES
-set(_CAPTURE_PROBES_NAME_LINES "")
-
-foreach(_line ${_CAPTURE_PROBES_LINES})
-    if(_line MATCHES "^[ ]*-[ ]*name:[ ]*")
-        list(APPEND _CAPTURE_PROBES_NAME_LINES "${_line}")
-    endif()
-endforeach()
-
-foreach(_line ${_CAPTURE_PROBES_NAME_LINES})
-    string(REGEX REPLACE "^[ ]*-[ ]*name:[ ]*" "" _probe_name "${_line}")
-
-    # message(STATUS "[${UPPER_PROJECT_NAME}]  Capture probe name: ${_probe_name}")
-    list(APPEND DATACRUMBS_CAPTURE_PROBES_LIST "${_probe_name}")
-endforeach()
-
-message(STATUS "[${UPPER_PROJECT_NAME}] Capture probes: ${DATACRUMBS_CAPTURE_PROBES_LIST}")
 
 list(APPEND DATACRUMBS_BPF_EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/common.c)
 list(APPEND DATACRUMBS_BPF_EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/server/bpf/init.bpf.c)

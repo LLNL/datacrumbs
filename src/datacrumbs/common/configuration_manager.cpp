@@ -34,6 +34,7 @@
  */
 #include <mpi.h>
 #include <yaml-cpp/yaml.h>
+#include <datacrumbs/utilities/config/yaml_utils.h>
 
 namespace datacrumbs {
 
@@ -210,180 +211,11 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
       DC_LOG_DEBUG("[ConfigurationManager] Data directory not specified, using default: %s",
                    this->data_dir.string().c_str());
     }
-    // Parse capture probes from YAML
+    // Parse capture probes from YAML via shared utility (skips disabled)
     if (config[DC_YAML_CAPTURE_PROBES]) {
-      DC_LOG_TRACE("[ConfigurationManager] Parsing capture probes...");
-      for (const auto& probe_node : config[DC_YAML_CAPTURE_PROBES]) {
-        if (probe_node["type"]) {
-          CaptureType type;
-          convert(probe_node["type"].as<std::string>(), type);
-
-          std::shared_ptr<CaptureProbe> probe;
-
-          DC_LOG_DEBUG("[ConfigurationManager] Capture probe enable_explorer set to: %s",
-                       probe->enable_explorer ? "true" : "false");
-          // Handle each capture probe type
-          switch (type) {
-            case CaptureType::HEADER: {
-              auto header_probe = std::make_shared<HeaderCaptureProbe>();
-              if (probe_node["file"]) {
-                header_probe->file = probe_node["file"].as<std::string>();
-                DC_LOG_DEBUG("[ConfigurationManager] Added HEADER probe: %s",
-                             header_probe->file.c_str());
-              } else {
-                DC_LOG_ERROR("[ConfigurationManager] Header name missing for HEADER capture type.");
-                throw std::invalid_argument("Header name is required for HEADER capture type.");
-              }
-              probe = header_probe;
-              break;
-            }
-            case CaptureType::BINARY: {
-              auto binary_probe = std::make_shared<BinaryCaptureProbe>();
-              if (probe_node["file"]) {
-                binary_probe->file = probe_node["file"].as<std::string>();
-                DC_LOG_DEBUG("[ConfigurationManager] Added BINARY probe: %s",
-                             binary_probe->file.c_str());
-              } else {
-                DC_LOG_ERROR("[ConfigurationManager] Binary path missing for BINARY capture type.");
-                throw std::invalid_argument("Binary path is required for BINARY capture type.");
-              }
-              if (probe_node["include_offsets"]) {
-                binary_probe->include_offsets = probe_node["include_offsets"].as<bool>();
-                DC_LOG_DEBUG("[ConfigurationManager] BINARY include_offsets set to: %s",
-                             binary_probe->include_offsets ? "true" : "false");
-              } else {
-                DC_LOG_DEBUG(
-                    "[ConfigurationManager] No include_offsets provided for BINARY, using default: "
-                    "false");
-                binary_probe->include_offsets = false;  // Default value
-              }
-              probe = binary_probe;
-              break;
-            }
-            case CaptureType::KSYM: {
-              probe = std::make_shared<KernelCaptureProbe>();
-              DC_LOG_DEBUG("[ConfigurationManager] Added KSYM probe.");
-              if (probe_node["regex"]) {
-                probe->regex = probe_node["regex"].as<std::string>();
-                DC_LOG_DEBUG("[ConfigurationManager] KSYM probe regex set: %s",
-                             probe->regex.c_str());
-              } else {
-                DC_LOG_ERROR("[ConfigurationManager] Regex missing for KSYM capture type.");
-                throw std::invalid_argument("Regex is required for KSYM capture type.");
-              }
-              break;
-            }
-            case CaptureType::USDT: {
-              auto usdt_probe = std::make_shared<USDTCaptureProbe>();
-              if (probe_node["binary_path"]) {
-                usdt_probe->binary_path = probe_node["binary_path"].as<std::string>();
-                DC_LOG_DEBUG("[ConfigurationManager] Added USDT probe: %s",
-                             usdt_probe->binary_path.c_str());
-              } else {
-                DC_LOG_ERROR("[ConfigurationManager] Binary path missing for USDT capture type.");
-                throw std::invalid_argument("Binary path is required for USDT capture type.");
-              }
-              if (probe_node["provider"]) {
-                usdt_probe->provider = probe_node["provider"].as<std::string>();
-                DC_LOG_DEBUG("[ConfigurationManager] USDT provider set: %s",
-                             usdt_probe->provider.c_str());
-              } else {
-                DC_LOG_ERROR("[ConfigurationManager] Provider missing for USDT capture type.");
-                throw std::invalid_argument("Provider is required for USDT capture type.");
-              }
-              probe = usdt_probe;
-              break;
-            }
-            case CaptureType::CUSTOM: {
-              auto custom_probe = std::make_shared<CustomCaptureProbe>();
-              if (probe_node["file"]) {
-                custom_probe->bpf_file = probe_node["file"].as<std::string>();
-                DC_LOG_DEBUG("[ConfigurationManager] Added CUSTOM probe: %s",
-                             custom_probe->bpf_file.c_str());
-              } else {
-                DC_LOG_ERROR("[ConfigurationManager] BPF file missing for CUSTOM capture type.");
-                throw std::invalid_argument("BPF file is required for CUSTOM capture type.");
-              }
-              if (probe_node["probes"]) {
-                custom_probe->probe_file = probe_node["probes"].as<std::string>();
-                DC_LOG_DEBUG("[ConfigurationManager] Custom probe file set: %s",
-                             custom_probe->probe_file.c_str());
-              } else {
-                DC_LOG_ERROR("[ConfigurationManager] Probe file missing for CUSTOM capture type.");
-                throw std::invalid_argument("Probe file is required for CUSTOM capture type.");
-              }
-              if (probe_node["start_event_id"]) {
-                custom_probe->start_event_id = probe_node["start_event_id"].as<uint64_t>();
-                DC_LOG_DEBUG("[ConfigurationManager] Custom start event ID set: %lu",
-                             custom_probe->start_event_id);
-              } else {
-                DC_LOG_DEBUG(
-                    "[ConfigurationManager] No start event ID provided, using default: %lu",
-                    custom_probe->start_event_id);
-              }
-              if (probe_node["process_header"]) {
-                custom_probe->process_header = probe_node["process_header"].as<std::string>();
-                DC_LOG_DEBUG("[ConfigurationManager] Custom process header set: %s",
-                             custom_probe->process_header.c_str());
-              } else {
-                DC_LOG_DEBUG("[ConfigurationManager] No process header provided, using default.");
-              }
-              if (probe_node["event_type"]) {
-                custom_probe->event_type = probe_node["event_type"].as<uint64_t>();
-                DC_LOG_DEBUG("[ConfigurationManager] Custom event type set: %lu",
-                             custom_probe->event_type);
-              } else {
-                DC_LOG_DEBUG("[ConfigurationManager] No event type provided, using default: 1");
-                custom_probe->event_type = 1;  // Default event type
-              }
-              probe = custom_probe;
-              break;
-            }
-            default:
-              DC_LOG_ERROR("[ConfigurationManager] Unknown CaptureType: %s",
-                           probe_node["type"].as<std::string>().c_str());
-              throw std::invalid_argument("Unknown CaptureType in configuration: " +
-                                          probe_node["type"].as<std::string>());
-          }
-          if (probe_node["enable_explorer"]) {
-            probe->enable_explorer = probe_node["enable_explorer"].as<bool>();
-          } else {
-            probe->enable_explorer = true;  // Default to true if not specified
-          }
-          // Parse probe type
-          if (probe_node["probe"]) {
-            auto probe_type_str = probe_node["probe"].as<std::string>();
-            convert(probe_type_str, probe->probe_type);
-            DC_LOG_DEBUG("[ConfigurationManager] Probe type set: %s", probe_type_str.c_str());
-          } else {
-            DC_LOG_ERROR("[ConfigurationManager] Probe type missing for capture type: %s",
-                         probe_node["type"].as<std::string>().c_str());
-            throw std::invalid_argument("Probe type is required for capture type: " +
-                                        probe_node["type"].as<std::string>());
-          }
-          // Parse probe name
-          if (probe_node["name"]) {
-            probe->name = probe_node["name"].as<std::string>();
-          } else {
-            DC_LOG_ERROR("[ConfigurationManager] Probe name missing for capture type: %s",
-                         probe_node["type"].as<std::string>().c_str());
-            throw std::invalid_argument("Probe name is required for capture type: " +
-                                        probe_node["type"].as<std::string>());
-          }
-          // Parse optional regex
-          if (probe_node["regex"]) {
-            probe->regex = probe_node["regex"].as<std::string>();
-            DC_LOG_DEBUG("[ConfigurationManager] Probe regex set: %s", probe->regex.c_str());
-          } else {
-            DC_LOG_TRACE("[ConfigurationManager] No regex provided for probe: %s",
-                         probe->name.c_str());
-          }
-          // Add probe to the list
-          if (probe) {
-            this->capture_probes.push_back(probe);
-          }
-        }
-      }
+      DC_LOG_TRACE("[ConfigurationManager] Parsing capture probes via utilities...");
+      auto parsed = datacrumbs::utilities::capture_probes(config_path.string());
+      this->capture_probes.insert(this->capture_probes.end(), parsed.begin(), parsed.end());
     }
     // Parse user from YAML or use default
     if (config[DC_YAML_USER]) {

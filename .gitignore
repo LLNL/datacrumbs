@@ -33,7 +33,7 @@
 
 # Ouput
 hydra_log
-build
+build*
 
 #VSCode
 .cache

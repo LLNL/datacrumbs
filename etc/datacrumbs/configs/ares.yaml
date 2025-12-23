@@ -1,0 +1,179 @@
+capture_probes:
+  - name: custom1
+    start_event_id: 100000
+    probe: custom
+    type: custom
+    file: @DATACRUMBS_PROJECT_PATH@/etc/datacrumbs/plugins/custom_probes/sys_io/sysio.bpf.c
+    probes: @DATACRUMBS_PROJECT_PATH@/etc/datacrumbs/plugins/custom_probes/sys_io/probes.json
+    process_header: @DATACRUMBS_PROJECT_PATH@/etc/datacrumbs/plugins/custom_probes/sys_io/sysio_process.h
+    event_type: 2
+  - name: sys
+    probe: syscalls
+    type: header
+    file: @DATACRUMBS_KERNEL_HEADERS_PATH@/include/linux/syscalls.h
+    regex: sys_.*
+  - name: libc
+    probe: uprobe
+    type: binary
+    file: @DATACRUMBS_LIBC_SO@
+    regex: .*fork.*
+  - name: orangefs_server
+    probe: uprobe
+    type: binary
+    file:  /mnt/repo/software/modules-install/orangefs/2.10/sbin/pvfs2-server
+    regex: ^(?!ff)(?!.*cold).*$
+  - name: orangefs_client
+    probe: uprobe
+    type: binary
+    file:  /mnt/repo/software/modules-install/orangefs/2.10/sbin/pvfs2-client
+    regex: ^(?!ff)(?!.*cold).*$
+  - name: orangefs_ko
+    probe: kprobe
+    type: binary
+    file: /usr/lib/modules/5.15.0-144-generic/kernel/fs/orangefs/orangefs.ko
+    regex: ^(?!.*\.cold$).*$
+  - name: os_page_cache
+    probe: kprobe
+    type: header
+    file: @DATACRUMBS_KERNEL_HEADERS_PATH@/include/linux/pagemap.h
+  - name: swap
+    probe: kprobe
+    type: header
+    file: @DATACRUMBS_KERNEL_HEADERS_PATH@/include/linux/swap.h
+    disable: true
+  - name: fscache
+    probe: kprobe
+    type: header
+    file: @DATACRUMBS_KERNEL_HEADERS_PATH@/include/linux/fscache.h
+    disable: true
+  - name: xfs
+    probe: kprobe
+    type: ksym
+    regex: ^xfs(?!.*cold).*
+  - name: iomap
+    probe: kprobe
+    type: ksym
+    regex: ^iomap(?!.*cold).*
+  - name: lmp
+    probe: uprobe
+    type: binary
+    file: /mnt/common/nrajesh/spack/opt/spack/linux-ubuntu22.04-skylake_avx512/gcc-12.3.0/lammps-20230802.3-kivpodre6ejk7pyxx7tbnxmdeoc565ar/bin/lmp
+    disable: true
+  - name: h5b_write
+    probe: uprobe
+    type: binary
+    file: /home/datacrumbs/source/h5bench/install/bin/h5bench_write
+    disable: true
+  - name: h5b_read
+    probe: uprobe
+    type: binary
+    file: /home/datacrumbs/source/h5bench/install/bin/h5bench_read
+    disable: true
+  - name: libchimaera_bdev
+    probe: uprobe
+    type: binary
+    file: /mnt/common/nrajesh/spack/opt/spack/linux-ubuntu22.04-skylake_avx512/gcc-11.4.0/iowarp-runtime-main-qm7xufwllxq47axtogsdklo4kliy3tkn/lib/libchimaera_bdev.so
+    regex: .*
+    disable: true
+  - name: libchimaera_remote_queue
+    probe: uprobe
+    type: binary
+    file: /mnt/common/nrajesh/spack/opt/spack/linux-ubuntu22.04-skylake_avx512/gcc-11.4.0/iowarp-runtime-main-qm7xufwllxq47axtogsdklo4kliy3tkn/lib/libchimaera_remote_queue.so
+    regex: ^(?!__)(?!.*.cold$).*
+    disable: true
+  - name: chimaera_interceptor_adios
+    probe: uprobe
+    type: binary
+    file: /home/nrajesh/.scspkg/packages/coeus/lib/libcoeus_coeus_mdm_client_run.so
+    regex: ^(?!__)(?!.*.cold$).*
+    disable: true
+  - name: mCalExec
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mCalExec
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mCalibrate
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mCalibrate
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mCatMap
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mCatMap
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mCatSearch
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mCatSearch
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mConvert
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mConvert
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mDiffExecMPI
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mDiffExecMPI
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mExec
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mExec
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mFitExecMPI
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mFitExecMPI
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mFlattenExec
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mFlattenExec
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mHdrCheck
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mHdrCheck
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mHdrtbl
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mHdrtbl
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mProjExecMPI
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mProjExecMPI
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mTblSort
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mTblSort
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mTileHdr
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mTileHdr
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
+  - name: mTileImage
+    probe: uprobe
+    type: binary
+    file:  /home/nrajesh/datacrumbs/apps/Montage/Montage-v6.1/bin/mTileImage
+    regex: ^(?!ff)(?!.*cold).*$
+    disable: true
