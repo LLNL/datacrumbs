@@ -3,65 +3,30 @@ capture_probes:
     start_event_id: 100000
     probe: custom
     type: custom
-    file: /home/haridev/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/sysio.bpf.c
-    probes: /home/haridev/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/probes.json
-    process_header: /home/haridev/datacrumbs/etc/datacrumbs/plugins/custom_probes/sys_io/sysio_process.h
+    file: @DATACRUMBS_PROJECT_PATH@/etc/datacrumbs/plugins/custom_probes/sys_io/sysio.bpf.c
+    probes: @DATACRUMBS_PROJECT_PATH@/etc/datacrumbs/plugins/custom_probes/sys_io/probes.json
+    process_header: @DATACRUMBS_PROJECT_PATH@/etc/datacrumbs/plugins/custom_probes/sys_io/sysio_process.h
     event_type: 2
   - name: sys
     probe: syscalls
     type: header
-    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/syscalls.h
+    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/syscalls.h
     regex: sys_.*
-  - name: libc
-    probe: uprobe
-    type: binary
-    file: /usr/lib64/libc.so.6
-    regex: .*fork.*
-  - name: hdf5
-    probe: uprobe
-    type: binary
-    file: /home/haridev/spack/opt/spack/linux-haswell/hdf5-1.14.5-ul6ejhuh527dwwbgwi3ij6soj2pikw2u/lib/libhdf5.so
-    regex: .*
-    include_offsets: false
-  - name: bio
-    probe: kprobe
-    type: ksym
-    regex: bio.*
-  - name: python
-    probe: usdt
-    type: usdt
-    binary_path: /usr/lib64/libpython3.9.so
-    provider: python
   - name: os_page_cache
     probe: kprobe
     type: header
-    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/pagemap.h
-  - name: shm
+    file: /usr/src/kernels/@DATACRUMBS_KERNEL_UNAME_R@/include/linux/pagemap.h
+  - name: lustre
     probe: kprobe
-    type: header
-    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/shmem_fs.h
-  - name: fscache
-    probe: kprobe
-    type: header
-    file: /usr/src/kernels/5.14.0-570.18.1.1toss.t5.x86_64/include/linux/fscache.h
-  - name: xfs
-    probe: kprobe
-    type: ksym
-    regex: ^xfs(?!.*cold).*
-  - name: ext4
-    probe: kprobe
-    type: ksym
-    regex: ^ext4(?!.*cold).*
-  - name: iomap
-    probe: kprobe
-    type: ksym
-    regex: ^iomap(?!.*cold).*
-  - name: mpi
+    type: binary
+    file: /usr/lib/modules/5.14.0-570.55.1.1toss.t5.x86_64/weak-updates/lustre/fs/lustre.ko
+  - name: mpiio
     probe: uprobe
     type: binary
-    file: /home/haridev/spack/opt/spack/linux-haswell/openmpi-5.0.7-y6xplmqxukxsuvvwnv2jqvztli5rhevm/lib/libmpi.so.40
+    file: /opt/toss/openmpi/4.1/gnu/lib/libmpi.so
     regex: .*
   - name: ior
     probe: uprobe
     type: binary
-    file: /home/haridev/spack/opt/spack/linux-haswell/ior-3.3.0-ip47j26fw7xxfftdzjvy2h36phgcuypv/bin/ior
+    file: /home/haridev/software/ior/install/bin/ior
+    regex: .*

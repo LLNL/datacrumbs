@@ -4,26 +4,27 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 // Generated Headers
-#include <datacrumbs/bpf/datacrumbs.skel.h>
+#include <datacrumbs/common/logging.h>
 #include <datacrumbs/datacrumbs_config.h>
-// other headers
+// Internal Headers
 #include <datacrumbs/common/configuration_manager.h>
-#include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/data_structures.h>
-#include <datacrumbs/common/logging.h>  // Logging header
-#include <datacrumbs/common/singleton.h>
-#include <datacrumbs/common/typedefs.h>
 #include <datacrumbs/common/utils.h>
+#include <datacrumbs/server/bpf/compat/map.h>
 #include <datacrumbs/server/bpf/shared.h>
 #include <datacrumbs/server/process/writer/chrome_writer.h>
+
 // std headers
 #include <errno.h>
+#include <fcntl.h>
 #include <grp.h>
 #include <json-c/json.h>
+#include <limits.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -54,20 +55,15 @@ class EventProcessor {
     return 0;
   }
 
-  int finalize() {
-    if (writer_) {
-      writer_->finalize();
-    }
-    return 0;
-  }
+  int finalize();
 
  public:
   std::shared_ptr<ConfigurationManager> configManager_;
   std::shared_ptr<datacrumbs::ChromeWriter> writer_;
   int failed_events;  // Count of failed events
+  std::atomic<uint64_t> event_index{0};
 
- private:
-  std::atomic<uint64_t> event_index{0};                // Atomic index for event processing
+ private:                                              // Atomic index for event processing
   std::unordered_set<unsigned int> processed_hashes_;  // Set to track processed PIDs
 };
 

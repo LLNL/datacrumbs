@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DATACRUMBS_COMMON_CONFIGURATION_MANAGER_H__
+#define DATACRUMBS_COMMON_CONFIGURATION_MANAGER_H__
 
 /**
  * @file configuration_manager.h
@@ -40,6 +41,9 @@ class ConfigurationManager {
   // Directory for data storage
   std::filesystem::path data_dir;
 
+  // Type of executable (SIMPLE or DAEMON)
+  ExecutableMode exe_mode;
+
   // Name of the configuration file
   std::string name;
 
@@ -80,6 +84,18 @@ class ConfigurationManager {
   // Derived configuration: current hostname
   std::string hostname;
 
+  // Unique run identifier
+  std::string run_id;
+
+  // Flag to disable MPI usage
+  bool disable_mpi;
+
+  // MPI rank of the current process
+  int mpi_rank{0};
+
+  // MPI size (total number of processes)
+  int mpi_size{1};
+
   /**
    * @brief Constructor that initializes the ConfigurationManager with command-line arguments.
    *
@@ -90,7 +106,8 @@ class ConfigurationManager {
    * @param argc Number of command-line arguments
    * @param argv Array of command-line argument strings
    */
-  ConfigurationManager(int argc, char** argv, bool print = true, int start_index = 1);
+  ConfigurationManager(int argc, char** argv, bool print = true,
+                       ExecutableType exe_type = ExecutableType::SIMPLE);
 
   ConfigurationManager() {
     // Default constructor for internal use
@@ -98,6 +115,9 @@ class ConfigurationManager {
 
   // For debugging: prints all configuration values to the log
   void print_configurations();
+
+  // Loads MPI-related configurations
+  void load_mpi_configurations();
 
  private:
   /**
@@ -129,6 +149,9 @@ class ArgumentParser {
   std::optional<uint64_t> skip_event_threshold_us;  ///< Optional skip event threshold
   std::optional<std::string> inclusion_path;        ///< Optional inclusion path
   std::optional<std::string> log_dir;               ///< Optional log directory
+  std::optional<ExecutableMode> exe_mode;           ///< Optional executable mode
+  std::optional<std::string> run_id;                ///< Optional run_id
+  std::optional<bool> disable_mpi;                  ///< Optional disable_mpi flag
 
   /**
    * @brief Constructor that parses command-line arguments.
@@ -136,7 +159,9 @@ class ArgumentParser {
    * @param argv Array of command-line argument strings
    * @throws std::invalid_argument if required arguments are missing or unknown arguments are found
    */
-  ArgumentParser(int argc, char** argv, int start_index = 1);
+  ArgumentParser(int argc, char** argv, ExecutableType exe_type = ExecutableType::SIMPLE);
 };
 
 }  // namespace datacrumbs
+
+#endif  // DATACRUMBS_COMMON_CONFIGURATION_MANAGER_H__

@@ -4,7 +4,6 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 // Generated Headers
-#include <datacrumbs/bpf/datacrumbs.skel.h>
 #include <datacrumbs/datacrumbs_config.h>
 // other headers
 #include <datacrumbs/common/configuration_manager.h>

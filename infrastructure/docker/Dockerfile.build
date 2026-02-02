@@ -8,11 +8,16 @@ RUN cd /etc/yum.repos.d/ && \
 # Update system
 RUN yum update -y
 
+# Install EPEL repository first (needed for patchelf)
+RUN yum install -y epel-release
+
 # Install base development tools and dependencies
 RUN yum install -y \
     gcc \
     clang \
     llvm \
+    patchelf \
+    sudo \
     elfutils-libelf-devel \
     kernel-devel \
     kernel-headers \
@@ -77,12 +82,21 @@ RUN echo "/usr/local/lib64" > /etc/ld.so.conf.d/local.conf && \
     echo "/usr/local/lib" >> /etc/ld.so.conf.d/local.conf && \
     ldconfig
 
+# Create a non-root user 'docker' with passwordless sudo access and install tools
+RUN (dnf -y install openmpi-devel || yum -y install openmpi-devel) && \
+    (dnf clean all || yum clean all) && \
+    groupadd -f wheel && \
+    useradd -m -s /bin/bash docker && \
+    usermod -aG wheel docker && \
+    echo 'docker ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/docker && \
+    chmod 0440 /etc/sudoers.d/docker
+
 # Create datacrumbs directory
 WORKDIR /opt/datacrumbs
 
 # Set environment variables
 ENV PATH="/opt/rh/gcc-toolset-11/root/usr/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/opt/rh/gcc-toolset-11/root/usr/lib64:/usr/local/lib64:/usr/local/lib:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/opt/rh/gcc-toolset-11/root/usr/lib64:/usr/local/lib64:/usr/local/lib"
 
 # Create entrypoint script
 RUN echo '#!/bin/bash' > /entrypoint.sh && \

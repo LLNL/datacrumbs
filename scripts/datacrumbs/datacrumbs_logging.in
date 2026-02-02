@@ -1,0 +1,29 @@
+#! /usr/bin/env bash
+
+set -eo pipefail
+
+log() {
+  if [[ "${QUIET:-0}" == "0" ]]; then
+    printf "[INFO $(date '+%Y-%m-%d %H:%M:%S')] $@"
+    printf "\n"
+  fi
+}
+
+debug() {
+  if [[ "${VERBOSE:-0}" == "1" ]] && [[ "${QUIET:-1}" == "0" ]]; then
+    printf "[DEBUG $(date '+%Y-%m-%d %H:%M:%S')] $@"
+    printf "\n"
+  fi
+}
+
+error() {
+  printf "[ERROR $(date '+%Y-%m-%d %H:%M:%S')] $@" >&2
+  printf "\n" >&2
+}
+
+warn() {
+  if [[ "${QUIET:-1}" != "" ]] && [[ "${QUIET:-1}" == "0" ]]; then
+    printf "[WARN $(date '+%Y-%m-%d %H:%M:%S')] $@" >&2
+    printf "\n" >&2
+  fi
+}

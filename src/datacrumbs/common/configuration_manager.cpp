@@ -12,6 +12,7 @@
 /**
  * std headers
  */
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -24,12 +25,14 @@
  * Internal headers
  */
 #include <datacrumbs/common/configuration_manager.h>
+#include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>  // <-- Added logging header
 #include <datacrumbs/common/singleton.h>
 #include <datacrumbs/common/utils.h>
 /**
  * External headers
  */
+#include <mpi.h>
 #include <yaml-cpp/yaml.h>
 
 namespace datacrumbs {
@@ -50,16 +53,33 @@ bool datacrumbs::Singleton<datacrumbs::ConfigurationManager>::stop_creating_inst
 #define DC_YAML_USER "user"
 #define DC_YAML_INCLUSION_PATH "inclusion_path"
 
-ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
+ArgumentParser::ArgumentParser(int argc, char** argv, ExecutableType exe_type) {
   DC_LOG_TRACE("[ArgumentParser] Parsing command line arguments...");
-  if (argc < 2) {
+  if (exe_type == ExecutableType::SIMPLE && argc < 2) {
     throw std::invalid_argument("Configuration name is required as the first argument.");
+  } else if (exe_type == ExecutableType::DAEMON && argc < 3) {
+    throw std::invalid_argument(
+        "Executable mode (start, stop, or run) and configuration name are required as the first "
+        "two arguments.");
   }
-  config_name = argv[start_index];
+  int start_index = 1;
+  if (exe_type == ExecutableType::SIMPLE) {
+    config_name = argv[start_index++];
+  } else if (exe_type == ExecutableType::DAEMON) {
+    ExecutableMode exe_mode;
+    convert(argv[start_index++], exe_mode);
+    this->exe_mode = exe_mode;
+    config_name = argv[start_index++];
+  } else {
+    throw std::invalid_argument("Unknown ExecutableType.");
+  }
 
-  for (int i = start_index + 1; i < argc; ++i) {
+  for (int i = start_index; i < argc; ++i) {
     std::string arg = argv[i];
-    if (arg == "--trace_log_dir" && i + 1 < argc) {
+    if (arg == "--run_id" && i + 1 < argc) {
+      run_id = argv[++i];
+      DC_LOG_DEBUG("[ArgumentParser] Run ID set to: %s", run_id->c_str());
+    } else if (arg == "--trace_log_dir" && i + 1 < argc) {
       trace_log_dir = argv[++i];
       DC_LOG_DEBUG("[ArgumentParser] Trace log dir set to: %s", trace_log_dir->c_str());
     } else if (arg == "--data_dir" && i + 1 < argc) {
@@ -77,9 +97,12 @@ ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
     } else if (arg == "--log_dir" && i + 1 < argc) {
       log_dir = argv[++i];
       DC_LOG_DEBUG("[ArgumentParser] Log directory set to: %s", log_dir->c_str());
+    } else if (arg == "--disable_mpi") {
+      disable_mpi = true;
+      DC_LOG_DEBUG("[ArgumentParser] disable_mpi set to: %s", disable_mpi ? "true" : "false");
     } else if (arg == "--help" || arg == "-h") {
       DC_LOG_PRINT(
-          "Usage: %s <config_name> [--trace_log_dir <path>] "
+          "Usage: %s <config_name> [--run_id <id>] [--trace_log_dir <path>] "
           "[--config_path <path>] [--user <user>] [--data_dir "
           "<path>] [--inclusion_path <path>] [--log_dir <path>]",
           argv[0]);
@@ -101,14 +124,49 @@ ArgumentParser::ArgumentParser(int argc, char** argv, int start_index) {
  * @param argc Number of command-line arguments
  * @param argv Array of command-line argument strings
  */
-ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, int start_index)
+ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
+                                           ExecutableType exe_type)
     : path(DATACRUMBS_CONFIG_PATH),
+      exe_mode(ExecutableMode::RUN),
       name("default"),
       trace_log_dir(DATACRUMBS_LOG_DIR),
       capture_probes(),
-      user("datacrumbs") {
+      user("datacrumbs"),
+      run_id("0") {
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
+    rl.rlim_cur = rl.rlim_max;  // Set soft limit to hard limit
+    if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
+      DC_LOG_WARN("[ConfigurationManager] Failed to set ulimit -n to hard limit.");
+    } else {
+      DC_LOG_DEBUG("[ConfigurationManager] Set ulimit -n to hard limit: %lu", rl.rlim_max);
+    }
+  } else {
+    DC_LOG_WARN("[ConfigurationManager] Failed to get current ulimit -n.");
+  }
+  if (getrlimit(RLIMIT_MEMLOCK, &rl) == 0) {
+    rl.rlim_cur = rl.rlim_max;  // Set soft limit to hard limit
+    if (setrlimit(RLIMIT_MEMLOCK, &rl) != 0) {
+      DC_LOG_WARN("[ConfigurationManager] Failed to set ulimit -l to hard limit.");
+    } else {
+      DC_LOG_DEBUG("[ConfigurationManager] Set ulimit -l to hard limit: %lu", rl.rlim_max);
+    }
+  } else {
+    DC_LOG_WARN("[ConfigurationManager] Failed to get current ulimit -l.");
+  }
+  // Set ulimit -c (core file size) to its hard limit
+  if (getrlimit(RLIMIT_CORE, &rl) == 0) {
+    rl.rlim_cur = rl.rlim_max;  // Set soft limit to hard limit
+    if (setrlimit(RLIMIT_CORE, &rl) != 0) {
+      DC_LOG_WARN("[ConfigurationManager] Failed to set ulimit -c to hard limit.");
+    } else {
+      DC_LOG_DEBUG("[ConfigurationManager] Set ulimit -c to hard limit: %lu", rl.rlim_max);
+    }
+  } else {
+    DC_LOG_WARN("[ConfigurationManager] Failed to get current ulimit -c.");
+  }
   DC_LOG_TRACE("[ConfigurationManager] Initializing with arguments...");
-  ArgumentParser parser(argc, argv, start_index);
+  ArgumentParser parser(argc, argv, exe_type);
   this->name = parser.config_name;
   // Override config path if provided as argument
   if (parser.config_path) {
@@ -334,6 +392,17 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, in
       DC_LOG_DEBUG("[ConfigurationManager] Inclusion path set from config: %s",
                    this->inclusion_path.c_str());
     }
+    // Override run_id if provided as argument
+    if (parser.run_id) {
+      this->run_id = *parser.run_id;
+      DC_LOG_DEBUG("[ConfigurationManager] Run ID overridden by argument: %s",
+                   this->run_id.c_str());
+    }
+    if (parser.exe_mode) {
+      this->exe_mode = *parser.exe_mode;
+      DC_LOG_DEBUG("[ConfigurationManager] Executable mode set from argument: %d",
+                   static_cast<int>(this->exe_mode));
+    }
     // Override config path if provided as argument
     if (parser.data_dir) {
       this->data_dir = *parser.data_dir;
@@ -370,6 +439,15 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print, in
       DC_LOG_DEBUG("[ConfigurationManager] No log directory specified, using default: %s",
                    this->log_dir.c_str());
     }
+    // Override disable_mpi if provided as argument
+    if (parser.disable_mpi) {
+      this->disable_mpi = *parser.disable_mpi;
+      DC_LOG_DEBUG("[ConfigurationManager] disable_mpi overridden by argument: %s",
+                   this->disable_mpi ? "true" : "false");
+    } else {
+      this->disable_mpi = false;
+      DC_LOG_DEBUG("[ConfigurationManager] No disable_mpi specified, using default: false");
+    }
   }
   // Derive additional configuration values and validate
   derive_configurations();
@@ -396,7 +474,8 @@ void ConfigurationManager::print_configurations() {
   DC_LOG_INFO("  Manual probe path: %s", this->manual_probe_path.string().c_str());
   DC_LOG_INFO("  Category map path: %s", this->category_map_path.string().c_str());
   DC_LOG_INFO("  Profiling interval: %f", DATACRUMBS_TIME_INTERVAL_NS / 1e9);
-  DC_LOG_INFO("  User: %s", this->user.c_str());
+  DC_LOG_INFO("  Runtime User: %s", this->user.c_str());
+  DC_LOG_INFO("  Install user: %s", DATACRUMBS_INSTALL_USER);
   DC_LOG_INFO("  Hostname: %s", this->hostname.c_str());
   DC_LOG_INFO("  Capture probes: %d", static_cast<int>(this->capture_probes.size()));
   if (DATACRUMBS_MODE == 1) {
@@ -424,9 +503,7 @@ void ConfigurationManager::print_configurations() {
  */
 void ConfigurationManager::derive_configurations() {
   DC_LOG_TRACE("[ConfigurationManager] Deriving configurations...");
-
-  pid_t pid = getpid();
-  DC_LOG_DEBUG("[ConfigurationManager] Process ID: %d", pid);
+  DC_LOG_DEBUG("[ConfigurationManager] Process ID: %d for rank: %d", getpid(), this->mpi_rank);
 
   // Use this->hostname (std::string) instead of local char array
   std::string hostname;
@@ -437,23 +514,21 @@ void ConfigurationManager::derive_configurations() {
   }
   hostname = hostname_buf;
   this->hostname = hostname;
-  DC_LOG_DEBUG("[ConfigurationManager] Hostname: %s", this->hostname.c_str());
+  DC_LOG_DEBUG("[ConfigurationManager] Hostname: %s for rank: %d", this->hostname.c_str(),
+               this->mpi_rank);
 
-  auto now = std::chrono::system_clock::now();
-  auto timestamp =
-      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-  DC_LOG_DEBUG("[ConfigurationManager] Timestamp: %lld", static_cast<long long>(timestamp));
+  std::string generated_file_suffix;
+  if (this->disable_mpi) {
+    generated_file_suffix = this->user + "-" + this->run_id + "-" + hostname + "-" + this->name;
+  } else {
+    generated_file_suffix = this->user + "-" + this->run_id + "-" + std::to_string(this->mpi_rank) +
+                            "-" + std::to_string(this->mpi_size) + "-" + this->name;
+  }
 
-  // Simple encoding: base64 of hostname + pid + timestamp
-  std::stringstream ss;
-  ss << this->name << "_" << pid << "_" << timestamp;
-  std::string raw = ss.str();
-  auto encoded =
-      datacrumbs::utils::base64_encode(std::vector<unsigned char>(raw.begin(), raw.end()));
-  std::string trace_file_name = "trace_" + user + "_" + encoded + ".pfw.gz";
+  std::string trace_file_name = "trace-" + generated_file_suffix + ".pfw.gz";
   this->trace_file_path = this->trace_log_dir / trace_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Trace file path: %s",
-               this->trace_file_path.string().c_str());
+  DC_LOG_DEBUG("[ConfigurationManager] Trace file path: %s for rank: %d",
+               this->trace_file_path.string().c_str(), this->mpi_rank);
 
   std::string hostname_str(this->name);
   // Remove digits from hostname for file naming
@@ -461,35 +536,42 @@ void ConfigurationManager::derive_configurations() {
                      hostname_str.end());
   DC_LOG_DEBUG("[ConfigurationManager] Hostname (digits removed): %s", hostname_str.c_str());
 
-  // Construct probe file name: probes-user-host.json
-  std::string probe_file_name = "probes-" + user + "-" + hostname_str + ".json";
+  std::string lookup_file_suffix = std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname_str;
+
+  // Construct probe file name: probes-DATACRUMBS_INSTALL_USER-host.json
+  std::string probe_file_name = "probes-" + lookup_file_suffix + ".json";
   this->probe_file_path = this->data_dir / probe_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Probe file path: %s",
-               this->probe_file_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Probe file path: %s",
+                 this->probe_file_path.string().c_str());
 
-  // Construct probe exclusion file name: probes-exclusion-user-host.json
-  std::string probe_exclusion_file_name = "probes-exclusion-" + user + "-" + hostname_str + ".json";
+  // Construct probe exclusion file name: probes-exclusion-DATACRUMBS_INSTALL_USER-host.json
+  std::string probe_exclusion_file_name = "probes-exclusion-" + lookup_file_suffix + ".json";
   this->probe_exclusion_file_path = this->data_dir / probe_exclusion_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Probe exclusion file path: %s",
-               this->probe_exclusion_file_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Probe exclusion file path: %s",
+                 this->probe_exclusion_file_path.string().c_str());
 
-  // Construct probe invalid file name: probes-invalid-user-host.json
-  std::string probe_invalid_file_name = "probes-invalid-" + user + "-" + hostname_str + ".json";
+  // Construct probe invalid file name: probes-invalid-DATACRUMBS_INSTALL_USER-host.json
+  std::string probe_invalid_file_name = "probes-invalid-" + lookup_file_suffix + ".json";
   this->probe_invalid_file_path = this->data_dir / probe_invalid_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Probe invalid path: %s",
-               this->probe_invalid_file_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Probe invalid path: %s",
+                 this->probe_invalid_file_path.string().c_str());
 
-  // Construct categories file name: categories-user-host.json
-  std::string categories_file_name = "categories-" + user + "-" + hostname_str + ".json";
+  // Construct categories file name: categories-DATACRUMBS_INSTALL_USER-host.json
+  std::string categories_file_name = "categories-" + lookup_file_suffix + ".json";
   this->category_map_path = this->data_dir / categories_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Category map path: %s",
-               this->category_map_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Category map path: %s",
+                 this->category_map_path.string().c_str());
 
-  // Construct manual probe file name: manual-probes-user-host.json
-  std::string manual_probe_file_name = "manual-probes-" + user + "-" + hostname_str + ".json";
+  // Construct manual probe file name: manual-probes-DATACRUMBS_INSTALL_USER-host.json
+  std::string manual_probe_file_name = "manual-probes-" + lookup_file_suffix + ".json";
   this->manual_probe_path = this->data_dir / manual_probe_file_name;
-  DC_LOG_DEBUG("[ConfigurationManager] Manual probe path: %s",
-               this->manual_probe_path.string().c_str());
+  if (this->mpi_rank == 0)
+    DC_LOG_DEBUG("[ConfigurationManager] Manual probe path: %s",
+                 this->manual_probe_path.string().c_str());
 
   // Load category_map from JSON file using json-c
   std::string category_json_path = category_map_path.string();
@@ -497,7 +579,8 @@ void ConfigurationManager::derive_configurations() {
     // Read file into string
     std::ifstream file(category_json_path);
     if (!file) {
-      DC_LOG_ERROR("Failed to open category map file: %s", category_json_path.c_str());
+      DC_LOG_ERROR("Failed to open category map file: %s for rank: %d", category_json_path.c_str(),
+                   this->mpi_rank);
       throw std::invalid_argument("Failed to open category map file: " + category_json_path);
     }
     std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -506,7 +589,8 @@ void ConfigurationManager::derive_configurations() {
     // Parse JSON
     struct json_object* root = json_tokener_parse(json_str.c_str());
     if (!root) {
-      DC_LOG_ERROR("Failed to parse JSON from %s", category_json_path.c_str());
+      DC_LOG_ERROR("Failed to parse JSON from %s for rank: %d", category_json_path.c_str(),
+                   this->mpi_rank);
       throw std::invalid_argument("Failed to parse JSON from: " + category_json_path);
     }
 
@@ -529,8 +613,8 @@ void ConfigurationManager::derive_configurations() {
     }
     json_object_put(root);
   } else {
-    DC_LOG_WARN("[ConfigurationManager] Category map file does not exist: %s",
-                category_json_path.c_str());
+    DC_LOG_WARN("[ConfigurationManager] Category map file does not exist: %s for rank: %d",
+                category_json_path.c_str(), this->mpi_rank);
   }
 }
 
@@ -542,20 +626,38 @@ void ConfigurationManager::derive_configurations() {
  */
 void ConfigurationManager::validate_configurations() {
   if (this->capture_probes.empty()) {
-    DC_LOG_ERROR("[ConfigurationManager] No capture probes defined in the configuration.");
+    DC_LOG_ERROR(
+        "[ConfigurationManager] No capture probes defined in the configuration for rank: %d.",
+        this->mpi_rank);
     throw std::invalid_argument("At least one capture probe must be defined.");
   }
   if (this->data_dir.empty() || !std::filesystem::exists(this->data_dir)) {
-    DC_LOG_ERROR("[ConfigurationManager] Data directory does not exist: %s",
-                 this->data_dir.string().c_str());
+    DC_LOG_ERROR("[ConfigurationManager] Data directory does not exist: %s for rank: %d.",
+                 this->data_dir.string().c_str(), this->mpi_rank);
     throw std::runtime_error("Data directory does not exist: " + this->data_dir.string());
   }
   if (this->trace_log_dir.empty() ||
       !std::filesystem::exists(std::filesystem::path(this->trace_log_dir))) {
-    DC_LOG_ERROR("[ConfigurationManager] Trace log directory does not exist: %s",
-                 this->trace_log_dir.string().c_str());
+    DC_LOG_ERROR("[ConfigurationManager] Trace log directory does not exist: %s for rank: %d.",
+                 this->trace_log_dir.string().c_str(), this->mpi_rank);
     throw std::runtime_error("Trace log directory does not exist: " +
                              std::filesystem::path(this->trace_log_dir).string());
+  }
+}
+
+void ConfigurationManager::load_mpi_configurations() {
+  if (this->disable_mpi) {
+    this->mpi_rank = 0;
+    this->mpi_size = 1;
+    DC_LOG_DEBUG("[ConfigurationManager] MPI disabled, setting rank to 0 and size to 1.");
+  } else {
+    DC_LOG_DEBUG("[ConfigurationManager] MPI enabled, initializing rank and size.");
+    int initialized;
+    int status = MPI_Initialized(&initialized);
+    if (status == MPI_SUCCESS && initialized == true) {
+      MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+      MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    }
   }
 }
 
