@@ -1,0 +1,186 @@
+# This describes what is deployed by this template.
+description: NFS server and clients + orangefs deployed with Heat on Chameleon
+
+# This defines the minimum Heat version required by this template.
+heat_template_version: 2015-10-15
+
+# The resources section defines what OpenStack resources are to be deployed and
+# how they should be configured.
+resources:
+  nfs_server_floating_ip:
+    type: OS::Nova::FloatingIP
+    properties:
+      pool: public
+
+  nfs_server:
+    type: OS::Nova::Server
+    properties:
+      flavor: baremetal
+      # NOTE: Change as needed
+      # image: CC-UBUNTU22.04
+      image: DC_ORANGEFS_03-03-2026
+      key_name: { get_param: key_name }
+      networks:
+        - network: sharednet1
+      scheduler_hints: { reservation: { get_param: reservation_id } }
+      # NOTE:  change the mount point for orangefs
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash
+            mkdir -p /home/cc/.ssh
+            echo "$public_key" > /home/cc/.ssh/id_rsa.pub
+            echo "-----BEGIN OPENSSH PRIVATE KEY-----" > /home/cc/.ssh/id_rsa
+            echo "$private_key" | tr -d " " | fold -w 70 >> /home/cc/.ssh/id_rsa
+            echo "-----END OPENSSH PRIVATE KEY-----" >> /home/cc/.ssh/id_rsa
+            cat /home/cc/.ssh/id_rsa.pub >> /home/cc/.ssh/authorized_keys
+            cat <<EOF >> /home/cc/.ssh/config
+            Host 10.52.*
+                StrictHostKeyChecking no
+                UserKnownHostsFile /dev/null
+            EOF
+            chown -R cc:cc /home/cc/.ssh
+            chmod 700 /home/cc/.ssh
+            chmod 600 /home/cc/.ssh/id_rsa /home/cc/.ssh/id_rsa.pub /home/cc/.ssh/authorized_keys /home/cc/.ssh/config
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y nfs-common  nfs-kernel-server
+            # NOTE: CHANGE PATH
+            mkdir -p /opt/shared
+            # NOTE: CHANGE PATH
+            chown -R cc:cc /opt/shared
+            mkdir -p /mnt/nvme/orangefs_{data,meta}
+            mkdir -p /mnt/orangefs
+            # NOTE: CHANGE PATH
+            echo '/opt/shared 10.0.0.0/8(rw,async)' > /etc/exports
+            systemctl enable rpcbind && systemctl start rpcbind
+            systemctl enable nfs-kernel-server && systemctl start nfs-kernel-server
+            exportfs -ra
+            firewall-cmd --permanent --add-service=rpc-bind
+            firewall-cmd --permanent --add-service=mountd
+            firewall-cmd --permanent --add-service=nfs
+            firewall-cmd --reload
+            echo "tcp://$nfs_server_ip:3334/orangefs /mnt/orangefs pvfs2 defaults,noauto 0 0" >> /etc/pvfs2tab
+            chmod a+r /etc/pvfs2tab
+            rm -r /opt/nfs_client
+            ln -s /opt/shared /opt/nfs_client
+            touch /opt/shared/nodelist.txt
+            chown -R cc:cc /opt/shared/nodelist.txt
+            /usr/sbin/ip addr show | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1 | grep 10\\. >> /opt/nfs_client/nodelist.txt
+
+            #echo /usr/sbin/ip addr show | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1 | grep 10\\. >> /opt/shared/nodelist.txt
+          params:
+            $public_key: { get_param: key_public }
+            $private_key: { get_param: key_private }
+
+  nfs_server_ip_association:
+    type: OS::Nova::FloatingIPAssociation
+    properties:
+      floating_ip: { get_resource: nfs_server_floating_ip }
+      server_id: { get_resource: nfs_server }
+
+  nfs_clients:
+    type: OS::Heat::ResourceGroup
+    properties:
+      count: { get_param: nfs_client_count }
+      resource_def:
+        type: OS::Nova::Server
+        properties:
+          flavor: baremetal
+          # NOTE: Change as needed
+          image: DC_ORANGEFS_03-03-2026
+          key_name: { get_param: key_name }
+          networks:
+            - network: sharednet1
+          scheduler_hints: { reservation: { get_param: reservation_id } }
+          user_data:
+            str_replace:
+              template: |
+                #!/bin/bash
+                mkdir -p /home/cc/.ssh
+                echo "$public_key" > /home/cc/.ssh/id_rsa.pub
+                echo "-----BEGIN OPENSSH PRIVATE KEY-----" > /home/cc/.ssh/id_rsa
+                echo "$private_key" | tr -d " " | fold -w 70 >> /home/cc/.ssh/id_rsa
+                echo "-----END OPENSSH PRIVATE KEY-----" >> /home/cc/.ssh/id_rsa
+                cat /home/cc/.ssh/id_rsa.pub >> /home/cc/.ssh/authorized_keys
+                cat <<EOF >> /home/cc/.ssh/config
+                Host 10.52.*
+                    StrictHostKeyChecking no
+                    UserKnownHostsFile /dev/null
+                EOF
+                chown -R cc:cc /home/cc/.ssh
+                chmod 700 /home/cc/.ssh
+                chmod 600 /home/cc/.ssh/id_rsa /home/cc/.ssh/id_rsa.pub /home/cc/.ssh/authorized_keys /home/cc/.ssh/config
+                apt-get update
+                DEBIAN_FRONTEND=noninteractive apt-get install -y nfs-common
+                # NOTE: CHANGE PATH
+                echo "$nfs_server_ip:/opt/shared    /opt/nfs_client    nfs" >> /etc/fstab
+                mkdir -p /mnt/orangefs
+                mkdir -p /opt/nfs_client
+                mount -a
+                echo "tcp://$nfs_server_ip:3334/orangefs /mnt/orangefs pvfs2 defaults,noauto 0 0" >> /etc/pvfs2tab
+                firewall-cmd --permanent --add-service=rpc-bind
+                firewall-cmd --permanent --add-service=mountd
+                firewall-cmd --permanent --add-service=nfs
+                firewall-cmd --reload
+                chmod a+r /etc/pvfs2tab
+                mkdir -p /mnt/nvme/orangefs_{data,meta}
+                # Wait for the NFS mount to be available and writable
+                MAX_RETRIES=10
+                RETRY_COUNT=0
+
+                while [ ! -w /opt/nfs_client ] && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                    echo "Waiting for NFS mount to be writable... (Attempt $((RETRY_COUNT+1)))"
+                    mount -a
+                    sleep 60
+                    RETRY_COUNT=$((RETRY_COUNT+1))
+                done
+
+                # Now perform the update once the mount is confirmed writable
+                if [ -w /opt/nfs_client ]; then
+                    /usr/sbin/ip addr show | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1 | grep 10\\. >> /opt/nfs_client/nodelist.txt
+                else
+                    echo "NFS mount failed to become writable after $MAX_RETRIES attempts." >&2
+                fi
+              params:
+                $nfs_server_ip: { get_attr: [nfs_server, first_address] }
+                $public_key: { get_param: key_public }
+                $private_key: { get_param: key_private }
+
+# The parameters section gathers configuration from the user.
+parameters:
+  key_public:
+    type: string
+    description: Public Key to enable SSH access to the instance
+    hidden: true
+  key_private:
+    type: string
+    description: Private Key to enable SSH access to the instance
+    hidden: true
+  nfs_client_count:
+    type: number
+    description: Number of NFS client instances
+    default: 1
+    constraints:
+      - range: { min: 1 }
+        description: There must be at least one client.
+  # NOTE: CHANGE SSH Key pair
+  key_name:
+    type: string
+    description: Name of a KeyPair to enable SSH access to the instance
+    default: default
+    constraints:
+      - custom_constraint: nova.keypair
+  # NOTE: CHANGE ID
+  reservation_id:
+    type: string
+    description: ID of the Blazar reservation to use for launching instances.
+    constraints:
+      - custom_constraint: blazar.reservation
+
+outputs:
+  server_ip:
+    description: Public IP address of the NFS server
+    value: { get_attr: [nfs_server_floating_ip, ip] }
+  client_ips:
+    description: Private IP addresses of the NFS clients
+    value: { get_attr: [nfs_clients, first_address] }
