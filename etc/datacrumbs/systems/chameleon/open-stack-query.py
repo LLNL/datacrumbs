@@ -217,6 +217,18 @@ def run_command(cmd: list[str], allow_failure: bool = False, env: dict[str, str]
 				"  pip install git+https://github.com/ChameleonCloud/python-blazarclient.git@chameleoncloud/xena\n"
 				"Then retry after re-activating the environment."
 			)
+		if (
+			cmd
+			and Path(cmd[0]).name == "openstack"
+			and "stack" in cmd
+			and "is not an openstack command" in stdout
+		):
+			raise RuntimeError(
+				"OpenStack stack commands are unavailable in this environment.\n"
+				"Install Heat client plugin:\n"
+				"  pip install python-heatclient\n"
+				"Then retry after re-activating the environment."
+			)
 		if stderr and stdout:
 			details = f"STDERR:\n{stderr}\n\nSTDOUT:\n{stdout}"
 		else:
@@ -390,6 +402,17 @@ def parse_ips(server_details: dict[str, Any]) -> list[str]:
 					addr = item.get("addr")
 					if isinstance(addr, str) and addr not in ip_values:
 						ip_values.append(addr)
+				elif isinstance(item, str):
+					ip = item.strip()
+					if ip and ip not in ip_values:
+						ip_values.append(ip)
+
+	for key in ("accessIPv4", "accessIPv6"):
+		value = server_details.get(key)
+		if isinstance(value, str):
+			ip = value.strip()
+			if ip and ip not in ip_values:
+				ip_values.append(ip)
 
 	if ip_values:
 		return ip_values
@@ -519,6 +542,87 @@ def get_all_server_details(env: dict[str, str]) -> list[dict[str, Any]]:
 		if isinstance(details, dict):
 			details_list.append(details)
 	return details_list
+
+
+def stack_matches_server(server_details: dict[str, Any], stack_id: str, stack_name: str) -> bool:
+	properties = parse_embedded(server_details.get("properties") or server_details.get("Properties"))
+	if isinstance(properties, dict):
+		stack_id_fields = [
+			properties.get("OS::stack_id"),
+			properties.get("stack_id"),
+		]
+		if any(isinstance(value, str) and value.strip() == stack_id for value in stack_id_fields):
+			return True
+
+		stack_name_fields = [
+			properties.get("OS::stack_name"),
+			properties.get("stack_name"),
+		]
+		if any(isinstance(value, str) and value.strip() == stack_name for value in stack_name_fields):
+			return True
+
+	text_blob = json.dumps(server_details, default=str)
+	return stack_id in text_blob or stack_name in text_blob
+
+
+def build_stack_result(stack_ref: str, env: dict[str, str]) -> dict[str, Any]:
+	stack = run_openstack_json(["stack", "show", stack_ref], env=env)
+	if not isinstance(stack, dict):
+		raise RuntimeError("Failed to parse stack details from OpenStack")
+
+	stack_id = str(stack.get("id") or stack.get("ID") or "").strip()
+	stack_name = str(stack.get("stack_name") or stack.get("stack_name") or stack.get("name") or stack_ref)
+	stack_status = str(stack.get("stack_status") or stack.get("status") or "")
+
+	all_servers = get_all_server_details(env)
+	servers = [
+		server
+		for server in all_servers
+		if isinstance(server, dict) and stack_matches_server(server, stack_id, stack_name)
+	]
+
+	server_rows: list[dict[str, Any]] = []
+	seen_server_ids: set[str] = set()
+	host_rows: list[dict[str, str]] = []
+	seen_host_keys: set[str] = set()
+	for server in servers:
+		server_id = str(server.get("id") or server.get("ID") or "").strip()
+		if not server_id or server_id in seen_server_ids:
+			continue
+		seen_server_ids.add(server_id)
+		node_name = get_node_name(server)
+		ips = parse_ips(server)
+		server_rows.append(
+			{
+				"server_id": server_id,
+				"server_name": server.get("name") or server.get("Name") or "",
+				"node": node_name,
+				"ips": ips,
+				"status": server.get("status") or server.get("Status") or "",
+			}
+		)
+
+		host_key = node_name or server_id
+		if host_key not in seen_host_keys:
+			seen_host_keys.add(host_key)
+			host_rows.append(
+				{
+					"host_id": node_name or "",
+					"node": node_name or "",
+					"uid": "",
+				}
+			)
+
+	return {
+		"reservation_id": "",
+		"lease_name": "",
+		"lease_status": "",
+		"stack_id": stack_id,
+		"stack_name": stack_name,
+		"stack_status": stack_status,
+		"hosts": host_rows,
+		"servers": server_rows,
+	}
 
 
 def fetch_host_details(host_ids: set[str], env: dict[str, str]) -> list[dict[str, Any]]:
@@ -656,11 +760,18 @@ def build_result(reservation_id: str, env: dict[str, str]) -> dict[str, Any]:
 
 
 def print_human(result: dict[str, Any], include_instances: bool = False) -> None:
-	print(f"Reservation: {result.get('reservation_id', '')}")
-	if result.get("lease_name"):
-		print(f"Lease Name : {result['lease_name']}")
-	if result.get("lease_status"):
-		print(f"Lease State: {result['lease_status']}")
+	if result.get("stack_id") or result.get("stack_name"):
+		print(f"Stack      : {result.get('stack_name', '')}")
+		if result.get("stack_id"):
+			print(f"Stack ID   : {result['stack_id']}")
+		if result.get("stack_status"):
+			print(f"Stack State: {result['stack_status']}")
+	else:
+		print(f"Reservation: {result.get('reservation_id', '')}")
+		if result.get("lease_name"):
+			print(f"Lease Name : {result['lease_name']}")
+		if result.get("lease_status"):
+			print(f"Lease State: {result['lease_status']}")
 
 	print("\nAllocated nodes in lease:")
 	hosts = result.get("hosts", [])
@@ -695,6 +806,10 @@ def parse_args() -> argparse.Namespace:
 		"reservation_id",
 		nargs="?",
 		help="Reservation ID (or lease identifier accepted by 'openstack reservation lease show')",
+	)
+	parser.add_argument(
+		"--stack",
+		help="OpenStack Heat stack name or ID to query deployed nodes and IPs",
 	)
 	parser.add_argument(
 		"--json",
@@ -735,9 +850,13 @@ def main() -> int:
 		print_chi_tacc_endpoints()
 		return 0
 
-	if not args.reservation_id:
+	if args.stack and args.reservation_id:
+		print("Error: provide either reservation_id or --stack, not both", file=sys.stderr)
+		return 2
+
+	if not args.reservation_id and not args.stack:
 		print(
-			"Error: reservation_id is required unless --print-endpoints is used",
+			"Error: reservation_id or --stack is required unless --print-endpoints is used",
 			file=sys.stderr,
 		)
 		return 2
@@ -758,7 +877,10 @@ def main() -> int:
 	env = merge_auth_environment(env, openrc_path)
 
 	try:
-		result = build_result(args.reservation_id, env)
+		if args.stack:
+			result = build_stack_result(args.stack, env)
+		else:
+			result = build_result(str(args.reservation_id), env)
 		if args.json:
 			print(json.dumps(result, indent=2))
 		else:
