@@ -433,7 +433,7 @@ The following table lists all available CMake configuration options:
    * - **Scheduler Integration**
      -
      -
-   * - ``DATACRUMBS_SCHEDULER_TYPE``
+   * - ``DATACRUMBS_LAUNCHER_TYPE``
      - ``FLUX``
      - Job scheduler type for multi-node support. Values: ``FLUX``, ``SLURM``, ``OPENMPI``, ``NONE``
    * - ``DATACRUMBS_SCHEDULER_JOBID_ENV_VAR``
@@ -503,7 +503,7 @@ Configuration Examples
     cmake -DCMAKE_INSTALL_PREFIX=$PREFIX \
           -DDATACRUMBS_HOST=tuolumne \
           -DDATACRUMBS_USER=$USER \
-          -DDATACRUMBS_SCHEDULER_TYPE=FLUX \
+          -DDATACRUMBS_LAUNCHER_TYPE=FLUX \
           -DDATACRUMBS_CONFIGURED_TRACE_DIR=/lustre/traces \
           -DDATACRUMBS_CONFIGURED_LOG_DIR=/lustre/logs \
           -DBPFTOOL_EXECUTABLE=$PREFIX/sbin/bpftool \
@@ -725,7 +725,7 @@ Configure CMake arguments:
         -DBPFTOOL_EXECUTABLE=$PREFIX/sbin/bpftool
         -DDATACRUMBS_HOST=tuolumne
         -DDATACRUMBS_USER=$USER
-        -DDATACRUMBS_SCHEDULER_TYPE=FLUX
+        -DDATACRUMBS_LAUNCHER_TYPE=FLUX
         -DDATACRUMBS_CONFIGURED_TRACE_DIR=/p/lustre1/$USER/traces
         -DDATACRUMBS_CONFIGURED_LOG_DIR=/p/lustre1/$USER/logs
     )

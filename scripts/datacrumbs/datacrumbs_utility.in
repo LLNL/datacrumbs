@@ -234,11 +234,11 @@ function server_launch() {
 
 function get_actual_user() {
 	local user=$(whoami)
-	if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
+	if [[ "FLUX" == "@DATACRUMBS_LAUNCHER_TYPE@" ]]; then
 		if [[ -n "$FLUX_JOB_USERID" ]]; then
 			user=$(id -nu $FLUX_JOB_USERID)
 		fi
-	elif [[ "SLURM" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
+	elif [[ "SLURM" == "@DATACRUMBS_LAUNCHER_TYPE@" ]]; then
 		if [[ -n "$SLURM_JOB_UID" ]]; then
 			user=$(id -nu $SLURM_JOB_UID)
 		fi

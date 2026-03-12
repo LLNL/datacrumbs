@@ -51,9 +51,9 @@ function get_slurm_datacrumbs_enabled() {
 
 function get_datacrumbs_enabled() {
   local enabled="no"
-  if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
+  if [[ "FLUX" == "@DATACRUMBS_LAUNCHER_TYPE@" ]]; then
     enabled=$(get_flux_datacrumbs_enabled)
-  elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
+  elif [[ "@DATACRUMBS_LAUNCHER_TYPE@" == "SLURM" ]]; then
     local slurm_job_comment=$(get_slurm_comment)
     log_system "Slurm comment: $slurm_job_comment"
     enabled=$(get_slurm_datacrumbs_enabled)
@@ -106,9 +106,9 @@ function get_general_datacrumbs_composite_name() {
 
 function get_datacrumbs_composite_name() {
   local name=$(get_default_datacrumbs_composite_name)
-  if [[ "FLUX" == "@DATACRUMBS_SCHEDULER_TYPE@" ]]; then
+  if [[ "FLUX" == "@DATACRUMBS_LAUNCHER_TYPE@" ]]; then
     name=$(get_flux_datacrumbs_composite_name)
-  elif [[ "@DATACRUMBS_SCHEDULER_TYPE@" == "SLURM" ]]; then
+  elif [[ "@DATACRUMBS_LAUNCHER_TYPE@" == "SLURM" ]]; then
     name=$(get_slurm_datacrumbs_composite_name)
   else
     name=$(get_general_datacrumbs_composite_name)
