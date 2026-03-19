@@ -7,8 +7,8 @@
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/datacrumbs_config.h>
 // Internal Headers
-#include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/data_structures.h>
+#include <datacrumbs/common/runtime_configuration_manager.h>
 #include <datacrumbs/common/utils.h>
 #include <datacrumbs/server/bpf/compat/map.h>
 #include <datacrumbs/server/bpf/shared.h>
@@ -39,7 +39,7 @@
 namespace datacrumbs {
 class EventProcessor {
  public:
-  EventProcessor(int argc, char** argv);
+  explicit EventProcessor(const std::filesystem::path& probe_file);
 
   ~EventProcessor() {}
 
@@ -58,7 +58,7 @@ class EventProcessor {
   int finalize();
 
  public:
-  std::shared_ptr<ConfigurationManager> configManager_;
+  std::shared_ptr<RuntimeConfigurationManager> configManager_;
   std::shared_ptr<datacrumbs::ChromeWriter> writer_;
   int failed_events;  // Count of failed events
   std::atomic<uint64_t> event_index{0};

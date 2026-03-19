@@ -14,6 +14,14 @@
 
 DATACRUMBS_MAP_EXTERN(pid_map, u32, u64, 1024);
 DATACRUMBS_MAP_EXTERN(fn_pid_map, struct fn_key_t, struct fn_value_t);
+DATACRUMBS_MAP_EXTERN(event_arg_config_map, u64, struct runtime_event_config_t,
+                      DATACRUMBS_MAX_RUNTIME_FUNCTIONS);
+extern struct {
+  __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+  __uint(max_entries, 1);
+  __type(key, u32);
+  __type(value, struct fn_value_t);
+} scratch_fn_value_map SEC(".maps");
 
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
 DATACRUMBS_MAP_EXTERN(failed_request, u32, u32, 128);
@@ -128,44 +136,267 @@ static inline __attribute__((always_inline)) int need_tracing(struct fn_key_t* k
 }
 #endif
 
+static inline __attribute__((always_inline)) const struct runtime_event_config_t*
+resolve_event_config(u64 attach_cookie) {
+  return (const struct runtime_event_config_t*)bpf_map_lookup_elem(&event_arg_config_map,
+                                                                   &attach_cookie);
+}
+
+static inline __attribute__((always_inline)) struct fn_value_t* get_scratch_fn_value(void) {
+  u32 key = 0;
+  return (struct fn_value_t*)bpf_map_lookup_elem(&scratch_fn_value_map, &key);
+}
+
+static inline __attribute__((always_inline)) int mark_current_pid_traced(void) {
+  const u64 tsp = bpf_ktime_get_ns();
+  const u64 current = bpf_get_current_pid_tgid();
+  const u32 pid = current & 0xFFFFFFFF;
+  if (pid == 0) return 0;
+  bpf_map_update_elem(&pid_map, &pid, &tsp, BPF_ANY);
+  DBG_PRINTK("Marked tracing pid=%u", pid);
+  return 0;
+}
+
+static inline __attribute__((always_inline)) int unmark_current_pid_traced(void) {
+  const u64 current = bpf_get_current_pid_tgid();
+  const u32 pid = current & 0xFFFFFFFF;
+  if (pid == 0) return 0;
+  bpf_map_delete_elem(&pid_map, &pid);
+  DBG_PRINTK("Unmarked tracing pid=%u", pid);
+  return 0;
+}
+
+static inline __attribute__((always_inline)) void reset_captured_args(struct fn_value_t* fn) {
+#pragma unroll
+  for (int index = 0; index < DATACRUMBS_MAX_CAPTURE_ARGS; ++index) {
+    fn->args[index] = 0;
+    fn->arg_data_len[index] = 0;
+    fn->arg_data_status[index] = 0;
+    __builtin_memset(fn->arg_data[index], 0, sizeof(fn->arg_data[index]));
+  }
+  fn->arg_count = 0;
+}
+
+static inline __attribute__((always_inline)) void copy_captured_args_to_event(
+    const struct fn_value_t* fn, struct generic_event_t* event) {
+  event->arg_count = fn->arg_count;
+#pragma unroll
+  for (int index = 0; index < DATACRUMBS_MAX_CAPTURE_ARGS; ++index) {
+    event->args[index] = fn->args[index];
+    event->arg_data_len[index] = fn->arg_data_len[index];
+    event->arg_data_status[index] = fn->arg_data_status[index];
+    __builtin_memcpy(event->arg_data[index], fn->arg_data[index], DATACRUMBS_MAX_CAPTURE_BYTES);
+  }
+}
+
+static inline __attribute__((always_inline)) void capture_runtime_args(
+    struct pt_regs* ctx, const struct runtime_event_config_t* config, struct fn_value_t* fn) {
+  unsigned int arg_index;
+  unsigned int num_bytes;
+  unsigned long long raw_value;
+  long err;
+  const unsigned long long raw_arg0 = PT_REGS_PARM1(ctx);
+  const unsigned long long raw_arg1 = PT_REGS_PARM2(ctx);
+  const unsigned long long raw_arg2 = PT_REGS_PARM3(ctx);
+  const unsigned long long raw_arg3 = PT_REGS_PARM4(ctx);
+  const unsigned long long raw_arg4 = PT_REGS_PARM5(ctx);
+
+  reset_captured_args(fn);
+  fn->arg_count = config->arg_count;
+#pragma unroll
+  for (int index = 0; index < DATACRUMBS_MAX_CAPTURE_ARGS; ++index) {
+    if ((unsigned int)index >= config->arg_count) break;
+    arg_index = config->arg_index[index];
+    raw_value = 0;
+    if (arg_index == 0) {
+      raw_value = raw_arg0;
+    } else if (arg_index == 1) {
+      raw_value = raw_arg1;
+    } else if (arg_index == 2) {
+      raw_value = raw_arg2;
+    } else if (arg_index == 3) {
+      raw_value = raw_arg3;
+    } else if (arg_index == 4) {
+      raw_value = raw_arg4;
+    }
+    fn->args[index] = raw_value;
+    fn->arg_data_status[index] = 0;
+    fn->arg_data_len[index] = 0;
+    __builtin_memset(fn->arg_data[index], 0, sizeof(fn->arg_data[index]));
+    num_bytes = config->arg_num_bytes[index];
+    if (num_bytes == 0) continue;
+    if (num_bytes > DATACRUMBS_MAX_CAPTURE_BYTES) {
+      num_bytes = DATACRUMBS_MAX_CAPTURE_BYTES;
+    }
+    if (config->arg_is_pointer[index] && raw_value != 0) {
+      fn->arg_data_len[index] = num_bytes;
+      if (config->probe_kind == DATACRUMBS_RUNTIME_PROBE_KIND_UPROBE) {
+        err = bpf_probe_read_user(fn->arg_data[index], num_bytes, (const void*)raw_value);
+      } else {
+        err = bpf_probe_read_kernel(fn->arg_data[index], num_bytes, (const void*)raw_value);
+      }
+      fn->arg_data_status[index] = err == 0 ? 2 : 3;
+      continue;
+    }
+    if (num_bytes > sizeof(raw_value)) {
+      num_bytes = sizeof(raw_value);
+    }
+    fn->arg_data_len[index] = num_bytes;
+    __builtin_memcpy(fn->arg_data[index], &raw_value, sizeof(raw_value));
+    fn->arg_data_status[index] = 1;
+  }
+}
+
+static inline __attribute__((always_inline)) void capture_runtime_raw_args(
+    const struct runtime_event_config_t* config, struct fn_value_t* fn, unsigned long long raw_arg0,
+    unsigned long long raw_arg1, unsigned long long raw_arg2, unsigned long long raw_arg3,
+    unsigned long long raw_arg4, bool read_user_pointers) {
+  unsigned int arg_index;
+  unsigned int num_bytes;
+  unsigned long long raw_value;
+  long err;
+
+  reset_captured_args(fn);
+  fn->arg_count = config->arg_count;
+#pragma unroll
+  for (int index = 0; index < DATACRUMBS_MAX_CAPTURE_ARGS; ++index) {
+    if ((unsigned int)index >= config->arg_count) break;
+    arg_index = config->arg_index[index];
+    raw_value = 0;
+    if (arg_index == 0) {
+      raw_value = raw_arg0;
+    } else if (arg_index == 1) {
+      raw_value = raw_arg1;
+    } else if (arg_index == 2) {
+      raw_value = raw_arg2;
+    } else if (arg_index == 3) {
+      raw_value = raw_arg3;
+    } else if (arg_index == 4) {
+      raw_value = raw_arg4;
+    }
+    fn->args[index] = raw_value;
+    fn->arg_data_status[index] = 0;
+    fn->arg_data_len[index] = 0;
+    __builtin_memset(fn->arg_data[index], 0, sizeof(fn->arg_data[index]));
+    num_bytes = config->arg_num_bytes[index];
+    if (num_bytes == 0) continue;
+    if (num_bytes > DATACRUMBS_MAX_CAPTURE_BYTES) {
+      num_bytes = DATACRUMBS_MAX_CAPTURE_BYTES;
+    }
+    if (config->arg_is_pointer[index] && raw_value != 0) {
+      fn->arg_data_len[index] = num_bytes;
+      if (read_user_pointers) {
+        err = bpf_probe_read_user(fn->arg_data[index], num_bytes, (const void*)raw_value);
+      } else {
+        err = bpf_probe_read_kernel(fn->arg_data[index], num_bytes, (const void*)raw_value);
+      }
+      fn->arg_data_status[index] = err == 0 ? 2 : 3;
+      continue;
+    }
+    if (num_bytes > sizeof(raw_value)) {
+      num_bytes = sizeof(raw_value);
+    }
+    fn->arg_data_len[index] = num_bytes;
+    __builtin_memcpy(fn->arg_data[index], &raw_value, sizeof(raw_value));
+    fn->arg_data_status[index] = 1;
+  }
+}
+
+static inline __attribute__((always_inline)) void capture_runtime_usdt_args(
+    struct pt_regs* ctx, const struct runtime_event_config_t* config, struct fn_value_t* fn) {
+  long raw_value = 0;
+  unsigned int num_bytes;
+  long err;
+  reset_captured_args(fn);
+  fn->arg_count = config->arg_count;
+#pragma unroll
+  for (int index = 0; index < DATACRUMBS_MAX_CAPTURE_ARGS; ++index) {
+    if ((unsigned int)index >= config->arg_count) break;
+    raw_value = 0;
+    if (bpf_usdt_arg(ctx, config->arg_index[index], &raw_value) != 0) {
+      raw_value = 0;
+    }
+    fn->args[index] = (unsigned long long)raw_value;
+    fn->arg_data_status[index] = 0;
+    fn->arg_data_len[index] = 0;
+    __builtin_memset(fn->arg_data[index], 0, sizeof(fn->arg_data[index]));
+    num_bytes = config->arg_num_bytes[index];
+    if (num_bytes == 0) continue;
+    if (num_bytes > DATACRUMBS_MAX_CAPTURE_BYTES) {
+      num_bytes = DATACRUMBS_MAX_CAPTURE_BYTES;
+    }
+    if (config->arg_is_pointer[index] && raw_value != 0) {
+      fn->arg_data_len[index] = num_bytes;
+      err = bpf_probe_read_user(fn->arg_data[index], num_bytes, (const void*)raw_value);
+      fn->arg_data_status[index] = err == 0 ? 2 : 3;
+      continue;
+    }
+    if (num_bytes > sizeof(raw_value)) {
+      num_bytes = sizeof(raw_value);
+    }
+    fn->arg_data_len[index] = num_bytes;
+    __builtin_memcpy(fn->arg_data[index], &raw_value, sizeof(raw_value));
+    fn->arg_data_status[index] = 1;
+  }
+}
+
 #if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
-static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
+static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx,
+                                                               u64 attach_cookie) {
+  const struct runtime_event_config_t* config = resolve_event_config(attach_cookie);
+  if (config == NULL) return 0;
+  const u64 event_id = config->event_id;
   struct fn_key_t key = {};
   key.event_id = event_id;
   u64 start_ts = 0;
   if (!need_tracing(&key, &start_ts)) {
     return 0;  // not tracing this pid
   }
-  struct fn_value_t fn = {};
-  fn.ts = bpf_ktime_get_ns();
-  bpf_map_update_elem(&fn_pid_map, &key, &fn, BPF_ANY);
+  struct fn_value_t* fn = get_scratch_fn_value();
+  if (fn == NULL) return 0;
+  __builtin_memset(fn, 0, sizeof(*fn));
+  fn->ts = bpf_ktime_get_ns();
+  capture_runtime_args(ctx, config, fn);
+  bpf_map_update_elem(&fn_pid_map, &key, fn, BPF_ANY);
   DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
   return 0;
 }
 #else
-static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
+static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx,
+                                                               u64 attach_cookie) {
+  const struct runtime_event_config_t* config = resolve_event_config(attach_cookie);
+  if (config == NULL) return 0;
+  const u64 event_id = config->event_id;
   struct fn_key_t key = {};
   key.event_id = event_id;
   u64 start_ts;
   if (!need_tracing(&key, &start_ts)) {
     return 0;  // not tracing this pid
   }
-  struct fn_value_t fn = {};
-  fn.ts = bpf_ktime_get_ns();
-  bpf_map_update_elem(&fn_pid_map, &key, &fn, BPF_ANY);
+  struct fn_value_t* fn = get_scratch_fn_value();
+  if (fn == NULL) return 0;
+  __builtin_memset(fn, 0, sizeof(*fn));
+  fn->ts = bpf_ktime_get_ns();
+  reset_captured_args(fn);
+  bpf_map_update_elem(&fn_pid_map, &key, fn, BPF_ANY);
   DBG_PRINTK("Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
   return 0;
 }
 #endif
 #else
-static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx, u64 event_id) {
+static inline __attribute__((always_inline)) int generic_entry(struct pt_regs* ctx,
+                                                               u64 attach_cookie) {
   return 0;
 }
 #endif
 #if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
-static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
+static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx,
+                                                              u64 attach_cookie) {
+  const struct runtime_event_config_t* config = resolve_event_config(attach_cookie);
+  if (config == NULL) return 0;
+  const u64 event_id = config->event_id;
   u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -176,17 +407,22 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
   if (fn == 0) return 0;  // missed entry
   DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
-  struct general_event_t* event;
-  DATACRUMBS_RB_RESERVE(output, struct general_event_t, event);
-  event->type = 1;
+  struct generic_event_t* event;
+  DATACRUMBS_RB_RESERVE(output, struct generic_event_t, event);
+  event->type = config->probe_kind;
   event->id = key.id;
   event->event_id = event_id;
   DATACRUMBS_COLLECT_TIME(event);
+  copy_captured_args_to_event(fn, event);
   DATACRUMBS_EVENT_SUBMIT(event, key.id, event_id);
   return 0;
 }
 #else
-static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
+static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx,
+                                                              u64 attach_cookie) {
+  const struct runtime_event_config_t* config = resolve_event_config(attach_cookie);
+  if (config == NULL) return 0;
+  const u64 event_id = config->event_id;
   u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -222,36 +458,86 @@ static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ct
 }
 #endif
 #else
-static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx, u64 event_id) {
-  return 0;
-}
-#endif
-
-#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
-static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx, u64 event_id) {
-  struct fn_key_t key = {};
-  key.event_id = event_id;
-  u64 start_ts;
-  if (!need_tracing(&key, &start_ts)) {
-    return 0;  // not tracing this pid
-  }
-  struct fn_value_t fn = {};
-  fn.ts = bpf_ktime_get_ns();
-  bpf_map_update_elem(&fn_pid_map, &key, &fn, BPF_ANY);
-  DBG_PRINTK("USDT  Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
-  return 0;
-}
-
-#else
-static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx, u64 event_id) {
+static inline __attribute__((always_inline)) int generic_exit(struct pt_regs* ctx,
+                                                              u64 attach_cookie) {
   return 0;
 }
 #endif
 
 #if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
-static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
+static inline __attribute__((always_inline)) int generic_syscall_entry(
+    struct pt_regs* ctx, u64 attach_cookie, unsigned long long arg0, unsigned long long arg1,
+    unsigned long long arg2, unsigned long long arg3, unsigned long long arg4) {
+  const struct runtime_event_config_t* config = resolve_event_config(attach_cookie);
+  if (config == NULL) return 0;
+  const u64 event_id = config->event_id;
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts = 0;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;
+  }
+  struct fn_value_t* fn = get_scratch_fn_value();
+  if (fn == NULL) return 0;
+  __builtin_memset(fn, 0, sizeof(*fn));
+  fn->ts = bpf_ktime_get_ns();
+  capture_runtime_raw_args(config, fn, arg0, arg1, arg2, arg3, arg4, true);
+  bpf_map_update_elem(&fn_pid_map, &key, fn, BPF_ANY);
+  DBG_PRINTK("Pushed syscall pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
+  return 0;
+}
+#else
+static inline __attribute__((always_inline)) int generic_syscall_entry(
+    struct pt_regs* ctx, u64 attach_cookie, unsigned long long arg0, unsigned long long arg1,
+    unsigned long long arg2, unsigned long long arg3, unsigned long long arg4) {
+  return 0;
+}
+#endif
+#else
+static inline __attribute__((always_inline)) int generic_syscall_entry(
+    struct pt_regs* ctx, u64 attach_cookie, unsigned long long arg0, unsigned long long arg1,
+    unsigned long long arg2, unsigned long long arg3, unsigned long long arg4) {
+  return 0;
+}
+#endif
+
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
+static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx,
+                                                            u64 attach_cookie) {
+  const struct runtime_event_config_t* config = resolve_event_config(attach_cookie);
+  if (config == NULL) return 0;
+  const u64 event_id = config->event_id;
+  struct fn_key_t key = {};
+  key.event_id = event_id;
+  u64 start_ts;
+  if (!need_tracing(&key, &start_ts)) {
+    return 0;  // not tracing this pid
+  }
+  struct fn_value_t* fn = get_scratch_fn_value();
+  if (fn == NULL) return 0;
+  __builtin_memset(fn, 0, sizeof(*fn));
+  fn->ts = bpf_ktime_get_ns();
+  capture_runtime_usdt_args(ctx, config, fn);
+  bpf_map_update_elem(&fn_pid_map, &key, fn, BPF_ANY);
+  DBG_PRINTK("USDT  Pushed pid:%d, event_id:%llu to map\n", (u32)key.id, event_id);
+  return 0;
+}
+
+#else
+static inline __attribute__((always_inline)) int usdt_entry(struct pt_regs* ctx,
+                                                            u64 attach_cookie) {
+  return 0;
+}
+#endif
+
+#if defined(DATACRUMBS_ENABLE) && (DATACRUMBS_ENABLE == 1)
+#if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
+static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 attach_cookie,
                                                            long clazz, long method) {
+  const struct runtime_event_config_t* config = resolve_event_config(attach_cookie);
+  if (config == NULL) return 0;
+  const u64 event_id = config->event_id;
   u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
   key.event_id = event_id;
@@ -262,36 +548,22 @@ static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, 
   struct fn_value_t* fn = bpf_map_lookup_elem(&fn_pid_map, &key);
   if (fn == 0) return 0;  // missed entry
   DATACRUMBS_SKIP_SMALL_EVENTS(fn, te);
-  struct string_t local_str = {};                                                      // 100
-  long len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)clazz);  // 90
-  local_str.len = len * 8;
-#if defined(DATACRUMBS_ENABLE_INCLUSION_PATH) && (DATACRUMBS_ENABLE_INCLUSION_PATH == 1)
-  int found = prefix_search(&inclusion_path_trie, &local_str);
-  if (!found) {
-    DBG_PRINTK("Skipping usdt for %s as it is not in inclusion path trie\n", local_str.str);
-    return 0;  // Skip if not in inclusion path
-  }
-#endif
-
-  struct usdt_event_t* event;
-  DATACRUMBS_RB_RESERVE(output, struct usdt_event_t, event);
-  event->type = 3;
+  struct generic_event_t* event;
+  DATACRUMBS_RB_RESERVE(output, struct generic_event_t, event);
+  event->type = config->probe_kind;
   event->id = key.id;
   event->event_id = event_id;
   DATACRUMBS_COLLECT_TIME(event);
-
-  u32 class_hash = hash_and_store(&local_str, len);
-  event->class_hash = class_hash;                                                  // 100
-  len = bpf_probe_read_user_str(&local_str.str, MAX_STR_READ_LEN, (void*)method);  // 90
-
-  u32 method_hash = hash_and_store(&local_str, len);
-  event->method_hash = method_hash;  // 100
+  copy_captured_args_to_event(fn, event);
   DATACRUMBS_EVENT_SUBMIT(event, key.id, event_id);
   return 0;
 }
 #else
-static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 event_id,
+static inline __attribute__((always_inline)) int usdt_exit(struct pt_regs* ctx, u64 attach_cookie,
                                                            long clazz, long method) {
+  const struct runtime_event_config_t* config = resolve_event_config(attach_cookie);
+  if (config == NULL) return 0;
+  const u64 event_id = config->event_id;
   u64 te = bpf_ktime_get_ns();
   struct fn_key_t key = {};
   key.event_id = event_id;

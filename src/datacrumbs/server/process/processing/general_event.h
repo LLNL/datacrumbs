@@ -6,7 +6,6 @@
 // Generated Headers
 #include <datacrumbs/datacrumbs_config.h>
 // other headers
-#include <datacrumbs/common/configuration_manager.h>
 #include <datacrumbs/common/constants.h>
 #include <datacrumbs/common/data_structures.h>
 #include <datacrumbs/common/logging.h>  // Logging header
@@ -84,7 +83,7 @@ inline static int lookup_1(int map_fd, unsigned long long latest_timestamp,
 #endif
 static datacrumbs::EventWithId* get_data_1(void* data, uint64_t index) {
 #if defined(DATACRUMBS_MODE) && (DATACRUMBS_MODE == 1)
-  struct general_event_t* base = (general_event_t*)data;
+  general_event_t* base = (general_event_t*)data;
 
   auto event = new datacrumbs::EventWithId(NORMAL_EVENT, index, base->type, base->id,
                                            base->event_id, base->ts, base->dur, nullptr);
