@@ -12,50 +12,11 @@
 
 namespace datacrumbs {
 
-enum class ExecutableType : uint8_t {
-  SIMPLE = 0,
-  DAEMON = 1,
-};
-
-enum class ExecutableMode : uint8_t { RUN = 0, START = 1, STOP = 2 };
-
-static std::string to_string(ExecutableMode mode) {
-  switch (mode) {
-    case ExecutableMode::RUN:
-      return "run";
-    case ExecutableMode::START:
-      return "start";
-    case ExecutableMode::STOP:
-      return "stop";
-    default:
-      return "unknown";
-  }
-}
-
 // Enum for different operating modes
 enum class Mode : uint8_t {
   PROFILER = 0,
   TRACER = 1,
 };
-
-inline void convert(const std::string& s, ExecutableMode& type) {
-  DC_LOG_TRACE("Entering convert for ExecutableMode with input: %s", s.c_str());
-  if (s == "run") {
-    type = ExecutableMode::RUN;
-    DC_LOG_DEBUG("Converted string '%s' to ExecutableMode::RUN", s.c_str());
-  } else if (s == "start") {
-    type = ExecutableMode::START;
-    DC_LOG_DEBUG("Converted string '%s' to ExecutableMode::START", s.c_str());
-  } else if (s == "stop") {
-    type = ExecutableMode::STOP;
-    DC_LOG_DEBUG("Converted string '%s' to ExecutableMode::STOP", s.c_str());
-  } else {
-    DC_LOG_ERROR("Unknown ExecutableMode string: '%s'", s.c_str());
-    throw std::invalid_argument("Unknown ExecutableMode: " + s +
-                                ". Valid types are: run, start, or stop.");
-  }
-  DC_LOG_TRACE("Exiting convert for ExecutableMode");
-}
 
 // Converts string to Mode enum. Throws if invalid.
 // DC_LOG_TRACE can be used to trace function entry/exit.
