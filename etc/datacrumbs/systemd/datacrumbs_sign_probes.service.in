@@ -1,0 +1,13 @@
+[Unit]
+Description=Datacrumbs trusted probe signing service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=@DATACRUMBS_INSTALL_BINARYDIR@/datacrumbs_sign_probes
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target
