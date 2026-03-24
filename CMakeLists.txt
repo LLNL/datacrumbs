@@ -103,6 +103,7 @@ set(DATACRUMBS_INCLUSION_PATH "NONE" CACHE STRING "Inclusion path for datacrumbs
 set(DATACRUMBS_CONFIGURED_TRACE_DIR "/tmp" CACHE STRING "Trace directory for datacrumbs")
 set(DATACRUMBS_CONFIGURED_LOG_DIR "/tmp" CACHE STRING "Log directory for datacrumbs")
 set(DATACRUMBS_CONFIGURED_RUN_DIR "NONE" CACHE STRING "Run directory for datacrumbs")
+set(DATACRUMBS_KERNEL_HEADERS_PATH "" CACHE PATH "Override path to the kernel headers for datacrumbs")
 set(DATACRUMBS_HOST "NONE" CACHE STRING "Host name for datacrumbs")
 set(DATACRUMBS_USER "$ENV{USER}" CACHE STRING "User name for datacrumbs")
 set(DATACRUMBS_INSTALL_USER "$ENV{USER}" CACHE STRING "Installation user name for datacrumbs")
