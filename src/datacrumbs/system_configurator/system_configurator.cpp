@@ -109,6 +109,11 @@ int SystemConfigurator::run() {
 
     const std::string system_configuration_path = this->system_configuration_path();
     if (std::filesystem::exists(system_configuration_path)) {
+      if (chmod(system_configuration_path.c_str(), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0) {
+        DC_LOG_ERROR("Failed to update system configuration file permissions: %s",
+                     system_configuration_path.c_str());
+        return 1;
+      }
       DC_LOG_INFO("System configuration already exists at: %s",
                   system_configuration_path.c_str());
       if (secret_ready) {
@@ -144,6 +149,11 @@ int SystemConfigurator::run() {
 
     if (!ok) {
       DC_LOG_ERROR("Failed to write system configuration file: %s",
+                   system_configuration_path.c_str());
+      return 1;
+    }
+    if (chmod(system_configuration_path.c_str(), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0) {
+      DC_LOG_ERROR("Failed to update system configuration file permissions: %s",
                    system_configuration_path.c_str());
       return 1;
     }
