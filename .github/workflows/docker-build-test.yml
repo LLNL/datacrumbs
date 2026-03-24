@@ -20,15 +20,31 @@ env:
 
 jobs:
   vm-build-and-test:
-    name: VM Build and Flow Test (${{ matrix.os_name }})
+    name: VM ${{ matrix.flow_name }} (${{ matrix.os_name }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - os_name: ubuntu-22.04
             runner: ubuntu-22.04
+            flow_name: Build and Flow Test
+            flow_id: signed
+            disable_signing: "false"
+          - os_name: ubuntu-22.04
+            runner: ubuntu-22.04
+            flow_name: Disabled Signing Flow Test
+            flow_id: disabled-signing
+            disable_signing: "true"
           - os_name: ubuntu-24.04
             runner: ubuntu-24.04
+            flow_name: Build and Flow Test
+            flow_id: signed
+            disable_signing: "false"
+          - os_name: ubuntu-24.04
+            runner: ubuntu-24.04
+            flow_name: Disabled Signing Flow Test
+            flow_id: disabled-signing
+            disable_signing: "true"
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -57,7 +73,27 @@ jobs:
             exit 1
           fi
 
-          sudo apt-get install -y             build-essential             cmake             git             pkg-config             clang             llvm             llvm-dev             libclang-dev             "${libclang_dev_pkg}"             libelf-dev             libssl-dev             libcap-dev             libyaml-cpp-dev             libjson-c-dev             zlib1g-dev             jq             patchelf             python3             openmpi-bin             libopenmpi-dev
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            clang \
+            llvm \
+            llvm-dev \
+            libclang-dev \
+            "${libclang_dev_pkg}" \
+            libelf-dev \
+            libssl-dev \
+            libcap-dev \
+            libyaml-cpp-dev \
+            libjson-c-dev \
+            zlib1g-dev \
+            jq \
+            patchelf \
+            python3 \
+            openmpi-bin \
+            libopenmpi-dev
           if [[ ! -d "/usr/src/linux-headers-$(uname -r)" ]]; then
             sudo apt-get install -y "linux-headers-$(uname -r)" || sudo apt-get install -y linux-headers-generic
           fi
@@ -152,6 +188,11 @@ jobs:
       - name: Configure datacrumbs
         run: |
           set -euo pipefail
+          extra_cmake_args=()
+          if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
+            extra_cmake_args+=("-DDATACRUMBS_DISABLE_PROBE_SIGNING=ON")
+          fi
+
           cmake -S "${GITHUB_WORKSPACE}/datacrumbs" -B "${BUILD_DIR}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
@@ -164,7 +205,8 @@ jobs:
             -DDATACRUMBS_CONFIGURED_TRACE_DIR="${TRACE_DIR}" \
             -DDATACRUMBS_KERNEL_HEADERS_PATH="/usr/src/linux-headers-$(uname -r)" \
             -DDATACRUMBS_UTILS_GIT_REPOSITORY="file://${GITHUB_WORKSPACE}/datacrumbs-utils" \
-            -DDATACRUMBS_UTILS_GIT_REF="${DATACRUMBS_UTILS_REF}"
+            -DDATACRUMBS_UTILS_GIT_REF="${DATACRUMBS_UTILS_REF}" \
+            "${extra_cmake_args[@]}"
 
       - name: Build datacrumbs
         run: |
@@ -181,7 +223,8 @@ jobs:
           set -euo pipefail
           sudo "${INSTALL_PREFIX}/bin/datacrumbs_system_configurator"
 
-      - name: Install and start systemd units
+      - name: Install and start signing-enabled systemd units
+        if: matrix.disable_signing == 'false'
         run: |
           set -euo pipefail
           sudo ln -sf "${INSTALL_PREFIX}/etc/datacrumbs/systemd/datacrumbs_sign_probes.service" /etc/systemd/system/datacrumbs_sign_probes.service
@@ -190,13 +233,40 @@ jobs:
           sudo systemctl enable --now datacrumbs_sign_probes.service
           sudo systemctl status --no-pager datacrumbs_sign_probes.service
 
-      - name: Generate signed probes
+      - name: Install disabled-signing runtime systemd unit
+        if: matrix.disable_signing == 'true'
+        run: |
+          set -euo pipefail
+          sudo ln -sf "${INSTALL_PREFIX}/etc/datacrumbs/systemd/datacrumbs@.service" /etc/systemd/system/datacrumbs@.service
+          sudo systemctl daemon-reload
+
+      - name: Generate probes
         run: |
           set -euo pipefail
           test -f "${CONFIG_YAML}"
           rm -f "${PROBE_FILE}"
-          "${INSTALL_PREFIX}/bin/datacrumbs_probe_configurator" "${CONFIG_YAML}" "${PROBE_FILE}"
+
+          probe_output="$("${INSTALL_PREFIX}/bin/datacrumbs_probe_configurator" "${CONFIG_YAML}" "${PROBE_FILE}" 2>&1)"
+          printf '%s\n' "${probe_output}"
           test -s "${PROBE_FILE}"
+
+          if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
+            grep -q "Probe signing is disabled" <<<"${probe_output}"
+            python3 - <<'PY'
+            import gzip
+            import json
+            import os
+            from pathlib import Path
+
+            probe_file = Path(os.environ["PROBE_FILE"])
+            with gzip.open(probe_file, "rt", encoding="utf-8") as handle:
+                payload = json.load(handle)
+
+            assert "checksum" not in payload, payload
+            assert "checksum_algorithm" not in payload, payload
+            assert isinstance(payload.get("categories"), list) and payload["categories"], payload
+            PY
+            fi
 
       - name: Run datacrumbs wrapper flow and verify logs
         run: |
@@ -208,7 +278,9 @@ jobs:
             "${INSTALL_PREFIX}/bin/datacrumbs_service_wrapper" stop "${JOB_ID}" "${service_user}" "${PROBE_FILE}" || true
             sudo systemctl status --no-pager "datacrumbs@${JOB_ID}.service" || true
             sudo journalctl -u "datacrumbs@${JOB_ID}.service" --no-pager -n 200 || true
-            sudo journalctl -u datacrumbs_sign_probes.service --no-pager -n 200 || true
+            if [[ "${{ matrix.disable_signing }}" == "false" ]]; then
+              sudo journalctl -u datacrumbs_sign_probes.service --no-pager -n 200 || true
+            fi
           }
           trap cleanup EXIT
 
@@ -229,13 +301,16 @@ jobs:
           ! sudo systemctl is-active --quiet "datacrumbs@${JOB_ID}.service"
           test -s "${log_file}"
           grep -q . "${log_file}"
+          if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
+            grep -q "Probe signing is disabled" "${log_file}"
+          fi
           tail -n 50 "${log_file}"
 
       - name: Upload datacrumbs logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: datacrumbs-${{ matrix.os_name }}-logs
+          name: datacrumbs-${{ matrix.os_name }}-${{ matrix.flow_id }}-logs
           path: |
             /tmp/datacrumbs-logs
             /tmp/datacrumbs-traces

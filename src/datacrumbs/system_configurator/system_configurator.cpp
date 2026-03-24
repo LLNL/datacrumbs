@@ -38,11 +38,15 @@ void SystemConfigurator::enforce_secret_ownership_and_mode() const {
 void SystemConfigurator::add_system_configuration(json_object* root) const {
   std::string job_other_flags;
   std::string inclusion_paths;
+  std::string probe_signing_disabled = "0";
 #ifdef DATACRUMBS_JOB_OTHER_FLAGS
   job_other_flags = optional_macro_string(DATACRUMBS_JOB_OTHER_FLAGS);
 #endif
 #ifdef DATACRUMBS_INCLUSION_PATHS
   inclusion_paths = optional_macro_string(DATACRUMBS_INCLUSION_PATHS);
+#endif
+#ifdef DATACRUMBS_DISABLE_PROBE_SIGNING
+  probe_signing_disabled = "1";
 #endif
 
   const std::unordered_map<std::string, std::string> values = {
@@ -72,6 +76,7 @@ void SystemConfigurator::add_system_configuration(json_object* root) const {
       {"DATACRUMBS_KERNEL_UNAME_R", DATACRUMBS_KERNEL_UNAME_R},
       {"DATACRUMBS_KERNEL_HEADERS_PATH", DATACRUMBS_KERNEL_HEADERS_PATH},
       {"DATACRUMBS_LIBC_SO", DATACRUMBS_LIBC_SO},
+      {"DATACRUMBS_DISABLE_PROBE_SIGNING", probe_signing_disabled},
   };
 
   for (const auto& [key, value] : values) {
