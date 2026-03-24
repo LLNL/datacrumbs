@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -23,6 +24,14 @@ std::string SystemConfigurator::current_hostname() const {
 void SystemConfigurator::add_string(json_object* root, const char* key,
                                     const std::string& value) const {
   json_object_object_add(root, key, json_object_new_string(value.c_str()));
+}
+
+std::string SystemConfigurator::system_configuration_path() const {
+  const char* override_path = std::getenv("DATACRUMBS_SYSTEM_PROBE_FILE_OVERRIDE");
+  if (override_path != nullptr && override_path[0] != '\0') {
+    return std::string(override_path);
+  }
+  return DATACRUMBS_SYSTEM_PROBE_FILE;
 }
 
 std::string SystemConfigurator::optional_macro_string(const char* value) const {
@@ -98,8 +107,10 @@ int SystemConfigurator::run() {
       DC_LOG_WARN("Skipping probe signing secret creation during non-root configuration pass");
     }
 
-    if (std::filesystem::exists(DATACRUMBS_SYSTEM_PROBE_FILE)) {
-      DC_LOG_INFO("System configuration already exists at: %s", DATACRUMBS_SYSTEM_PROBE_FILE);
+    const std::string system_configuration_path = this->system_configuration_path();
+    if (std::filesystem::exists(system_configuration_path)) {
+      DC_LOG_INFO("System configuration already exists at: %s",
+                  system_configuration_path.c_str());
       if (secret_ready) {
         DC_LOG_INFO("Probe signing secret ensured at: %s",
                     datacrumbs::probe_file::secret_path().string().c_str());
@@ -120,7 +131,7 @@ int SystemConfigurator::run() {
     add_string(summary, "config_path", DATACRUMBS_INSTALL_CONFIGS_DIR);
     add_string(summary, "trace_log_dir", DATACRUMBS_CONFIGURED_TRACE_DIR);
     add_string(summary, "data_dir", DATACRUMBS_INSTALL_SHARED_DATA_DIR);
-    add_string(summary, "system_probe_path", DATACRUMBS_SYSTEM_PROBE_FILE);
+    add_string(summary, "system_probe_path", system_configuration_path);
     add_string(summary, "hostname", hostname);
     add_string(summary, "user", DATACRUMBS_USER);
     add_string(summary, "install_user", DATACRUMBS_INSTALL_USER);
@@ -128,15 +139,16 @@ int SystemConfigurator::run() {
 
     const char* json_payload = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PLAIN);
     const bool ok =
-        datacrumbs::probe_file::write_gzip_file(DATACRUMBS_SYSTEM_PROBE_FILE, json_payload);
+        datacrumbs::probe_file::write_gzip_file(system_configuration_path, json_payload);
     json_object_put(root);
 
     if (!ok) {
-      DC_LOG_ERROR("Failed to write system configuration file: %s", DATACRUMBS_SYSTEM_PROBE_FILE);
+      DC_LOG_ERROR("Failed to write system configuration file: %s",
+                   system_configuration_path.c_str());
       return 1;
     }
 
-    DC_LOG_INFO("System configuration written to: %s", DATACRUMBS_SYSTEM_PROBE_FILE);
+    DC_LOG_INFO("System configuration written to: %s", system_configuration_path.c_str());
     if (secret_ready) {
       DC_LOG_INFO("Probe signing secret ensured at: %s",
                   datacrumbs::probe_file::secret_path().string().c_str());

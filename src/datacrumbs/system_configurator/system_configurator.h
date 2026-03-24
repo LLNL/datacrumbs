@@ -11,6 +11,7 @@ class SystemConfigurator {
 
  private:
   std::string current_hostname() const;
+  std::string system_configuration_path() const;
   void add_string(json_object* root, const char* key, const std::string& value) const;
   std::string optional_macro_string(const char* value) const;
   void enforce_secret_ownership_and_mode() const;
