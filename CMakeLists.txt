@@ -156,6 +156,9 @@ set(DATACRUMBS_PROBE_SECRET_FILE
 set(DATACRUMBS_SIGN_PROBES_SOCKET_PATH
     "${DATACRUMBS_INSTALL_SHARED_DATA_DIR}/datacrumbs-sign-probes.sock"
 )
+set(DATACRUMBS_UTILS_SYSTEM_CONFIGURATION_FILE
+    "${CMAKE_BINARY_DIR}/configs/datacrumbs-system-configuration.json.gz"
+)
 set(DATACRUMBS_TRACE_DIR_PATTERN "${DATACRUMBS_CONFIGURED_TRACE_DIR}/%YY%/%MM%/%DD%")
 set(DATACRUMBS_CLIENT_LIB "${DATACRUMBS_UTILS_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libdatacrumbs_client.so")
 set(DATACRUMBS_JOB_SCHEDULER "${DATACRUMBS_SCHEDULER_TYPE}")
@@ -310,6 +313,8 @@ ExternalProject_Add(
     "-DCMAKE_SYSTEMD_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME}/systemd"
     "-DDATACRUMBS_PROJECT_PATH=${CMAKE_CURRENT_SOURCE_DIR}"
     "-DDATACRUMBS_UTILS_PROJECT_PATH=<SOURCE_DIR>"
+    "-DDATACRUMBS_BUILD_SYSTEM_CONFIGURATION_FILE=${DATACRUMBS_UTILS_SYSTEM_CONFIGURATION_FILE}"
+    "-DDATACRUMBS_INSTALL_DIR=${CMAKE_INSTALL_PREFIX}"
     "-DDATACRUMBS_HOST=${DATACRUMBS_HOST}"
     "-DDATACRUMBS_USER=${DATACRUMBS_USER}"
     "-DDATACRUMBS_INSTALL_USER=${DATACRUMBS_INSTALL_USER}"
@@ -363,10 +368,21 @@ set(DATACRUMBS_SIGN_PROBES_SERVICE_SRC
 
 add_executable(datacrumbs_system_configurator ${DATACRUMBS_SYSTEM_CONFIGURATOR_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(datacrumbs_system_configurator ${DEPENDENCY_LIB})
-add_dependencies(datacrumbs_system_configurator datacrumbs_utils_install)
 install(TARGETS datacrumbs_system_configurator
     RUNTIME DESTINATION "${DATACRUMBS_INSTALL_BINARYDIR}"
 )
+
+add_custom_target(
+    generate_utils_system_configuration
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/configs
+    COMMAND
+      ${CMAKE_COMMAND} -E env
+      DATACRUMBS_SYSTEM_PROBE_FILE_OVERRIDE=${DATACRUMBS_UTILS_SYSTEM_CONFIGURATION_FILE}
+      $<TARGET_FILE:datacrumbs_system_configurator>
+    DEPENDS datacrumbs_system_configurator
+    COMMENT "Generating build-tree system configuration for datacrumbs-utils"
+)
+add_dependencies(datacrumbs_utils_external generate_utils_system_configuration)
 
 add_executable(datacrumbs_sign_probes ${DATACRUMBS_SIGN_PROBES_SERVICE_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(datacrumbs_sign_probes ${DEPENDENCY_LIB})
@@ -384,7 +400,7 @@ add_custom_target(
     -DDATACRUMBS_SYSTEM_CONFIGURATOR_BIN=$<TARGET_FILE:datacrumbs_system_configurator>
     -P
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_system_configurator_if_missing.cmake
-    DEPENDS datacrumbs_system_configurator datacrumbs_utils_install
+    DEPENDS datacrumbs_system_configurator
     COMMENT "Generating install-time system configuration and probe secret"
 )
 
