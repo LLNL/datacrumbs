@@ -6,6 +6,6 @@ if source @DATACRUMBS_INSTALL_SBINARYDIR@/datacrumbs_service_common.sh; then
   umask 022
   write_service_env_file "${DATACRUMBS_SERVICE_ENV_FILE}" "${DATACRUMBS_PROBE_FILE}"
   log_system "Starting datacrumbs@${DATACRUMBS_SERVICE_RUN_ID}.service with ${DATACRUMBS_PROBE_FILE}"
-  systemctl_cmd start "datacrumbs@${DATACRUMBS_SERVICE_RUN_ID}.service"
+  systemctl_cmd enable --now "datacrumbs@${DATACRUMBS_SERVICE_RUN_ID}.service"
 fi
 exit 0

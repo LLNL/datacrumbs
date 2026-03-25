@@ -15,11 +15,18 @@ jobs:
       with:
         path: datacrumbs
 
+    - name: Resolve compatible datacrumbs-utils ref
+      run: |
+        set -euo pipefail
+        cmake -DOUTPUT="${RUNNER_TEMP}/datacrumbs-utils-compatibility.env" \
+          -P "${GITHUB_WORKSPACE}/datacrumbs/cmake/write_datacrumbs_utils_compatibility_env.cmake"
+        cat "${RUNNER_TEMP}/datacrumbs-utils-compatibility.env" >> "${GITHUB_ENV}"
+
     - name: Checkout datacrumbs-utils
       uses: actions/checkout@v4
       with:
-        repository: llnl/datacrumbs-utils
-        ref: main
+        repository: ${{ env.DATACRUMBS_UTILS_COMPATIBLE_REPOSITORY }}
+        ref: ${{ env.DATACRUMBS_UTILS_COMPATIBLE_REF }}
         fetch-depth: 1
         path: datacrumbs-utils
 

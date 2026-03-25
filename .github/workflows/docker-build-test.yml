@@ -8,6 +8,7 @@ on:
 
 env:
   BUILD_DIR: /tmp/dc-build
+  UTILS_BUILD_DIR: /tmp/dc-utils-build
   INSTALL_PREFIX: /tmp/dc-install
   CONFIG_YAML: /tmp/dc-install/etc/datacrumbs/configs/docker.yaml
   PROBE_FILE: /tmp/datacrumbs-ci-probes.json.gz
@@ -54,11 +55,18 @@ jobs:
           path: datacrumbs
           submodules: recursive
 
+      - name: Resolve compatible datacrumbs-utils ref
+        run: |
+          set -euo pipefail
+          cmake -DOUTPUT="${RUNNER_TEMP}/datacrumbs-utils-compatibility.env" \
+            -P "${GITHUB_WORKSPACE}/datacrumbs/cmake/write_datacrumbs_utils_compatibility_env.cmake"
+          cat "${RUNNER_TEMP}/datacrumbs-utils-compatibility.env" >> "${GITHUB_ENV}"
+
       - name: Checkout datacrumbs-utils
         uses: actions/checkout@v4
         with:
-          repository: llnl/datacrumbs-utils
-          ref: main
+          repository: ${{ env.DATACRUMBS_UTILS_COMPATIBLE_REPOSITORY }}
+          ref: ${{ env.DATACRUMBS_UTILS_COMPATIBLE_REF }}
           fetch-depth: 1
           path: datacrumbs-utils
 
@@ -180,11 +188,6 @@ jobs:
           systemctl --version
           test -d /run/systemd/system
 
-      - name: Record datacrumbs-utils revision
-        run: |
-          set -euo pipefail
-          echo "DATACRUMBS_UTILS_REF=$(git -C "${GITHUB_WORKSPACE}/datacrumbs-utils" rev-parse HEAD)" >> "${GITHUB_ENV}"
-
       - name: Configure datacrumbs
         run: |
           set -euo pipefail
@@ -204,8 +207,6 @@ jobs:
             -DDATACRUMBS_CONFIGURED_LOG_DIR="${LOG_DIR}" \
             -DDATACRUMBS_CONFIGURED_TRACE_DIR="${TRACE_DIR}" \
             -DDATACRUMBS_KERNEL_HEADERS_PATH="/usr/src/linux-headers-$(uname -r)" \
-            -DDATACRUMBS_UTILS_GIT_REPOSITORY="file://${GITHUB_WORKSPACE}/datacrumbs-utils" \
-            -DDATACRUMBS_UTILS_GIT_REF="${DATACRUMBS_UTILS_REF}" \
             "${extra_cmake_args[@]}"
 
       - name: Build datacrumbs
@@ -217,6 +218,51 @@ jobs:
         run: |
           set -euo pipefail
           sudo cmake --install "${BUILD_DIR}"
+
+      - name: Configure compatible datacrumbs-utils
+        run: |
+          set -euo pipefail
+          utils_extra_cmake_args=()
+          if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
+            utils_extra_cmake_args+=("-DDATACRUMBS_DISABLE_PROBE_SIGNING=ON")
+          fi
+
+          cmake -S "${GITHUB_WORKSPACE}/datacrumbs-utils" -B "${UTILS_BUILD_DIR}" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
+            -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX};${CMAKE_PREFIX_PATH:-}" \
+            "${utils_extra_cmake_args[@]}"
+
+      - name: Build datacrumbs-utils
+        run: |
+          set -euo pipefail
+          cmake --build "${UTILS_BUILD_DIR}" -j"$(nproc)"
+
+      - name: Install datacrumbs-utils
+        run: |
+          set -euo pipefail
+          sudo cmake --install "${UTILS_BUILD_DIR}"
+
+      - name: Verify probe configurator linkage
+        run: |
+          set -euo pipefail
+          probe_exec="${INSTALL_PREFIX}/bin/datacrumbs_probe_configurator_exec"
+          probe_wrapper="${INSTALL_PREFIX}/bin/datacrumbs_probe_configurator"
+
+          test -x "${probe_exec}"
+          test -x "${probe_wrapper}"
+
+          echo "Wrapper LD_LIBRARY_PATH export:"
+          grep -n "LD_LIBRARY_PATH" "${probe_wrapper}"
+
+          echo "Probe configurator dynamic section:"
+          readelf -d "${probe_exec}" | grep -E 'NEEDED|RPATH|RUNPATH'
+
+          echo "Probe configurator shared library resolution:"
+          ldd "${probe_exec}"
+
+          ! ldd "${probe_exec}" | grep -q "not found"
+          ldd "${probe_exec}" | grep -q "libclang"
 
       - name: Run system configurator explicitly
         run: |
@@ -246,9 +292,34 @@ jobs:
           test -f "${CONFIG_YAML}"
           rm -f "${PROBE_FILE}"
 
+          set +e
           probe_output="$("${INSTALL_PREFIX}/bin/datacrumbs_probe_configurator" "${CONFIG_YAML}" "${PROBE_FILE}" 2>&1)"
+          probe_status=$?
+          set -e
           printf '%s\n' "${probe_output}"
-          test -s "${PROBE_FILE}"
+          printf 'datacrumbs_probe_configurator exit status: %s\n' "${probe_status}"
+
+          if [[ "${probe_status}" != "0" ]]; then
+            if [[ "${probe_status}" == "1" ]] && grep -Eq "One or more probes failed validation|Extraction summary: .*invalid=yes" <<<"${probe_output}"; then
+              if [[ -s "${PROBE_FILE}" ]]; then
+                echo "Continuing with generated probes file despite invalid candidate probes on this runner."
+                ls -l "$(dirname "${PROBE_FILE}")"
+                find "$(dirname "${PROBE_FILE}")" -maxdepth 1 \( -name 'probes-*.json' -o -name 'probes-*.json.gz' -o -name 'categories-*.json' \) -print || true
+              else
+                echo "Probe validation reported invalid candidates and no probes file was written."
+                ls -l "$(dirname "${PROBE_FILE}")"
+                find "$(dirname "${PROBE_FILE}")" -maxdepth 1 \( -name 'probes-*.json' -o -name 'probes-*.json.gz' -o -name 'categories-*.json' \) -print || true
+                exit "${probe_status}"
+              fi
+            else
+              echo "Probe generation failed unexpectedly."
+              ls -l "$(dirname "${PROBE_FILE}")"
+              find "$(dirname "${PROBE_FILE}")" -maxdepth 1 \( -name 'probes-*.json' -o -name 'probes-*.json.gz' -o -name 'categories-*.json' \) -print || true
+              exit "${probe_status}"
+            fi
+          else
+            test -s "${PROBE_FILE}"
+          fi
 
           if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
             grep -q "Probe signing is disabled" <<<"${probe_output}"

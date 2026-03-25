@@ -21,7 +21,7 @@ class SignProbesService {
   bool is_authorized_client(int client_fd, std::string* error) const;
 
   std::filesystem::path socket_path_;
-  std::filesystem::path allowed_client_executable_;
+  std::string allowed_client_executable_name_;
   int server_fd_ = -1;
 };
 

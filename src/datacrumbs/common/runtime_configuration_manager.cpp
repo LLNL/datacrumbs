@@ -4,6 +4,7 @@
 #include <datacrumbs/common/singleton.h>
 #include <json-c/json.h>
 #include <pwd.h>
+#include <sqlite3.h>
 #include <sys/resource.h>
 #include <unistd.h>
 
@@ -16,12 +17,19 @@
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
+#include <unordered_map>
 
 namespace datacrumbs {
 
 namespace {
 
 constexpr uint64_t kRuntimeProbeEventIdBase = 1000;
+constexpr int kSqliteBusyTimeoutMs = 5000;
+
+struct InvalidProbeBucket {
+  std::string group;
+  std::string scope_key;
+};
 
 std::string json_string_or_empty(json_object* root, const char* key) {
   json_object* value = nullptr;
@@ -30,6 +38,30 @@ std::string json_string_or_empty(json_object* root, const char* key) {
     return "";
   }
   return json_object_get_string(value);
+}
+
+std::unordered_map<std::string, std::string> load_sqlite_kv_table(
+    sqlite3* db, const char* table_name, const std::filesystem::path& database_path) {
+  std::unordered_map<std::string, std::string> values;
+  const std::string sql = std::string("SELECT key, value FROM ") + table_name + ";";
+  sqlite3_stmt* statement = nullptr;
+  if (sqlite3_prepare_v2(db, sql.c_str(), -1, &statement, nullptr) != SQLITE_OK) {
+    DC_LOG_WARN("[RuntimeConfigurationManager] Failed to query %s from %s: %s", table_name,
+                database_path.string().c_str(), sqlite3_errmsg(db));
+    return values;
+  }
+
+  while (sqlite3_step(statement) == SQLITE_ROW) {
+    const unsigned char* key = sqlite3_column_text(statement, 0);
+    const unsigned char* value = sqlite3_column_text(statement, 1);
+    if (!key || !value) {
+      continue;
+    }
+    values[reinterpret_cast<const char*>(key)] = reinterpret_cast<const char*>(value);
+  }
+
+  sqlite3_finalize(statement);
+  return values;
 }
 
 std::shared_ptr<Probe> probe_from_json(json_object* probe_obj) {
@@ -65,6 +97,83 @@ bool is_supported_runtime_probe_type(ProbeType type) {
     default:
       return false;
   }
+}
+
+InvalidProbeBucket invalid_probe_bucket(const std::shared_ptr<Probe>& probe) {
+  if (!probe) {
+    return {"unknown", ""};
+  }
+
+  switch (probe->type) {
+    case ProbeType::SYSCALLS:
+      return {"syscalls", ""};
+    case ProbeType::KPROBE:
+      return {"kprobes", ""};
+    case ProbeType::UPROBE: {
+      const auto uprobe = std::dynamic_pointer_cast<UProbe>(probe);
+      return {"binary", uprobe ? uprobe->binary_path : ""};
+    }
+    case ProbeType::USDT: {
+      const auto usdt = std::dynamic_pointer_cast<USDTProbe>(probe);
+      if (!usdt) {
+        return {"usdt", ""};
+      }
+      return {"usdt", usdt->binary_path + "\n" + usdt->provider};
+    }
+    default:
+      return {"unknown", ""};
+  }
+}
+
+bool sqlite_exec(sqlite3* db, const char* sql, const std::filesystem::path& path,
+                 const char* operation) {
+  char* error_message = nullptr;
+  const int rc = sqlite3_exec(db, sql, nullptr, nullptr, &error_message);
+  if (rc == SQLITE_OK) {
+    return true;
+  }
+
+  const char* sqlite_message = error_message ? error_message : sqlite3_errmsg(db);
+  DC_LOG_WARN("[RuntimeConfigurationManager] Failed to %s %s: %s", operation, path.string().c_str(),
+              sqlite_message ? sqlite_message : "unknown sqlite error");
+  if (error_message) {
+    sqlite3_free(error_message);
+  }
+  return false;
+}
+
+sqlite3* open_runtime_probe_state_database(const std::filesystem::path& database_path, int flags) {
+  sqlite3* db = nullptr;
+  if (sqlite3_open_v2(database_path.c_str(), &db, flags, nullptr) != SQLITE_OK) {
+    DC_LOG_WARN("[RuntimeConfigurationManager] Failed to open runtime probe state database %s: %s",
+                database_path.string().c_str(), db ? sqlite3_errmsg(db) : "sqlite open failed");
+    if (db) {
+      sqlite3_close(db);
+    }
+    return nullptr;
+  }
+
+  sqlite3_busy_timeout(db, kSqliteBusyTimeoutMs);
+  return db;
+}
+
+bool initialize_runtime_probe_state_database(sqlite3* db,
+                                             const std::filesystem::path& database_path) {
+  if (!sqlite_exec(db, "PRAGMA journal_mode=WAL;", database_path, "enable WAL mode")) {
+    return false;
+  }
+  if (!sqlite_exec(db, "PRAGMA synchronous=NORMAL;", database_path, "set synchronous mode")) {
+    return false;
+  }
+  return sqlite_exec(db,
+                     "CREATE TABLE IF NOT EXISTS runtime_probe_status ("
+                     "probe_group TEXT NOT NULL,"
+                     "scope_key TEXT NOT NULL,"
+                     "function_name TEXT NOT NULL,"
+                     "status TEXT NOT NULL CHECK (status IN ('invalid', 'successful')),"
+                     "PRIMARY KEY (probe_group, scope_key, function_name, status)"
+                     ");",
+                     database_path, "create runtime probe state table");
 }
 
 void ensure_directory_owned_by_install_user(const std::filesystem::path& directory) {
@@ -175,14 +284,12 @@ RuntimeConfigurationManager::RuntimeConfigurationManager() {
 RuntimeConfigurationManager::RuntimeConfigurationManager(
     const std::filesystem::path& runtime_probe_file, const std::string& explicit_run_id,
     const std::string& explicit_user, bool print)
-    : config_path(DATACRUMBS_CONFIG_PATH),
-      data_dir(DATACRUMBS_INSTALL_SHARED_DATA_DIR),
+    : data_dir(DATACRUMBS_INSTALL_SHARED_DATA_DIR),
       trace_log_dir(),
       probe_file_path(runtime_probe_file),
       system_probe_path(DATACRUMBS_SYSTEM_PROBE_FILE),
       server_run_dir(DATACRUMBS_SERVER_RUN_DIR),
       server_run_id_file(DATACRUMBS_SERVER_RUN_ID_FILE),
-      config_name(runtime_probe_file.stem().string()),
       user(explicit_user),
       log_dir(DATACRUMBS_LOG_DIR),
       run_id(explicit_run_id),
@@ -205,8 +312,6 @@ RuntimeConfigurationManager::RuntimeConfigurationManager(
 
 void RuntimeConfigurationManager::print_configurations() const {
   DC_LOG_INFO("[RuntimeConfigurationManager] Final configuration:");
-  DC_LOG_INFO("  Config path: %s", config_path.string().c_str());
-  DC_LOG_INFO("  Config name: %s", config_name.c_str());
   DC_LOG_INFO("  Trace log dir: %s", trace_log_dir.string().c_str());
   DC_LOG_INFO("  Trace file path: %s", trace_file_path.string().c_str());
   DC_LOG_INFO("  Trace dir pattern: %s",
@@ -214,7 +319,7 @@ void RuntimeConfigurationManager::print_configurations() const {
   DC_LOG_INFO("  Data dir: %s", data_dir.string().c_str());
   DC_LOG_INFO("  Probe file path: %s", probe_file_path.string().c_str());
   DC_LOG_INFO("  System probe path: %s", system_probe_path.string().c_str());
-  DC_LOG_INFO("  Invalid probe database: %s", invalid_probe_file_path.string().c_str());
+  DC_LOG_INFO("  Runtime probe state database: %s", runtime_probe_state_db_path.string().c_str());
   DC_LOG_INFO("  Run dir: %s", server_run_dir.string().c_str());
   DC_LOG_INFO("  Run ID file: %s", server_run_id_file.string().c_str());
   DC_LOG_INFO("  Ready file: %s", server_ready_file.string().c_str());
@@ -239,65 +344,56 @@ void RuntimeConfigurationManager::derive_configurations() {
   }
   ensure_directory_owned_by_install_user(trace_log_dir);
 
-  const std::string generated_file_suffix =
-      user + "-" + run_id + "-" + hostname + "-" + config_name;
-  const std::string lookup_file_suffix = std::string(DATACRUMBS_INSTALL_USER) + "-" + config_name;
+  const std::string probe_stem = probe_file_path.stem().string();
+  const std::string generated_file_suffix = user + "-" + run_id + "-" + hostname + "-" + probe_stem;
+  const std::string lookup_file_suffix = std::string(DATACRUMBS_INSTALL_USER) + "-" + hostname;
   trace_file_path = trace_log_dir / ("trace-" + generated_file_suffix + ".pfw.gz");
-  invalid_probe_file_path = data_dir / ("probes-invalid-" + lookup_file_suffix + ".json.gz");
+  runtime_probe_state_db_path =
+      data_dir / ("probes-runtime-status-" + lookup_file_suffix + ".sqlite");
   server_ready_file = server_run_dir / ("datacrumbs-" + run_id + ".ready");
 }
 
 void RuntimeConfigurationManager::load_runtime_system_configuration() {
-  const std::string payload = datacrumbs::probe_file::read_probe_payload(system_probe_path);
-  if (payload.empty()) {
-    throw std::runtime_error("Failed to read system probe file: " + system_probe_path.string());
+  sqlite3* db = open_runtime_probe_state_database(system_probe_path, SQLITE_OPEN_READONLY);
+  if (!db) {
+    throw std::runtime_error("Failed to open system configuration database: " +
+                             system_probe_path.string());
   }
 
-  json_object* root = json_tokener_parse(payload.c_str());
-  if (!root || json_object_get_type(root) != json_type_object) {
-    if (root) json_object_put(root);
-    throw std::runtime_error("Failed to parse system probe file: " + system_probe_path.string());
+  const auto summary = load_sqlite_kv_table(db, "summary", system_probe_path);
+  const auto system_configuration =
+      load_sqlite_kv_table(db, "system_configuration", system_probe_path);
+  sqlite3_close(db);
+
+  if (const auto it = summary.find("trace_log_dir");
+      it != summary.end() && trace_dir_pattern.empty() && !it->second.empty()) {
+    trace_log_dir = it->second;
   }
 
-  json_object* summary = nullptr;
-  json_object* system_configuration = nullptr;
-  if (json_object_object_get_ex(root, "summary", &summary) &&
-      json_object_get_type(summary) == json_type_object) {
-    const std::string imported_config_path = json_string_or_empty(summary, "config_path");
-    const std::string imported_trace_dir = json_string_or_empty(summary, "trace_log_dir");
-    const std::string imported_config_name = json_string_or_empty(summary, "config_name");
-    if (!imported_config_path.empty()) config_path = imported_config_path;
-    if (trace_dir_pattern.empty() && !imported_trace_dir.empty())
-      trace_log_dir = imported_trace_dir;
-    if (!imported_config_name.empty()) config_name = imported_config_name;
+  if (const auto it = system_configuration.find("DATACRUMBS_LOG_DIR");
+      it != system_configuration.end() && !it->second.empty()) {
+    log_dir = it->second;
   }
-
-  if (json_object_object_get_ex(root, "system_configuration", &system_configuration) &&
-      json_object_get_type(system_configuration) == json_type_object) {
-    const std::string imported_log_dir =
-        json_string_or_empty(system_configuration, "DATACRUMBS_LOG_DIR");
-    const std::string imported_data_dir =
-        json_string_or_empty(system_configuration, "DATACRUMBS_INSTALL_DATA_DIR");
-    const std::string imported_inclusion_paths =
-        json_string_or_empty(system_configuration, "DATACRUMBS_INCLUSION_PATHS");
-    const std::string imported_trace_dir_pattern =
-        json_string_or_empty(system_configuration, "DATACRUMBS_TRACE_DIR_PATTERN");
-    const std::string imported_run_dir =
-        json_string_or_empty(system_configuration, "DATACRUMBS_SERVER_RUN_DIR");
-    const std::string imported_run_id_file =
-        json_string_or_empty(system_configuration, "DATACRUMBS_SERVER_RUN_ID_FILE");
-
-    if (!imported_log_dir.empty()) log_dir = imported_log_dir;
-    if (!imported_data_dir.empty()) data_dir = imported_data_dir;
-    if (!imported_trace_dir_pattern.empty()) trace_dir_pattern = imported_trace_dir_pattern;
-    if (!imported_run_dir.empty()) server_run_dir = imported_run_dir;
-    if (!imported_run_id_file.empty()) server_run_id_file = imported_run_id_file;
-    if (inclusion_paths.empty() && !imported_inclusion_paths.empty()) {
-      inclusion_paths = imported_inclusion_paths;
-    }
+  if (const auto it = system_configuration.find("DATACRUMBS_INSTALL_DATA_DIR");
+      it != system_configuration.end() && !it->second.empty()) {
+    data_dir = it->second;
   }
-
-  json_object_put(root);
+  if (const auto it = system_configuration.find("DATACRUMBS_INCLUSION_PATHS");
+      it != system_configuration.end() && inclusion_paths.empty() && !it->second.empty()) {
+    inclusion_paths = it->second;
+  }
+  if (const auto it = system_configuration.find("DATACRUMBS_TRACE_DIR_PATTERN");
+      it != system_configuration.end() && !it->second.empty()) {
+    trace_dir_pattern = it->second;
+  }
+  if (const auto it = system_configuration.find("DATACRUMBS_SERVER_RUN_DIR");
+      it != system_configuration.end() && !it->second.empty()) {
+    server_run_dir = it->second;
+  }
+  if (const auto it = system_configuration.find("DATACRUMBS_SERVER_RUN_ID_FILE");
+      it != system_configuration.end() && !it->second.empty()) {
+    server_run_id_file = it->second;
+  }
 }
 
 void RuntimeConfigurationManager::load_runtime_probe_file() {
@@ -315,7 +411,8 @@ void RuntimeConfigurationManager::load_runtime_probe_file() {
   runtime_event_ids.clear();
   runtime_event_metadata.clear();
   invalid_runtime_probes.clear();
-  load_invalid_runtime_probes();
+  successful_runtime_probes.clear();
+  load_runtime_probe_state();
 
   size_t total_runtime_functions = 0;
   size_t skipped_known_invalid_functions = 0;
@@ -340,7 +437,7 @@ void RuntimeConfigurationManager::load_runtime_probe_file() {
     std::vector<std::string> filtered_functions;
     filtered_functions.reserve(probe->functions.size());
     for (const auto& function_name : probe->functions) {
-      if (is_known_invalid_runtime_probe(probe->name, function_name)) {
+      if (is_known_invalid_runtime_probe(probe, function_name)) {
         ++skipped_known_invalid_functions;
         continue;
       }
@@ -370,7 +467,7 @@ void RuntimeConfigurationManager::load_runtime_probe_file() {
     DC_LOG_WARN(
         "[RuntimeConfigurationManager] Skipped %zu known invalid runtime probe functions "
         "using %s",
-        skipped_known_invalid_functions, invalid_probe_file_path.string().c_str());
+        skipped_known_invalid_functions, runtime_probe_state_db_path.string().c_str());
   }
 
   if (total_runtime_functions > DATACRUMBS_MAX_RUNTIME_FUNCTIONS) {
@@ -383,104 +480,203 @@ void RuntimeConfigurationManager::load_runtime_probe_file() {
   }
 }
 
-void RuntimeConfigurationManager::load_invalid_runtime_probes() {
-  if (invalid_probe_file_path.empty() || !std::filesystem::exists(invalid_probe_file_path)) {
+void RuntimeConfigurationManager::load_runtime_probe_state() {
+  if (runtime_probe_state_db_path.empty() ||
+      !std::filesystem::exists(runtime_probe_state_db_path)) {
     return;
   }
 
-  const std::string content = datacrumbs::probe_file::read_probe_payload(invalid_probe_file_path);
-  if (content.empty()) {
-    DC_LOG_WARN("[RuntimeConfigurationManager] Failed to read invalid probe database: %s",
-                invalid_probe_file_path.string().c_str());
-    return;
-  }
-  json_object* root = json_tokener_parse(content.c_str());
-  if (!root || json_object_get_type(root) != json_type_array) {
-    if (root) json_object_put(root);
-    DC_LOG_WARN("[RuntimeConfigurationManager] Invalid invalid probe database format: %s",
-                invalid_probe_file_path.string().c_str());
+  sqlite3* db =
+      open_runtime_probe_state_database(runtime_probe_state_db_path, SQLITE_OPEN_READONLY);
+  if (!db) {
     return;
   }
 
-  const int arr_len = json_object_array_length(root);
-  for (int i = 0; i < arr_len; ++i) {
-    json_object* probe_obj = json_object_array_get_idx(root, i);
-    if (!probe_obj) continue;
+  sqlite3_stmt* statement = nullptr;
+  const char* sql =
+      "SELECT probe_group, scope_key, function_name, status FROM runtime_probe_status;";
+  if (sqlite3_prepare_v2(db, sql, -1, &statement, nullptr) != SQLITE_OK) {
+    DC_LOG_WARN("[RuntimeConfigurationManager] Failed to query runtime probe state database %s: %s",
+                runtime_probe_state_db_path.string().c_str(), sqlite3_errmsg(db));
+    sqlite3_close(db);
+    return;
+  }
 
-    json_object* name_obj = nullptr;
-    json_object* functions_obj = nullptr;
-    if (!json_object_object_get_ex(probe_obj, "name", &name_obj) ||
-        !json_object_object_get_ex(probe_obj, "functions", &functions_obj) ||
-        json_object_get_type(name_obj) != json_type_string ||
-        json_object_get_type(functions_obj) != json_type_array) {
+  while (sqlite3_step(statement) == SQLITE_ROW) {
+    const unsigned char* probe_group = sqlite3_column_text(statement, 0);
+    const unsigned char* scope_key = sqlite3_column_text(statement, 1);
+    const unsigned char* function_name = sqlite3_column_text(statement, 2);
+    const unsigned char* status = sqlite3_column_text(statement, 3);
+    if (!probe_group || !scope_key || !function_name || !status) {
       continue;
     }
-
-    auto& function_set = invalid_runtime_probes[std::string(json_object_get_string(name_obj))];
-    const int function_count = json_object_array_length(functions_obj);
-    for (int j = 0; j < function_count; ++j) {
-      json_object* function_obj = json_object_array_get_idx(functions_obj, j);
-      if (function_obj && json_object_get_type(function_obj) == json_type_string) {
-        function_set.insert(json_object_get_string(function_obj));
-      }
-    }
+    auto& target = std::string(reinterpret_cast<const char*>(status)) == "successful"
+                       ? successful_runtime_probes
+                       : invalid_runtime_probes;
+    target[reinterpret_cast<const char*>(probe_group)][reinterpret_cast<const char*>(scope_key)]
+        .insert(reinterpret_cast<const char*>(function_name));
   }
 
-  json_object_put(root);
+  sqlite3_finalize(statement);
+  sqlite3_close(db);
 }
 
 bool RuntimeConfigurationManager::is_known_invalid_runtime_probe(
-    const std::string& probe_name, const std::string& function_name) const {
-  const auto probe_it = invalid_runtime_probes.find(probe_name);
-  if (probe_it == invalid_runtime_probes.end()) {
+    const std::shared_ptr<Probe>& probe, const std::string& function_name) const {
+  const auto bucket = invalid_probe_bucket(probe);
+  const auto group_it = invalid_runtime_probes.find(bucket.group);
+  if (group_it == invalid_runtime_probes.end()) {
     return false;
   }
-  return probe_it->second.find(function_name) != probe_it->second.end();
+  const auto scope_it = group_it->second.find(bucket.scope_key);
+  if (scope_it == group_it->second.end()) {
+    return false;
+  }
+  const auto successful_group_it = successful_runtime_probes.find(bucket.group);
+  if (successful_group_it != successful_runtime_probes.end()) {
+    const auto successful_scope_it = successful_group_it->second.find(bucket.scope_key);
+    if (successful_scope_it != successful_group_it->second.end() &&
+        successful_scope_it->second.find(function_name) != successful_scope_it->second.end()) {
+      return false;
+    }
+  }
+  return scope_it->second.find(function_name) != scope_it->second.end();
 }
 
-void RuntimeConfigurationManager::record_invalid_runtime_probe(const std::string& probe_name,
+void RuntimeConfigurationManager::record_invalid_runtime_probe(const std::shared_ptr<Probe>& probe,
                                                                const std::string& function_name) {
-  invalid_runtime_probes[probe_name].insert(function_name);
+  const auto bucket = invalid_probe_bucket(probe);
+  invalid_runtime_probes[bucket.group][bucket.scope_key].insert(function_name);
 }
 
-void RuntimeConfigurationManager::persist_invalid_runtime_probes() const {
-  if (invalid_probe_file_path.empty()) {
+void RuntimeConfigurationManager::record_successful_runtime_probe(
+    const std::shared_ptr<Probe>& probe, const std::string& function_name) {
+  const auto bucket = invalid_probe_bucket(probe);
+  successful_runtime_probes[bucket.group][bucket.scope_key].insert(function_name);
+
+  const auto invalid_group_it = invalid_runtime_probes.find(bucket.group);
+  if (invalid_group_it == invalid_runtime_probes.end()) {
+    return;
+  }
+  const auto invalid_scope_it = invalid_group_it->second.find(bucket.scope_key);
+  if (invalid_scope_it == invalid_group_it->second.end()) {
+    return;
+  }
+
+  invalid_scope_it->second.erase(function_name);
+  if (invalid_scope_it->second.empty()) {
+    invalid_group_it->second.erase(invalid_scope_it);
+  }
+  if (invalid_group_it->second.empty()) {
+    invalid_runtime_probes.erase(invalid_group_it);
+  }
+}
+
+void RuntimeConfigurationManager::persist_runtime_probe_state() const {
+  if (runtime_probe_state_db_path.empty()) {
     return;
   }
 
   std::error_code ec;
-  std::filesystem::create_directories(invalid_probe_file_path.parent_path(), ec);
+  std::filesystem::create_directories(runtime_probe_state_db_path.parent_path(), ec);
 
-  json_object* root = json_object_new_array();
-  for (const auto& [probe_name, functions] : invalid_runtime_probes) {
-    if (functions.empty()) {
-      continue;
-    }
-    json_object* probe_obj = json_object_new_object();
-    json_object_object_add(probe_obj, "name", json_object_new_string(probe_name.c_str()));
-    json_object* function_array = json_object_new_array();
-    std::vector<std::string> sorted_functions(functions.begin(), functions.end());
-    std::sort(sorted_functions.begin(), sorted_functions.end());
-    for (const auto& function_name : sorted_functions) {
-      json_object_array_add(function_array, json_object_new_string(function_name.c_str()));
-    }
-    json_object_object_add(probe_obj, "functions", function_array);
-    json_object_array_add(root, probe_obj);
-  }
-
-  const std::string payload = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY);
-  if (!datacrumbs::probe_file::write_gzip_file(invalid_probe_file_path, payload)) {
-    json_object_put(root);
-    DC_LOG_WARN("[RuntimeConfigurationManager] Failed to persist invalid probe database: %s",
-                invalid_probe_file_path.string().c_str());
+  sqlite3* db = open_runtime_probe_state_database(runtime_probe_state_db_path,
+                                                  SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
+  if (!db) {
     return;
   }
 
-  if (struct passwd* pwd = getpwnam(DATACRUMBS_INSTALL_USER); pwd != nullptr) {
-    chown(invalid_probe_file_path.c_str(), pwd->pw_uid, pwd->pw_gid);
+  if (!initialize_runtime_probe_state_database(db, runtime_probe_state_db_path)) {
+    sqlite3_close(db);
+    return;
   }
-  chmod(invalid_probe_file_path.c_str(), S_IRUSR | S_IWUSR);
-  json_object_put(root);
+  if (!sqlite_exec(db, "BEGIN IMMEDIATE TRANSACTION;", runtime_probe_state_db_path,
+                   "begin transaction")) {
+    sqlite3_close(db);
+    return;
+  }
+
+  sqlite3_stmt* insert_statement = nullptr;
+  const char* insert_sql =
+      "INSERT OR IGNORE INTO runtime_probe_status "
+      "(probe_group, scope_key, function_name, status) VALUES (?, ?, ?, ?);";
+  if (sqlite3_prepare_v2(db, insert_sql, -1, &insert_statement, nullptr) != SQLITE_OK) {
+    DC_LOG_WARN(
+        "[RuntimeConfigurationManager] Failed to prepare runtime probe state insert for %s: %s",
+        runtime_probe_state_db_path.string().c_str(), sqlite3_errmsg(db));
+    sqlite_exec(db, "ROLLBACK;", runtime_probe_state_db_path, "rollback transaction");
+    sqlite3_close(db);
+    return;
+  }
+
+  sqlite3_stmt* delete_invalid_statement = nullptr;
+  const char* delete_invalid_sql =
+      "DELETE FROM runtime_probe_status WHERE probe_group = ? AND scope_key = ? "
+      "AND function_name = ? AND status = 'invalid';";
+  if (sqlite3_prepare_v2(db, delete_invalid_sql, -1, &delete_invalid_statement, nullptr) !=
+      SQLITE_OK) {
+    DC_LOG_WARN(
+        "[RuntimeConfigurationManager] Failed to prepare runtime probe state cleanup for %s: %s",
+        runtime_probe_state_db_path.string().c_str(), sqlite3_errmsg(db));
+    sqlite3_finalize(insert_statement);
+    sqlite_exec(db, "ROLLBACK;", runtime_probe_state_db_path, "rollback transaction");
+    sqlite3_close(db);
+    return;
+  }
+
+  const auto insert_entries = [&](const auto& probe_sets, const char* status) {
+    for (const auto& [probe_group, scopes] : probe_sets) {
+      for (const auto& [scope_key, functions] : scopes) {
+        for (const auto& function_name : functions) {
+          sqlite3_reset(insert_statement);
+          sqlite3_clear_bindings(insert_statement);
+          sqlite3_bind_text(insert_statement, 1, probe_group.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(insert_statement, 2, scope_key.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(insert_statement, 3, function_name.c_str(), -1, SQLITE_TRANSIENT);
+          sqlite3_bind_text(insert_statement, 4, status, -1, SQLITE_STATIC);
+          if (sqlite3_step(insert_statement) != SQLITE_DONE) {
+            DC_LOG_WARN(
+                "[RuntimeConfigurationManager] Failed to persist %s runtime probe entry to %s: %s",
+                status, runtime_probe_state_db_path.string().c_str(), sqlite3_errmsg(db));
+          }
+        }
+      }
+    }
+  };
+
+  for (const auto& [probe_group, scopes] : successful_runtime_probes) {
+    for (const auto& [scope_key, functions] : scopes) {
+      for (const auto& function_name : functions) {
+        sqlite3_reset(delete_invalid_statement);
+        sqlite3_clear_bindings(delete_invalid_statement);
+        sqlite3_bind_text(delete_invalid_statement, 1, probe_group.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(delete_invalid_statement, 2, scope_key.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(delete_invalid_statement, 3, function_name.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(delete_invalid_statement) != SQLITE_DONE) {
+          DC_LOG_WARN(
+              "[RuntimeConfigurationManager] Failed to clear stale invalid runtime probe entry "
+              "from %s: %s",
+              runtime_probe_state_db_path.string().c_str(), sqlite3_errmsg(db));
+        }
+      }
+    }
+  }
+
+  insert_entries(successful_runtime_probes, "successful");
+  insert_entries(invalid_runtime_probes, "invalid");
+
+  sqlite3_finalize(delete_invalid_statement);
+  sqlite3_finalize(insert_statement);
+  if (!sqlite_exec(db, "COMMIT;", runtime_probe_state_db_path, "commit transaction")) {
+    sqlite3_close(db);
+    return;
+  }
+  sqlite3_close(db);
+
+  if (struct passwd* pwd = getpwnam(DATACRUMBS_INSTALL_USER); pwd != nullptr) {
+    chown(runtime_probe_state_db_path.c_str(), pwd->pw_uid, pwd->pw_gid);
+  }
+  chmod(runtime_probe_state_db_path.c_str(), S_IRUSR | S_IWUSR);
 }
 
 std::optional<uint64_t> RuntimeConfigurationManager::get_runtime_event_id(

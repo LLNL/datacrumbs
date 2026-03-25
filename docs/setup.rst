@@ -8,7 +8,8 @@ Environment and Module Setup
 ============================
 
 The user-facing setup helpers now live in `datacrumbs-utils`, but they are
-installed into the shared DataCrumbs prefix.
+installed into the shared DataCrumbs prefix by a separate `datacrumbs-utils`
+installation.
 
 Typical setup:
 
@@ -34,7 +35,7 @@ At runtime, `datacrumbs` needs:
 
 Those installed files are:
 
-- `<install-prefix>/share/datacrumbs/data/system-probe-<install-user>-<host>.json.gz`
+- `<install-prefix>/share/datacrumbs/data/system-probe-<install-user>-<host>.sqlite`
 - `<install-prefix>/share/datacrumbs/data/.datacrumbs-probe-secret`
 
 On login nodes, probe generation also depends on:
@@ -93,17 +94,19 @@ redirected to:
 
     ${DATACRUMBS_LOG_DIR}/datacrumbs_${DATACRUMBS_USER}_${DATACRUMBS_SERVICE_RUN_ID}_$(hostname).log
 
-Runtime-Detected Invalid Probes
-===============================
+Runtime Probe Status Database
+=============================
 
-Failed runtime attach targets are recorded to a compressed invalid-probe
-database:
+Runtime attach results are recorded to a SQLite status database:
 
 .. code-block:: text
 
-    <install-prefix>/share/datacrumbs/data/probes-invalid-<install-user>-<config-name>.json.gz
+    <install-prefix>/share/datacrumbs/data/probes-runtime-status-<install-user>-<config-name>.sqlite
 
-This file is written with mode `0400` and owned by `root`.
+The database stores both failed and successful runtime attach targets. Failed
+targets are skipped on later runs, and a later successful attach removes any
+stale failed mark for the same target. This file is written with mode `0600`
+and owned by the datacrumbs install user.
 
 Probe signing service
 =====================
