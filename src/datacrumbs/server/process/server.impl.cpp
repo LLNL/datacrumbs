@@ -175,7 +175,7 @@ static int attach_runtime_probes(datacrumbs::EventProcessor* event_processor,
   int total_attached = 0;
   int total_failed = 0;
   uint64_t cookie = 1;
-  bool invalid_probe_database_updated = false;
+  bool runtime_probe_state_updated = false;
 
   for (const auto& probe : config_manager->runtime_probes) {
     for (const auto& function_name : probe->functions) {
@@ -207,11 +207,13 @@ static int attach_runtime_probes(datacrumbs::EventProcessor* event_processor,
         auto* exit_link =
             bpf_program__attach_kprobe_opts(kprobe_exit, function_name.c_str(), &exit_opts);
         if (libbpf_get_error(entry_link) || libbpf_get_error(exit_link)) {
-          config_manager->record_invalid_runtime_probe(probe->name, function_name);
-          invalid_probe_database_updated = true;
+          config_manager->record_invalid_runtime_probe(probe, function_name);
+          runtime_probe_state_updated = true;
           total_failed += 2;
           continue;
         }
+        config_manager->record_successful_runtime_probe(probe, function_name);
+        runtime_probe_state_updated = true;
         total_attached += 2;
       } else if (probe->type == datacrumbs::ProbeType::SYSCALLS) {
         total_requested += 2;
@@ -232,11 +234,13 @@ static int attach_runtime_probes(datacrumbs::EventProcessor* event_processor,
         auto* exit_link =
             bpf_program__attach_ksyscall(syscall_exit, function_name.c_str(), &exit_opts);
         if (libbpf_get_error(entry_link) || libbpf_get_error(exit_link)) {
-          config_manager->record_invalid_runtime_probe(probe->name, function_name);
-          invalid_probe_database_updated = true;
+          config_manager->record_invalid_runtime_probe(probe, function_name);
+          runtime_probe_state_updated = true;
           total_failed += 2;
           continue;
         }
+        config_manager->record_successful_runtime_probe(probe, function_name);
+        runtime_probe_state_updated = true;
         total_attached += 2;
       } else if (probe->type == datacrumbs::ProbeType::UPROBE) {
         total_requested += 2;
@@ -271,11 +275,13 @@ static int attach_runtime_probes(datacrumbs::EventProcessor* event_processor,
         auto* exit_link = bpf_program__attach_uprobe_opts(
             uprobe_exit, -1, uprobe->binary_path.c_str(), offset, &exit_opts);
         if (libbpf_get_error(entry_link) || libbpf_get_error(exit_link)) {
-          config_manager->record_invalid_runtime_probe(probe->name, function_name);
-          invalid_probe_database_updated = true;
+          config_manager->record_invalid_runtime_probe(probe, function_name);
+          runtime_probe_state_updated = true;
           total_failed += 2;
           continue;
         }
+        config_manager->record_successful_runtime_probe(probe, function_name);
+        runtime_probe_state_updated = true;
         total_attached += 2;
       } else if (probe->type == datacrumbs::ProbeType::USDT) {
         total_requested += 2;
@@ -300,11 +306,13 @@ static int attach_runtime_probes(datacrumbs::EventProcessor* event_processor,
                                                           function_name.c_str(), &exit_opts)
                                : nullptr;
         if (!usdt || libbpf_get_error(entry_link) || libbpf_get_error(exit_link)) {
-          config_manager->record_invalid_runtime_probe(probe->name, function_name);
-          invalid_probe_database_updated = true;
+          config_manager->record_invalid_runtime_probe(probe, function_name);
+          runtime_probe_state_updated = true;
           total_failed += 2;
           continue;
         }
+        config_manager->record_successful_runtime_probe(probe, function_name);
+        runtime_probe_state_updated = true;
         total_attached += 2;
       } else {
         DC_LOG_WARN("Skipping unsupported runtime probe type %d for %s",
@@ -314,8 +322,8 @@ static int attach_runtime_probes(datacrumbs::EventProcessor* event_processor,
     }
   }
 
-  if (invalid_probe_database_updated) {
-    config_manager->persist_invalid_runtime_probes();
+  if (runtime_probe_state_updated) {
+    config_manager->persist_runtime_probe_state();
   }
 
   DC_LOG_INFO("Runtime probe attachment summary: requested=%d attached=%d failed=%d",

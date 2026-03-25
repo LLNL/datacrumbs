@@ -13,8 +13,7 @@ The supported production path is scheduler-managed systemd service startup.
 At a high level:
 
 1. install `datacrumbs`
-2. let `datacrumbs` bootstrap and install `datacrumbs-utils` into the same
-   prefix
+2. install `datacrumbs-utils` separately into the same prefix
 3. register `datacrumbs@.service` on compute nodes
 4. register `datacrumbs_sign_probes.service` on login nodes
 5. install Flux or SLURM prolog and epilog hooks
@@ -31,7 +30,7 @@ Key files provided by the install:
 - `<install-prefix>/etc/datacrumbs/systemd/datacrumbs_sign_probes.service`
 - `<install-prefix>/sbin/datacrumbs_service_run.sh`
 - `<install-prefix>/sbin/datacrumbs_service_stop.sh`
-- `<install-prefix>/share/datacrumbs/data/system-probe-<install-user>-<host>.json.gz`
+- `<install-prefix>/share/datacrumbs/data/system-probe-<install-user>-<host>.sqlite`
 - `<install-prefix>/share/datacrumbs/data/.datacrumbs-probe-secret`
 
 Key utility assets installed into the same prefix:

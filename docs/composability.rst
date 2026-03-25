@@ -195,17 +195,18 @@ If the selection is too large:
 - the probe configurator fails when over the limit
 - runtime also rejects oversized probe files before attach
 
-Invalid probe carry-forward
-===========================
+Runtime probe state carry-forward
+=================================
 
-Runtime-discovered attach failures are stored in:
+Runtime-discovered attach results are stored in:
 
 .. code-block:: text
 
-    <install-prefix>/share/datacrumbs/data/probes-invalid-<install-user>-<config-name>.json.gz
+    <install-prefix>/share/datacrumbs/data/probes-runtime-status-<install-user>-<config-name>.sqlite
 
-That invalid-probe database is reused so later runs do not keep retrying known
-bad targets.
+That runtime-probe status database is reused so later runs do not keep retrying
+known bad targets, while still preserving a queryable record of which targets
+attached successfully.
 
 Migration note
 ==============

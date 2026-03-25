@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-EnvironmentFile=-@DATACRUMBS_INSTALL_CONFIGS_DIR@/datacrumbs-%i.env
+EnvironmentFile=-@DATACRUMBS_SERVER_RUN_DIR@/datacrumbs-%i.env
 ExecStartPre=/usr/bin/rm -f @DATACRUMBS_SERVER_RUN_DIR@/datacrumbs-%i.ready
 ExecStartPre=/bin/sh -c 'mkdir -p "${DATACRUMBS_LOG_DIR}"'
 ExecStartPre=/bin/sh -c 'log_file="${DATACRUMBS_LOG_DIR}/datacrumbs_${DATACRUMBS_USER}_${DATACRUMBS_SERVICE_RUN_ID}_$$(hostname).log"; touch "$${log_file}" && chown "${DATACRUMBS_USER}":"${DATACRUMBS_USER}" "$${log_file}" && chmod 0660 "$${log_file}"'
