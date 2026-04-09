@@ -5,6 +5,7 @@
 #include <datacrumbs/datacrumbs_config.h>
 #include <json-c/json.h>
 #include <linux/limits.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -17,8 +18,7 @@
 
 SignProbesService::SignProbesService()
     : socket_path_(DATACRUMBS_SIGN_PROBES_SOCKET_PATH),
-      allowed_client_executable_(std::filesystem::path(DATACRUMBS_INSTALL_BIN_DIR) /
-                                 "datacrumbs_probe_configurator_exec") {}
+      allowed_client_executable_name_("datacrumbs_probe_configurator_exec") {}
 
 SignProbesService::~SignProbesService() {
   if (server_fd_ >= 0) {
@@ -30,6 +30,8 @@ SignProbesService::~SignProbesService() {
 }
 
 int SignProbesService::run() {
+  signal(SIGPIPE, SIG_IGN);
+
   std::string secret;
   if (!datacrumbs::probe_file::ensure_probe_secret(&secret)) {
     DC_LOG_ERROR("Failed to create or read probe signing secret");
@@ -51,7 +53,18 @@ int SignProbesService::run() {
       DC_LOG_ERROR("Failed to accept signer connection");
       continue;
     }
-    handle_client(client_fd);
+    try {
+      handle_client(client_fd);
+    } catch (const std::exception& ex) {
+      const std::string response_payload = build_response(false, "", ex.what());
+      write_all_to_fd(client_fd, response_payload);
+      DC_LOG_ERROR("Signer request handling failed: %s", ex.what());
+    } catch (...) {
+      const std::string response_payload =
+          build_response(false, "", "unexpected signer service error");
+      write_all_to_fd(client_fd, response_payload);
+      DC_LOG_ERROR("Signer request handling failed: unknown exception");
+    }
     close(client_fd);
   }
 
@@ -110,6 +123,7 @@ void SignProbesService::handle_client(int client_fd) const {
     write_all_to_fd(client_fd, response_payload);
     return;
   }
+  DC_LOG_INFO("Accepted signer request");
 
   if (!read_all_from_fd(client_fd, &request_payload)) {
     response_payload = build_response(false, "", "failed to read signing request");
@@ -122,6 +136,7 @@ void SignProbesService::handle_client(int client_fd) const {
   if (checksum.empty()) {
     response_payload = build_response(false, "", error);
   } else {
+    DC_LOG_INFO("Successfully signed probe payload");
     response_payload = build_response(true, checksum, "");
   }
   write_all_to_fd(client_fd, response_payload);
@@ -147,8 +162,16 @@ bool SignProbesService::read_all_from_fd(int fd, std::string* payload) const {
   char buffer[4096];
   payload->clear();
   ssize_t read_bytes = 0;
-  while ((read_bytes = read(fd, buffer, sizeof(buffer))) > 0) {
-    payload->append(buffer, static_cast<std::size_t>(read_bytes));
+  for (;;) {
+    read_bytes = read(fd, buffer, sizeof(buffer));
+    if (read_bytes > 0) {
+      payload->append(buffer, static_cast<std::size_t>(read_bytes));
+      continue;
+    }
+    if (read_bytes < 0 && errno == EINTR) {
+      continue;
+    }
+    break;
   }
   return read_bytes == 0;
 }
@@ -158,6 +181,9 @@ bool SignProbesService::write_all_to_fd(int fd, const std::string& payload) cons
   while (total_written < payload.size()) {
     const ssize_t written =
         write(fd, payload.data() + total_written, payload.size() - total_written);
+    if (written < 0 && errno == EINTR) {
+      continue;
+    }
     if (written <= 0) {
       return false;
     }
@@ -237,21 +263,13 @@ bool SignProbesService::is_authorized_client(int client_fd, std::string* error) 
     return false;
   }
 
-  ec.clear();
-  const auto allowed_executable = std::filesystem::weakly_canonical(allowed_client_executable_, ec);
-  if (ec) {
-    if (error != nullptr) {
-      *error = "failed to resolve allowed probe configurator path";
-    }
-    return false;
-  }
-
-  if (peer_executable != allowed_executable) {
+  const std::string peer_executable_name = peer_executable.filename().string();
+  if (peer_executable_name != allowed_client_executable_name_) {
     if (error != nullptr) {
       *error = "probe signing requests are only accepted from datacrumbs_probe_configurator";
     }
-    DC_LOG_WARN("Rejected signer request from pid=%d exe=%s expected=%s", credentials.pid,
-                peer_executable.string().c_str(), allowed_executable.string().c_str());
+    DC_LOG_WARN("Rejected signer request from pid=%d exe=%s expected-name=%s", credentials.pid,
+                peer_executable.string().c_str(), allowed_client_executable_name_.c_str());
     return false;
   }
 

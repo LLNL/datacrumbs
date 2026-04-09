@@ -7,9 +7,15 @@
 #include <datacrumbs/common/enumerations.h>
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/typedefs.h>
-#include <datacrumbs/server/bpf/shared.h>
 // dependency headers
 #include <json-c/json.h>
+
+#ifndef DATACRUMBS_MAX_CAPTURE_ARGS
+#define DATACRUMBS_MAX_CAPTURE_ARGS 5
+#endif
+#ifndef DATACRUMBS_MAX_CAPTURE_BYTES
+#define DATACRUMBS_MAX_CAPTURE_BYTES 64
+#endif
 // std headers
 #include <string>
 #include <unordered_map>

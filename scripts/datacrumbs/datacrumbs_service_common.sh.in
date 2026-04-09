@@ -5,7 +5,7 @@ set -eo pipefail
 readonly DATACRUMBS_SERVICE_SCHEDULER_TYPE="@DATACRUMBS_SCHEDULER_TYPE@"
 readonly DATACRUMBS_SERVICE_INSTALL_USER="@DATACRUMBS_INSTALL_USER@"
 readonly DATACRUMBS_SERVICE_JOB_ID_VAR="@DATACRUMBS_SCHEDULER_JOBID_ENV_VAR@"
-readonly DATACRUMBS_SERVICE_CONFIGS_DIR="@DATACRUMBS_INSTALL_CONFIGS_DIR@"
+readonly DATACRUMBS_SERVICE_RUN_DIR="@DATACRUMBS_SERVER_RUN_DIR@"
 readonly DATACRUMBS_SERVICE_LOG_DIR="@DATACRUMBS_CONFIGURED_LOG_DIR@"
 readonly DATACRUMBS_SERVICE_RUN_ID_FILE="@DATACRUMBS_INSTALL_RUNSTATEDIR@/@PROJECT_NAME@/datacrumbs.runid"
 
@@ -23,8 +23,8 @@ log_system() {
 log_user() {
   local message="$*"
   if [[ "${DATACRUMBS_SERVICE_SCHEDULER_TYPE}" == "FLUX" && -n "${FLUX_JOB_ID:-}" ]]; then
-    flux job raise --severity=7 "${FLUX_JOB_ID}" \
-      "[INFO $(date '+%Y-%m-%d %H:%M:%S') ${FLUX_JOB_ID}] ${message}"
+    flux job raise --severity=7 "${FLUX_JOB_ID}" -- \
+      "[INFO $(date '+%Y-%m-%d %H:%M:%S') ${FLUX_JOB_ID}] ${message}" >/dev/null
   elif [[ "${DATACRUMBS_SERVICE_SCHEDULER_TYPE}" == "SLURM" && -n "${SLURM_JOB_ID:-}" ]]; then
     logger "[INFO $(date '+%Y-%m-%d %H:%M:%S') ${SLURM_JOB_ID}] ${message}"
   else
@@ -35,8 +35,8 @@ log_user() {
 error_user() {
   local message="$*"
   if [[ "${DATACRUMBS_SERVICE_SCHEDULER_TYPE}" == "FLUX" && -n "${FLUX_JOB_ID:-}" ]]; then
-    flux job raise --severity=1 "${FLUX_JOB_ID}" \
-      "[ERROR $(date '+%Y-%m-%d %H:%M:%S') ${FLUX_JOB_ID}] ${message}"
+    flux job raise --severity=1 "${FLUX_JOB_ID}" -- \
+      "[ERROR $(date '+%Y-%m-%d %H:%M:%S') ${FLUX_JOB_ID}] ${message}" >/dev/null
   elif [[ "${DATACRUMBS_SERVICE_SCHEDULER_TYPE}" == "SLURM" && -n "${SLURM_JOB_ID:-}" ]]; then
     logger "[ERROR $(date '+%Y-%m-%d %H:%M:%S') ${SLURM_JOB_ID}] ${message}"
   else
@@ -265,12 +265,33 @@ escape_env_value() {
 write_service_env_file() {
   local env_file="$1"
   local probe_file="$2"
-  mkdir -p "$(dirname "${env_file}")"
-  printf 'DATACRUMBS_PROBE_FILE=%s\n' "$(escape_env_value "${probe_file}")" >"${env_file}"
-  printf 'DATACRUMBS_USER=%s\n' "$(escape_env_value "${DATACRUMBS_USER}")" >>"${env_file}"
-  printf 'DATACRUMBS_SERVICE_RUN_ID=%s\n' "$(escape_env_value "${DATACRUMBS_SERVICE_RUN_ID}")" >>"${env_file}"
-  printf 'DATACRUMBS_LOG_DIR=%s\n' "$(escape_env_value "${DATACRUMBS_SERVICE_LOG_DIR}")" >>"${env_file}"
-  chmod 0400 "${env_file}" 2>/dev/null || true
+  local env_dir
+  local tmp_env_file
+  env_dir="$(dirname "${env_file}")"
+  tmp_env_file="$(mktemp)"
+  trap 'rm -f "${tmp_env_file}"' RETURN
+
+  printf 'DATACRUMBS_PROBE_FILE=%s\n' "$(escape_env_value "${probe_file}")" >"${tmp_env_file}"
+  printf 'DATACRUMBS_USER=%s\n' "$(escape_env_value "${DATACRUMBS_USER}")" >>"${tmp_env_file}"
+  printf 'DATACRUMBS_SERVICE_RUN_ID=%s\n' "$(escape_env_value "${DATACRUMBS_SERVICE_RUN_ID}")" >>"${tmp_env_file}"
+  printf 'DATACRUMBS_LOG_DIR=%s\n' "$(escape_env_value "${DATACRUMBS_SERVICE_LOG_DIR}")" >>"${tmp_env_file}"
+
+  if [[ "$(id -u)" == "0" ]]; then
+    mkdir -p "${env_dir}"
+    install -m 0400 "${tmp_env_file}" "${env_file}"
+  else
+    sudo mkdir -p "${env_dir}"
+    sudo install -m 0400 "${tmp_env_file}" "${env_file}"
+  fi
+}
+
+remove_service_env_file() {
+  local env_file="$1"
+  if [[ "$(id -u)" == "0" ]]; then
+    rm -f "${env_file}"
+  else
+    sudo rm -f "${env_file}"
+  fi
 }
 
 systemctl_cmd() {
@@ -322,7 +343,7 @@ if [[ -n "${DATACRUMBS_PROBE_FILE}" ]] && ! probe_file_readable_by_user "${DATAC
 fi
 
 DATACRUMBS_SERVICE_RUN_ID=$(get_run_id)
-DATACRUMBS_SERVICE_ENV_FILE="${DATACRUMBS_SERVICE_CONFIGS_DIR}/datacrumbs-${DATACRUMBS_SERVICE_RUN_ID}.env"
+DATACRUMBS_SERVICE_ENV_FILE="${DATACRUMBS_SERVICE_RUN_DIR}/datacrumbs-${DATACRUMBS_SERVICE_RUN_ID}.env"
 
 readonly DATACRUMBS_ENABLED
 readonly DATACRUMBS_PROBE_FILE

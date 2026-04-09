@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0075 NEW)
 project(datacrumbs LANGUAGES C CXX)
+include(CMakePackageConfigHelpers)
 
 # ------------------------------------------------------------------------------
 # Version information
@@ -21,6 +22,7 @@ set(DATACRUMBS_RELEASE_VERSION_MINOR "0")
 set(DATACRUMBS_RELEASE_VERSION_PATCH "4")
 set(DATACRUMBS_VERSION "(${DATACRUMBS_RELEASE_VERSION_MAJOR}, ${DATACRUMBS_RELEASE_VERSION_MINOR}, ${DATACRUMBS_RELEASE_VERSION_PATCH})")
 set(DATACRUMBS_RELEASE_VERSION_STRING "${DATACRUMBS_RELEASE_VERSION_MAJOR}.${DATACRUMBS_RELEASE_VERSION_MINOR}.${DATACRUMBS_RELEASE_VERSION_PATCH}")
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/datacrumbs_utils_compatibility.cmake)
 
 # Convenience defines
 string(TOUPPER "${PROJECT_NAME}" UPPER_PROJECT_NAME)
@@ -40,6 +42,10 @@ option(DATACRUMBS_BUILD_ONLY "Build only the datacrumbs library without installa
 load_build_variables()
 
 message(STATUS "[${UPPER_PROJECT_NAME}] DATACRUMBS_LIBDIR set to ${DATACRUMBS_LIBDIR}")
+message(
+  STATUS
+    "[${UPPER_PROJECT_NAME}] Compatible datacrumbs-utils ref: ${DATACRUMBS_UTILS_COMPATIBLE_REPOSITORY}@${DATACRUMBS_UTILS_COMPATIBLE_REF}"
+)
 
 # ------------------------------------------------------------------------------
 # Internal Paths for cmake libraries and Setup install and output Directories
@@ -53,37 +59,6 @@ include_directories(${CMAKE_BINARY_DIR}/include)
 include_directories(${CMAKE_BINARY_DIR}/libexec)
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
-include(ExternalProject)
-
-set(_DATACRUMBS_UTILS_GITHUB_REPOSITORY_DEFAULT
-    "https://github.com/LLNL/datacrumbs-utils.git"
-)
-
-set(
-  DATACRUMBS_UTILS_GIT_REPOSITORY
-  "${_DATACRUMBS_UTILS_GITHUB_REPOSITORY_DEFAULT}"
-  CACHE STRING "GitHub repository URL for datacrumbs-utils" FORCE
-)
-set(
-  DATACRUMBS_UTILS_GIT_REF
-  "main"
-  CACHE STRING "Git branch, tag, or commit used for datacrumbs-utils bootstrap"
-)
-set(
-  DATACRUMBS_UTILS_SOURCE_DIR
-  "${CMAKE_BINARY_DIR}/_deps/datacrumbs-utils-src"
-  CACHE PATH "Path to the datacrumbs-utils source tree" FORCE
-)
-set(
-  DATACRUMBS_UTILS_BUILD_DIR
-  "${CMAKE_BINARY_DIR}/_deps/datacrumbs-utils-build"
-  CACHE PATH "Path to the datacrumbs-utils build tree" FORCE
-)
-set(
-  DATACRUMBS_UTILS_INSTALL_PREFIX
-  "${CMAKE_INSTALL_PREFIX}"
-  CACHE PATH "Path to the datacrumbs-utils install prefix"
-)
 
 # ------------------------------------------------------------------------------
 # Options for CMake
@@ -92,6 +67,7 @@ option(DATACRUMBS_BPFTIME_COMPATIBLE "Enable compatibility with bpftime" OFF)
 option(DATACRUMBS_ENABLE_OPT "Enable tracing" ON)
 option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
 option(DATACRUMBS_BPF_PRINT_ENABLE "Enable BPF print" OFF)
+option(DATACRUMBS_DISABLE_PROBE_SIGNING "Disable probe signing and signature verification" OFF)
 set(DATACRUMBS_MODE_STR "TRACE" CACHE STRING "Mode for datacrumbs (TRACE or PROFILE)")
 set_property(CACHE DATACRUMBS_MODE_STR PROPERTY STRINGS TRACE PROFILE)
 
@@ -102,17 +78,13 @@ set(DATACRUMBS_INCLUSION_PATH "NONE" CACHE STRING "Inclusion path for datacrumbs
 set(DATACRUMBS_CONFIGURED_TRACE_DIR "/tmp" CACHE STRING "Trace directory for datacrumbs")
 set(DATACRUMBS_CONFIGURED_LOG_DIR "/tmp" CACHE STRING "Log directory for datacrumbs")
 set(DATACRUMBS_CONFIGURED_RUN_DIR "NONE" CACHE STRING "Run directory for datacrumbs")
+set(DATACRUMBS_KERNEL_HEADERS_PATH "" CACHE PATH "Override path to the kernel headers for datacrumbs")
 set(DATACRUMBS_HOST "NONE" CACHE STRING "Host name for datacrumbs")
 set(DATACRUMBS_USER "$ENV{USER}" CACHE STRING "User name for datacrumbs")
 set(DATACRUMBS_INSTALL_USER "$ENV{USER}" CACHE STRING "Installation user name for datacrumbs")
 set(DATACRUMBS_SCHEDULER_TYPE "FLUX" CACHE STRING "Scheduler type for datacrumbs")
 set_property(CACHE DATACRUMBS_SCHEDULER_TYPE PROPERTY STRINGS FLUX SLURM OPENMPI NONE)
 set(DATACRUMBS_SCHEDULER_JOBID_ENV_VAR "NONE" CACHE STRING "Scheduler job ID environment variable name")
-set(DATACRUMBS_SCHEDULER_RUN_EXTRA_ARGS "" CACHE STRING "Scheduler run extra args")
-
-# Configure Make steps
-option(DATACRUMBS_SKIP_PROBE_EXPLORING "Skip building the probe explorer executable" OFF)
-option(DATACRUMBS_SKIP_PROBE_GENERATION "Skip building the probe generator executable" OFF)
 
 # Tracing Options
 set(DATACRUMBS_TRACE_RINGBUF_SIZE_MB "16" CACHE STRING "Ring buffer size in MB for BPF tracing")
@@ -146,7 +118,7 @@ set(DATACRUMBS_INSTALL_CONFIGS_DIR "${DATACRUMBS_INSTALL_ETC_CONFIGSDIR}")
 set(DATACRUMBS_INSTALL_SHARED_DATA_DIR "${CMAKE_INSTALL_PREFIX}/share/datacrumbs/data")
 set(DATACRUMBS_INSTALL_DATA_DIR "${DATACRUMBS_INSTALL_SHARED_DATA_DIR}")
 set(DATACRUMBS_SYSTEM_PROBE_FILE
-    "${DATACRUMBS_INSTALL_SHARED_DATA_DIR}/system-probe-${DATACRUMBS_INSTALL_USER}-${DATACRUMBS_HOST}.json.gz"
+    "${DATACRUMBS_INSTALL_SHARED_DATA_DIR}/system-probe-${DATACRUMBS_INSTALL_USER}-${DATACRUMBS_HOST}.sqlite"
 )
 set(DATACRUMBS_PROBE_SECRET_FILE
     "${DATACRUMBS_INSTALL_SHARED_DATA_DIR}/.datacrumbs-probe-secret"
@@ -154,10 +126,12 @@ set(DATACRUMBS_PROBE_SECRET_FILE
 set(DATACRUMBS_SIGN_PROBES_SOCKET_PATH
     "${DATACRUMBS_INSTALL_SHARED_DATA_DIR}/datacrumbs-sign-probes.sock"
 )
+set(DATACRUMBS_UTILS_SYSTEM_CONFIGURATION_FILE
+    "${CMAKE_BINARY_DIR}/configs/datacrumbs-system-configuration.sqlite"
+)
 set(DATACRUMBS_TRACE_DIR_PATTERN "${DATACRUMBS_CONFIGURED_TRACE_DIR}/%YY%/%MM%/%DD%")
-set(DATACRUMBS_CLIENT_LIB "${DATACRUMBS_UTILS_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libdatacrumbs_client.so")
+set(DATACRUMBS_CLIENT_LIB "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libdatacrumbs_client.so")
 set(DATACRUMBS_JOB_SCHEDULER "${DATACRUMBS_SCHEDULER_TYPE}")
-set(DATACRUMBS_JOB_OTHER_FLAGS "${DATACRUMBS_SCHEDULER_RUN_EXTRA_ARGS}")
 set(DATACRUMBS_JOB_ID_VAR "${DATACRUMBS_SCHEDULER_JOBID_ENV_VAR}")
 if(DATACRUMBS_ENABLE_INCLUSION_PATH)
   set(DATACRUMBS_INCLUSION_PATHS "${DATACRUMBS_INCLUSION_PATH}")
@@ -181,7 +155,6 @@ set(DATACRUMBS_SYSTEM_CONFIGURATION_DEFINE_KEYS
     DATACRUMBS_INSTALL_PROBE_OBJECTS_DIR
     DATACRUMBS_CLIENT_LIB
     DATACRUMBS_JOB_SCHEDULER
-    DATACRUMBS_JOB_OTHER_FLAGS
     DATACRUMBS_JOB_ID_VAR
     DATACRUMBS_SERVER_RUN_DIR
     DATACRUMBS_CONFIGURED_TRACE_DIR
@@ -231,14 +204,11 @@ message(STATUS "             - DATACRUMBS_MAX_RUNTIME_FUNCTIONS: ${DATACRUMBS_MA
 message(STATUS "             - DATACRUMBS_TRACE_ALL_PROCESSES: ${DATACRUMBS_TRACE_ALL_PROCESSES}")
 message(STATUS "             - DATACRUMBS_TIME_INTERVAL_NS: ${DATACRUMBS_TIME_INTERVAL_NS}")
 message(STATUS "             - DATACRUMBS_BPF_PRINT_ENABLE_FLAG: ${DATACRUMBS_BPF_PRINT_ENABLE_FLAG}")
-message(STATUS "             - DATACRUMBS_SKIP_PROBE_EXPLORING: ${DATACRUMBS_SKIP_PROBE_EXPLORING}")
-message(STATUS "             - DATACRUMBS_SKIP_PROBE_GENERATION: ${DATACRUMBS_SKIP_PROBE_GENERATION}")
 message(STATUS "             - DATACRUMBS_TRACE_RINGBUF_SIZE_MB: ${DATACRUMBS_TRACE_RINGBUF_SIZE_MB}")
 
 message(STATUS "             - DATACRUMBS_SRC_GEN_PATH: ${DATACRUMBS_SRC_GEN_PATH}")
 message(STATUS "             - DATACRUMBS_LIBC_SO: ${DATACRUMBS_LIBC_SO}")
 
-message(STATUS "             - DATACRUMBS_CONFIG_PATH: ${DATACRUMBS_CONFIG_PATH}")
 message(STATUS "             - DATACRUMBS_LOG_DIR: ${DATACRUMBS_LOG_DIR}")
 message(STATUS "             - DATACRUMBS_DATA_DIR: ${DATACRUMBS_DATA_DIR}")
 message(STATUS "             - DATACRUMBS_ENABLE_INCLUSION_PATH: ${DATACRUMBS_ENABLE_INCLUSION_PATH}")
@@ -280,62 +250,6 @@ file(MAKE_DIRECTORY ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY}/objects/)
 # ------------------------------------------------------------------------------
 include_dependencies()
 
-ExternalProject_Add(
-  datacrumbs_utils_external
-  PREFIX "${CMAKE_BINARY_DIR}/_deps/datacrumbs-utils"
-  GIT_REPOSITORY "${DATACRUMBS_UTILS_GIT_REPOSITORY}"
-  GIT_TAG "${DATACRUMBS_UTILS_GIT_REF}"
-  GIT_SHALLOW FALSE
-  GIT_REMOTE_UPDATE_STRATEGY CHECKOUT
-  GIT_SUBMODULES ""
-  GIT_SUBMODULES_RECURSE FALSE
-  UPDATE_DISCONNECTED FALSE
-  SOURCE_DIR "${DATACRUMBS_UTILS_SOURCE_DIR}"
-  BINARY_DIR "${DATACRUMBS_UTILS_BUILD_DIR}"
-  INSTALL_DIR "${DATACRUMBS_UTILS_INSTALL_PREFIX}"
-  CMAKE_ARGS
-    "-DCMAKE_INSTALL_PREFIX=${DATACRUMBS_UTILS_INSTALL_PREFIX}"
-    "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/bin"
-    "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR}"
-    "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/${DATACRUMBS_LIBDIR}"
-    "-DCMAKE_INCLUDE_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/include"
-    "-DCMAKE_CONFIG_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/configs"
-    "-DCMAKE_DATA_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/data"
-    "-DCMAKE_LIBEXEC_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/libexec/${PROJECT_NAME}"
-    "-DCMAKE_ETC_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME}"
-    "-DCMAKE_MODULES_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME}/modulefiles"
-    "-DCMAKE_FLUX_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME}/flux"
-    "-DCMAKE_SYSTEMD_OUTPUT_DIRECTORY=${CMAKE_BINARY_DIR}/etc/${PROJECT_NAME}/systemd"
-    "-DDATACRUMBS_PROJECT_PATH=${CMAKE_CURRENT_SOURCE_DIR}"
-    "-DDATACRUMBS_UTILS_PROJECT_PATH=<SOURCE_DIR>"
-    "-DDATACRUMBS_HOST=${DATACRUMBS_HOST}"
-    "-DDATACRUMBS_USER=${DATACRUMBS_USER}"
-    "-DDATACRUMBS_INSTALL_USER=${DATACRUMBS_INSTALL_USER}"
-    "-DDATACRUMBS_INCLUSION_PATH=${DATACRUMBS_INCLUSION_PATH}"
-    "-DDATACRUMBS_CONFIGURED_TRACE_DIR=${DATACRUMBS_CONFIGURED_TRACE_DIR}"
-    "-DDATACRUMBS_CONFIGURED_LOG_DIR=${DATACRUMBS_CONFIGURED_LOG_DIR}"
-    "-DDATACRUMBS_CONFIGURED_RUN_DIR=${DATACRUMBS_CONFIGURED_RUN_DIR}"
-    "-DDATACRUMBS_SCHEDULER_TYPE=${DATACRUMBS_SCHEDULER_TYPE}"
-    "-DDATACRUMBS_SCHEDULER_JOBID_ENV_VAR=${DATACRUMBS_SCHEDULER_JOBID_ENV_VAR}"
-    "-DDATACRUMBS_SCHEDULER_RUN_EXTRA_ARGS=${DATACRUMBS_SCHEDULER_RUN_EXTRA_ARGS}"
-    "-DDATACRUMBS_LOG_LEVEL_STR=${DATACRUMBS_LOG_LEVEL_STR}"
-    "-DDATACRUMBS_MODE_STR=${DATACRUMBS_MODE_STR}"
-    "-DDATACRUMBS_ENABLE_OPT=${DATACRUMBS_ENABLE_OPT}"
-    "-DDATACRUMBS_TRACE_ALL_PROCESSES_OPT=${DATACRUMBS_TRACE_ALL_PROCESSES_OPT}"
-    "-DDATACRUMBS_BPF_PRINT_ENABLE=${DATACRUMBS_BPF_PRINT_ENABLE}"
-    "-DDATACRUMBS_KERNEL_HEADERS_PATH=${DATACRUMBS_KERNEL_HEADERS_PATH}"
-    "-DDATACRUMBS_KERNEL_VERSION=${DATACRUMBS_KERNEL_VERSION}"
-  BUILD_COMMAND
-    "${CMAKE_COMMAND}" --build "<BINARY_DIR>" --clean-first
-  INSTALL_COMMAND
-    "${CMAKE_COMMAND}" --build "<BINARY_DIR>" --target install
-  USES_TERMINAL_DOWNLOAD TRUE
-  USES_TERMINAL_UPDATE TRUE
-  USES_TERMINAL_BUILD TRUE
-)
-
-add_custom_target(datacrumbs_utils_install DEPENDS datacrumbs_utils_external)
-
 # print_all_variables()
 # ------------------------------------------------------------------------------
 
@@ -345,6 +259,62 @@ add_custom_target(datacrumbs_utils_install DEPENDS datacrumbs_utils_external)
 set(DATACRUMBS_COMMON_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/data_structures.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/enumerations.h
+)
+set(DATACRUMBS_PUBLIC_COMMON_HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/constants.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/data_structures.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/enumerations.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/logging.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/probe_file.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/singleton.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/typedefs.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/common/utils.h
+)
+add_library(datacrumbs_common INTERFACE)
+target_include_directories(
+  datacrumbs_common
+  INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_INCLUDE_OUTPUT_DIRECTORY}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+install(
+  TARGETS datacrumbs_common
+  EXPORT datacrumbsTargets
+)
+install(FILES "${CMAKE_INCLUDE_OUTPUT_DIRECTORY}/datacrumbs/datacrumbs_config.h"
+        DESTINATION "${DATACRUMBS_INSTALL_INCLUDE_DIR}/datacrumbs")
+install(FILES ${DATACRUMBS_PUBLIC_COMMON_HEADERS}
+        DESTINATION "${DATACRUMBS_INSTALL_INCLUDE_DIR}/datacrumbs/common")
+
+configure_package_config_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/datacrumbsConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/datacrumbsConfig.cmake"
+  INSTALL_DESTINATION "${DATACRUMBS_INSTALL_LIB_DIR}/cmake/datacrumbs"
+  PATH_VARS
+    DATACRUMBS_INSTALL_INCLUDE_DIR
+    DATACRUMBS_INSTALL_LIB_DIR
+    DATACRUMBS_INSTALL_BINARYDIR
+    DATACRUMBS_INSTALL_SBINARYDIR
+    DATACRUMBS_INSTALL_SYSCONFDIR
+    DATACRUMBS_INSTALL_SHARED_DATA_DIR
+)
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/datacrumbsConfigVersion.cmake"
+  VERSION "${DATACRUMBS_PACKAGE_VERSION}"
+  COMPATIBILITY SameMajorVersion
+)
+install(
+  EXPORT datacrumbsTargets
+  FILE datacrumbsTargets.cmake
+  NAMESPACE datacrumbs::
+  DESTINATION "${DATACRUMBS_INSTALL_LIB_DIR}/cmake/datacrumbs"
+)
+install(
+  FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/datacrumbsConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/datacrumbsConfigVersion.cmake"
+  DESTINATION "${DATACRUMBS_INSTALL_LIB_DIR}/cmake/datacrumbs"
 )
 
 set(DATACRUMBS_SYSTEM_CONFIGURATOR_SRC
@@ -360,16 +330,26 @@ set(DATACRUMBS_SIGN_PROBES_SERVICE_SRC
 
 add_executable(datacrumbs_system_configurator ${DATACRUMBS_SYSTEM_CONFIGURATOR_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(datacrumbs_system_configurator ${DEPENDENCY_LIB})
-add_dependencies(datacrumbs_system_configurator datacrumbs_utils_install)
 install(TARGETS datacrumbs_system_configurator
     RUNTIME DESTINATION "${DATACRUMBS_INSTALL_BINARYDIR}"
 )
 
+add_custom_target(
+    generate_utils_system_configuration
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/configs
+    COMMAND
+      ${CMAKE_COMMAND} -E env
+      DATACRUMBS_SYSTEM_PROBE_FILE_OVERRIDE=${DATACRUMBS_UTILS_SYSTEM_CONFIGURATION_FILE}
+      $<TARGET_FILE:datacrumbs_system_configurator>
+    DEPENDS datacrumbs_system_configurator
+    COMMENT "Generating build-tree system configuration for datacrumbs-utils"
+)
+
 add_executable(datacrumbs_sign_probes ${DATACRUMBS_SIGN_PROBES_SERVICE_SRC} ${DATACRUMBS_COMMON_SRC})
 target_link_libraries(datacrumbs_sign_probes ${DEPENDENCY_LIB})
-add_dependencies(datacrumbs_sign_probes datacrumbs_utils_install run_system_configurator)
+add_dependencies(datacrumbs_sign_probes run_system_configurator)
 install(TARGETS datacrumbs_sign_probes
-    RUNTIME DESTINATION "${DATACRUMBS_INSTALL_BINARYDIR}"
+    RUNTIME DESTINATION "${DATACRUMBS_INSTALL_SBINARYDIR}"
 )
 
 add_custom_target(
@@ -381,7 +361,7 @@ add_custom_target(
     -DDATACRUMBS_SYSTEM_CONFIGURATOR_BIN=$<TARGET_FILE:datacrumbs_system_configurator>
     -P
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_system_configurator_if_missing.cmake
-    DEPENDS datacrumbs_system_configurator datacrumbs_utils_install
+    DEPENDS datacrumbs_system_configurator
     COMMENT "Generating install-time system configuration and probe secret"
 )
 
@@ -525,12 +505,12 @@ target_link_libraries(datacrumbs_obj ${DEPENDENCY_LIB})
 install(TARGETS datacrumbs_obj
     LIBRARY DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
 )
-add_dependencies(datacrumbs_obj datacrumbs_utils_install datacrumbs_bpf_skel run_system_configurator)
+add_dependencies(datacrumbs_obj datacrumbs_bpf_skel run_system_configurator)
 
 # Build the final executable by linking server.cpp and the object library
 add_executable(${PROJECT_NAME} ${DATACRUMBS_SERVER_SRC})
 target_link_libraries(${PROJECT_NAME} datacrumbs_obj ${DEPENDENCY_LIB})
-add_dependencies(${PROJECT_NAME} datacrumbs_utils_install datacrumbs_bpf_skel datacrumbs_obj run_system_configurator)
+add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel datacrumbs_obj run_system_configurator)
 
 # Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
 install(TARGETS ${PROJECT_NAME}

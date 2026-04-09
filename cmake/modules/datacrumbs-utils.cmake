@@ -38,6 +38,7 @@ macro(include_dependencies)
   find_package(LLVM REQUIRED CONFIG COMPONENTS Clang)
   find_package(json-c REQUIRED)
   find_package(OpenSSL REQUIRED)
+  find_package(SQLite3 REQUIRED)
   find_package(ZLIB REQUIRED)
 
   # all validator
@@ -101,6 +102,7 @@ macro(include_dependencies)
   if(LLVM_FOUND)
     include_directories(${LLVM_INCLUDE_DIRS})
     link_directories(${LLVM_LIBRARY_DIRS})
+    list(APPEND DEPENDENCY_LIBRARY_DIRS ${LLVM_LIBRARY_DIRS})
     set(DEPENDENCY_LIB ${DEPENDENCY_LIB} ${LLVM_LIBRARIES} -lclang)
     set(CLANG_EXECUTABLE ${LLVM_TOOLS_BINARY_DIR}/clang)
 
@@ -143,6 +145,13 @@ macro(include_dependencies)
     message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] OpenSSL is needed for ${PROJECT_NAME} build")
   endif()
 
+  if(SQLite3_FOUND)
+    include_directories(${SQLite3_INCLUDE_DIRS})
+    set(DEPENDENCY_LIB ${DEPENDENCY_LIB} SQLite::SQLite3)
+  else()
+    message(FATAL_ERROR "-- [${UPPER_PROJECT_NAME}] SQLite3 is needed for ${PROJECT_NAME} build")
+  endif()
+
   if(ZLIB_FOUND)
     include_directories(${ZLIB_INCLUDE_DIRS})
     get_filename_component(ZLIB_LIBRARY_DIRS "${ZLIB_LIBRARIES}/../" ABSOLUTE)
@@ -169,6 +178,9 @@ macro(include_dependencies)
       "             - Found json-c:${json-c_CONSIDERED_VERSIONS} at include:${json-c_INCLUDE_DIR} lib:${json-c_LIBRARY_DIR}"
   )
   message(
+    STATUS "             - Found sqlite3:${SQLite3_VERSION} at include:${SQLite3_INCLUDE_DIRS}"
+  )
+  message(
     STATUS
       "             - Found zlib:${ZLIB_VERSION} at include:${ZLIB_INCLUDE_DIRS} lib:${ZLIB_LIBRARY_DIRS}"
   )
@@ -180,6 +192,7 @@ macro(include_dependencies)
             DEPENDENCY_LIBRARY_DIRS_COLON
             "${DEPENDENCY_LIBRARY_DIRS}"
   )
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
   set(CMAKE_INSTALL_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
   set(CMAKE_BUILD_RPATH "${DEPENDENCY_LIBRARY_DIRS}")
 
@@ -223,18 +236,6 @@ macro(derive_configurations)
     set(BPFTOOL_EXECUTABLE "")
   endif()
 
-  if(NOT DATACRUMBS_SKIP_PROBE_EXPLORING)
-    set(ENABLE_PROBE_EXPLORER 1)
-  else()
-    set(ENABLE_PROBE_EXPLORER 0)
-  endif()
-
-  if(NOT DATACRUMBS_SKIP_PROBE_GENERATION)
-    set(ENABLE_PROBE_GENERATOR 1)
-  else()
-    set(ENABLE_PROBE_GENERATOR 0)
-  endif()
-
   if(DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
     set(DATACRUMBS_ENABLE_INCLUSION_PATH 0)
   else()
@@ -248,15 +249,28 @@ macro(derive_configurations)
   endif()
 
   set(DATACRUMBS_SRC_GEN_PATH ${CMAKE_LIBEXEC_OUTPUT_DIRECTORY})
+  if(DATACRUMBS_CONFIGURED_LOG_DIR
+     AND NOT
+         DATACRUMBS_CONFIGURED_LOG_DIR
+         STREQUAL
+         ""
+     AND NOT
+         DATACRUMBS_CONFIGURED_LOG_DIR
+         STREQUAL
+         "NONE"
+  )
+    set(DATACRUMBS_LOG_DIR ${DATACRUMBS_CONFIGURED_LOG_DIR})
+  else()
+    set(DATACRUMBS_LOG_DIR ${CMAKE_BINARY_DIR}/logs)
+  endif()
+
   set(DATACRUMBS_VARS
       --user
       ${DATACRUMBS_USER}
-      --config_path
-      ${CMAKE_CONFIG_OUTPUT_DIRECTORY}
       --data_dir
       ${CMAKE_DATA_OUTPUT_DIRECTORY}
       --trace_log_dir
-      ${CMAKE_BINARY_DIR}/logs
+      ${DATACRUMBS_LOG_DIR}
   )
 
   if(NOT
@@ -267,9 +281,7 @@ macro(derive_configurations)
     set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
   endif()
 
-  set(DATACRUMBS_CONFIG_PATH ${CMAKE_CONFIG_OUTPUT_DIRECTORY})
   set(DATACRUMBS_DATA_DIR ${CMAKE_DATA_OUTPUT_DIRECTORY})
-  set(DATACRUMBS_LOG_DIR ${CMAKE_BINARY_DIR}/logs)
   file(MAKE_DIRECTORY ${DATACRUMBS_LOG_DIR})
 
   if(DATACRUMBS_ENABLE_OPT AND DATACRUMBS_ENABLE_OPT STREQUAL "ON")
