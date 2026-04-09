@@ -10,7 +10,9 @@ env:
   BUILD_DIR: /tmp/dc-build
   UTILS_BUILD_DIR: /tmp/dc-utils-build
   INSTALL_PREFIX: /tmp/dc-install
-  CONFIG_YAML: /tmp/dc-install/etc/datacrumbs/configs/docker.yaml
+  INSTALLED_CONFIG_TEMPLATE_YAML: /tmp/dc-install/etc/datacrumbs/configs/docker.yaml
+  CONFIG_TEMPLATE_YAML: ${{ github.workspace }}/datacrumbs-utils/docs/configs/docker.yaml
+  CONFIG_YAML: /tmp/datacrumbs-ci-config.yaml
   PROBE_FILE: /tmp/datacrumbs-ci-probes.json.gz
   JOB_ID: "1"
   LOG_DIR: /tmp/datacrumbs-logs
@@ -289,8 +291,19 @@ jobs:
       - name: Generate probes
         run: |
           set -euo pipefail
+          set -x
+          test -x "${INSTALL_PREFIX}/bin/datacrumbs_configure_template"
+          config_template_yaml="${INSTALLED_CONFIG_TEMPLATE_YAML}"
+          if [[ ! -f "${config_template_yaml}" ]]; then
+            config_template_yaml="${CONFIG_TEMPLATE_YAML}"
+          fi
+          test -f "${config_template_yaml}"
+          rm -f "${CONFIG_YAML}"
+          "${INSTALL_PREFIX}/bin/datacrumbs_configure_template" "${config_template_yaml}" "${CONFIG_YAML}"
           test -f "${CONFIG_YAML}"
           rm -f "${PROBE_FILE}"
+          probe_dir="$(dirname "${PROBE_FILE}")"
+          fallback_probe_file=""
 
           set +e
           probe_output="$("${INSTALL_PREFIX}/bin/datacrumbs_probe_configurator" "${CONFIG_YAML}" "${PROBE_FILE}" 2>&1)"
@@ -299,45 +312,44 @@ jobs:
           printf '%s\n' "${probe_output}"
           printf 'datacrumbs_probe_configurator exit status: %s\n' "${probe_status}"
 
+          if [[ ! -s "${PROBE_FILE}" ]]; then
+            set +e
+            fallback_probe_file="$(find "${probe_dir}" -maxdepth 1 -name 'probes-*.json.gz' -size +0c -print | sort | tail -n 1)"
+            set -e
+            if [[ -n "${fallback_probe_file}" ]]; then
+              cp "${fallback_probe_file}" "${PROBE_FILE}"
+              echo "Using generated fallback probes file: ${fallback_probe_file}"
+            fi
+          fi
+
           if [[ "${probe_status}" != "0" ]]; then
             if [[ "${probe_status}" == "1" ]] && grep -Eq "One or more probes failed validation|Extraction summary: .*invalid=yes" <<<"${probe_output}"; then
               if [[ -s "${PROBE_FILE}" ]]; then
                 echo "Continuing with generated probes file despite invalid candidate probes on this runner."
-                ls -l "$(dirname "${PROBE_FILE}")"
-                find "$(dirname "${PROBE_FILE}")" -maxdepth 1 \( -name 'probes-*.json' -o -name 'probes-*.json.gz' -o -name 'categories-*.json' \) -print || true
+                ls -l "${probe_dir}"
+                find "${probe_dir}" -maxdepth 1 \( -name 'probes-*.json' -o -name 'probes-*.json.gz' -o -name 'categories-*.json' \) -print || true
               else
                 echo "Probe validation reported invalid candidates and no probes file was written."
-                ls -l "$(dirname "${PROBE_FILE}")"
-                find "$(dirname "${PROBE_FILE}")" -maxdepth 1 \( -name 'probes-*.json' -o -name 'probes-*.json.gz' -o -name 'categories-*.json' \) -print || true
+                ls -l "${probe_dir}"
+                find "${probe_dir}" -maxdepth 1 \( -name 'probes-*.json' -o -name 'probes-*.json.gz' -o -name 'categories-*.json' \) -print || true
                 exit "${probe_status}"
               fi
             else
               echo "Probe generation failed unexpectedly."
-              ls -l "$(dirname "${PROBE_FILE}")"
-              find "$(dirname "${PROBE_FILE}")" -maxdepth 1 \( -name 'probes-*.json' -o -name 'probes-*.json.gz' -o -name 'categories-*.json' \) -print || true
+              ls -l "${probe_dir}"
+              find "${probe_dir}" -maxdepth 1 \( -name 'probes-*.json' -o -name 'probes-*.json.gz' -o -name 'categories-*.json' \) -print || true
               exit "${probe_status}"
             fi
           else
             test -s "${PROBE_FILE}"
           fi
 
+          set +x
+
           if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
             grep -q "Probe signing is disabled" <<<"${probe_output}"
-            python3 - <<'PY'
-            import gzip
-            import json
-            import os
-            from pathlib import Path
-
-            probe_file = Path(os.environ["PROBE_FILE"])
-            with gzip.open(probe_file, "rt", encoding="utf-8") as handle:
-                payload = json.load(handle)
-
-            assert "checksum" not in payload, payload
-            assert "checksum_algorithm" not in payload, payload
-            assert isinstance(payload.get("categories"), list) and payload["categories"], payload
-            PY
-            fi
+            python3 -c 'import gzip, json, os; from pathlib import Path; probe_file = Path(os.environ["PROBE_FILE"]); payload = json.load(gzip.open(probe_file, "rt", encoding="utf-8")); assert "checksum" not in payload, payload; assert "checksum_algorithm" not in payload, payload; assert isinstance(payload.get("categories"), list) and payload["categories"], payload'
+          fi
 
       - name: Run datacrumbs wrapper flow and verify logs
         run: |
