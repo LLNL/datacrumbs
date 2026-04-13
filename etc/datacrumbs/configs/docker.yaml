@@ -21,3 +21,4 @@ capture_probes:
     probe: kprobe
     type: header
     file: @DATACRUMBS_KERNEL_HEADERS_PATH@/include/linux/pagemap.h
+    enable_explorer: false

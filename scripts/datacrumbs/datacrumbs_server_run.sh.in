@@ -6,15 +6,15 @@ SCRIPT_DIR=@DATACRUMBS_INSTALL_BINARYDIR@
 
 # Check if datacrumbs_args exists in scripts directory
 if [[ ! -f "$SCRIPT_DIR/datacrumbs_args" ]]; then
-    echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
-    exit 1
+  echo "Error: datacrumbs_args not found in $SCRIPT_DIR"
+  exit 1
 fi
 
 # Source argument parser
 source "$SCRIPT_DIR/datacrumbs_args"
 
 dc_args_init "DATACRUMBS"
-dc_args_add_option "DATACRUMBS" "composite-name" "OPTIONAL" "Composable name" "string"
+dc_args_add_option "DATACRUMBS" "composite-name" "OPTIONAL" "Composable name" "string" "$DATACRUMBS_COMPOSABLE_NAME"
 dc_args_add_option "DATACRUMBS" "enable-mpi" "OPTIONAL" "switch to enable MPI" "bool" "0"
 dc_args_add_option "DATACRUMBS" "nodes" "OPTIONAL" "Set number of nodes" "int" "1"
 dc_args_add_option "DATACRUMBS" "ppn" "OPTIONAL" "Set processes per node" "int" "1"
@@ -23,9 +23,9 @@ dc_args_add_subcommand "DATACRUMBS" "enable-mpi" "1" "nodes" "ppn"
 dc_args_parse "DATACRUMBS" "datacrumbs_run" "$@"
 
 if [[ $? -ne 0 ]]; then
-    echo "Error: Argument parsing failed."
-    show_help
-    exit 1
+  echo "Error: Argument parsing failed."
+  show_help
+  exit 1
 fi
 
 export DATACRUMBS_JOB_ENABLE_MPI=${DATACRUMBS_ENABLE_MPI:-0}
@@ -37,31 +37,26 @@ PROG_NAME=$(basename "$0")
 source $SCRIPT_DIR/datacrumbs_setup
 
 if [[ "$DATACRUMBS_COMPOSITE_NAME" != "" ]] && [[ "$DATACRUMBS_COMPOSITE_NAME" != "NONE" ]]; then
-    if [[ ! -f "${DATACRUMBS_CLIENT_BIN}/datacrumbs_${DATACRUMBS_COMPOSITE_NAME}" ]]; then
-        error "Composite ${DATACRUMBS_COMPOSITE_NAME} not found for ${DATACRUMBS_USER}"
-        exit 1
-    fi
+  if ! validate_datacrumbs_composite_name "${DATACRUMBS_COMPOSITE_NAME}"; then
+    error "Invalid composable name: ${DATACRUMBS_COMPOSITE_NAME}"
+    exit 1
+  fi
 fi
-
 
 check_sudo_user
 
-RUNID=${!DATACRUMBS_JOB_ID_VAR}
-RUNID=${RUNID:-1000}
-DATACRUMBS_LOG_FILE=${DATACRUMBS_LOG_DIR}/datacrumbs_${DATACRUMBS_USER}_${RUNID}.log
-READY_FILE="@DATACRUMBS_INSTALL_RUNSTATEDIR@/datacrumbs_${DATACRUMBS_USER}_${RUNID}.ready"
-debug "RUNID: $RUNID"
+debug "DATACRUMBS_SERVER_RUN_ID: $DATACRUMBS_SERVER_RUN_ID"
 debug "DATACRUMBS_JOB_ID_VAR: $DATACRUMBS_JOB_ID_VAR"
 debug "value DATACRUMBS_JOB_ID_VAR: ${!DATACRUMBS_JOB_ID_VAR}"
 debug "DATACRUMBS_LOG_FILE: $DATACRUMBS_LOG_FILE"
-debug "READY_FILE: $READY_FILE"
+debug "DATACRUMBS_SERVER_READY_FILE: $DATACRUMBS_SERVER_READY_FILE"
 log "Running as USER = $DATACRUMBS_USER and storing traces in $DATACRUMBS_TRACE_DIR and log file $DATACRUMBS_LOG_FILE"
 datacrumbs_init $DATACRUMBS_USER $DATACRUMBS_TRACE_DIR
 exec=()
 if [[ "$DATACRUMBS_COMPOSITE_NAME" != "" ]] && [[ "$DATACRUMBS_COMPOSITE_NAME" != "NONE" ]]; then
-    exec=("${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_compose_wrapper" "${DATACRUMBS_COMPOSITE_NAME}")
+  exec=("${DATACRUMBS_INSTALL_SBIN_DIR}/datacrumbs_compose_wrapper" "${DATACRUMBS_COMPOSITE_NAME}")
 else
-    exec=(@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs)
+  exec=(@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_SBINDIR@/datacrumbs)
 fi
 
 datacrumbs_start_server "${exec[*]}"

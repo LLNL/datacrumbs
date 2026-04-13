@@ -393,6 +393,7 @@ class CaptureProbe {
   std::string regex;     // Regex pattern for matching
   std::string name;      // Name of the capture probe
   ProbeType probe_type;  // Type of probe associated with the capture
+  bool enable_explorer;  // Flag to enable explorer for this capture probe
 };
 
 // Capture probe for kernel symbols

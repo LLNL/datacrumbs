@@ -1,5 +1,5 @@
 #!/bin/bash
-SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" &>/dev/null && pwd 2>/dev/null)"
 echo $SCRIPT_DIR
 TEST_DIR=$(dirname $SCRIPT_DIR)
 PROJECT_DIR=$(dirname $TEST_DIR)
@@ -26,8 +26,7 @@ if [ "$TEST_CASE" -eq "0" ] || [ "$TEST_CASE" -eq "2" ]; then
   rm -rf $DATA_DIR/*
 fi
 
-for TSKB in $((1*1024)); #1 4 16 64 256 1024 4096 16384 65536 262144
-do
+for TSKB in $((1 * 1024)); do #1 4 16 64 256 1024 4096 16384 65536 262144
   TS=$((TSKB * 1024))
   if [ "$TEST_CASE" -eq "0" ] || [ "$TEST_CASE" -eq "2" ]; then
     cmd=(${PROJECT_DIR}/build/tests/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 0 ${DIRECTIO})
@@ -40,10 +39,8 @@ do
   fi
   if [ "$TEST_CASE" -eq "1" ] || [ "$TEST_CASE" -eq "2" ]; then
     sleep 5
-    cmd=( ${PROJECT_DIR}/build/tests/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 1 ${DIRECTIO})
+    cmd=(${PROJECT_DIR}/build/tests/df_tracer_test ${NUM_FILES} ${NUM_OPS} ${TS} ${DATA_DIR} 1 ${DIRECTIO})
     echo "${cmd[@]}"
     LD_PRELOAD=${DATACRUMBS_SO} "${cmd[@]}"
   fi
 done
-
-

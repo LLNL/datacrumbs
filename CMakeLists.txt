@@ -62,6 +62,7 @@ option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
 set(DATACRUMBS_INCLUSION_PATH "NONE" CACHE STRING "Inclusion path for datacrumbs")
 set(DATACRUMBS_CONFIGURED_TRACE_DIR "/tmp" CACHE STRING "Trace directory for datacrumbs")
 set(DATACRUMBS_CONFIGURED_LOG_DIR "/tmp" CACHE STRING "Log directory for datacrumbs")
+set(DATACRUMBS_CONFIGURED_RUN_DIR "NONE" CACHE STRING "Run directory for datacrumbs")
 
 option(DATACRUMBS_BPF_PRINT_ENABLE "Enable BPF print" OFF)
 set(DATACRUMBS_MODE_STR "TRACE" CACHE STRING "Mode for datacrumbs (TRACE or PROFILE)")
@@ -83,6 +84,15 @@ set(DATACRUMBS_SKIP_SMALL_EVENTS_THRESHOLD_NS "1000" CACHE STRING "Threshold in 
 
 # Profiling Options
 set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval in nanosecond")
+
+# Scheduling Options
+set(DATACRUMBS_LAUNCHER_TYPE "FLUX" CACHE STRING "Scheduler type for datacrumbs (FLUX, SLURM, OPENMPI, or NONE)")
+set_property(CACHE DATACRUMBS_LAUNCHER_TYPE PROPERTY STRINGS FLUX SLURM OPENMPI NONE)
+set(DATACRUMBS_SCHEDULER_JOBID_ENV_VAR "NONE" CACHE STRING "Scheduler job ID environment variable name")
+set(DATACRUMBS_SCHEDULER_NODES_CMD_OPT "NONE" CACHE STRING "Scheduler option for setting nodes")
+set(DATACRUMBS_SCHEDULER_PPN_CMD_OPT "NONE" CACHE STRING "Scheduler option for setting processes per node")
+set(DATACRUMBS_SCHEDULER_RUN_CMD "NONE" CACHE STRING "Scheduler run command")
+set(DATACRUMBS_SCHEDULER_RUN_EXTRA_ARGS "" CACHE STRING "Scheduler run extra args")
 
 # Other options
 set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPER_PROJECT_NAME}")
@@ -139,6 +149,11 @@ message(STATUS "             - Found kernel headers at: ${DATACRUMBS_KERNEL_HEAD
 message(STATUS "             - DATACRUMBS_KERNEL_UNAME_R: ${DATACRUMBS_KERNEL_UNAME_R}")
 message(STATUS "             - DATACRUMBS_CONFIGURED_TRACE_DIR: ${DATACRUMBS_CONFIGURED_TRACE_DIR}")
 message(STATUS "             - DATACRUMBS_CONFIGURED_LOG_DIR: ${DATACRUMBS_CONFIGURED_LOG_DIR}")
+message(STATUS "             - DATACRUMBS_LAUNCHER_TYPE: ${DATACRUMBS_LAUNCHER_TYPE}")
+message(STATUS "             - DATACRUMBS_SCHEDULER_JOBID_ENV_VAR: ${DATACRUMBS_SCHEDULER_JOBID_ENV_VAR}")
+message(STATUS "             - DATACRUMBS_SCHEDULER_NODES_CMD_OPT: ${DATACRUMBS_SCHEDULER_NODES_CMD_OPT}")
+message(STATUS "             - DATACRUMBS_SCHEDULER_PPN_CMD_OPT: ${DATACRUMBS_SCHEDULER_PPN_CMD_OPT}")
+message(STATUS "             - DATACRUMBS_SCHEDULER_RUN_CMD: ${DATACRUMBS_SCHEDULER_RUN_CMD}")
 
 if(NOT EXISTS "${DATACRUMBS_CONFIGURED_TRACE_DIR}")
     message(FATAL_ERROR "[${UPPER_PROJECT_NAME}] DATACRUMBS_CONFIGURED_TRACE_DIR does not exist: ${DATACRUMBS_CONFIGURED_TRACE_DIR}")
@@ -424,7 +439,7 @@ add_dependencies(datacrumbs_obj datacrumbs_bpf_skel)
 
 # Build the final executable by linking server.cpp and the object library
 add_executable(${PROJECT_NAME} ${DATACRUMBS_SERVER_SRC})
-target_link_libraries(${PROJECT_NAME} ${DEPENDENCY_LIB} datacrumbs_obj)
+target_link_libraries(${PROJECT_NAME} datacrumbs_obj ${DEPENDENCY_LIB})
 add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel datacrumbs_obj)
 
 # Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
@@ -587,6 +602,8 @@ set(_DATACRUMBS_DATA_FILES
     "${CMAKE_DATA_OUTPUT_DIRECTORY}/categories-${DATACRUMBS_USER}-${DATACRUMBS_HOST}.json"
     "${CMAKE_DATA_OUTPUT_DIRECTORY}/probes-${DATACRUMBS_USER}-${DATACRUMBS_HOST}.json"
 )
+# Ensure the data output directory exists
+file(MAKE_DIRECTORY ${CMAKE_DATA_OUTPUT_DIRECTORY})
 
 if(_DATACRUMBS_DATA_FILES)
     install(FILES ${_DATACRUMBS_DATA_FILES}
@@ -775,6 +792,15 @@ install(
     ${DATACRUMBS_INSTALL_SBINARYDIR}
 )
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/datacrumbs/datacrumbs_salloc.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_salloc @ONLY)
+install(
+    PROGRAMS
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs_salloc
+    DESTINATION
+    ${DATACRUMBS_INSTALL_BINARYDIR}
+)
+
+
 # Create an empty directory at install time
 install(CODE "file(MAKE_DIRECTORY \"\${DATACRUMBS_INSTALL_LIBEXEC}/sbin\")")
 
@@ -795,15 +821,15 @@ if(NOT DATACRUMBS_INCLUSION_PATH STREQUAL "NONE")
     set(DATACRUMBS_VARS ${DATACRUMBS_VARS} --inclusion_path ${DATACRUMBS_INCLUSION_PATH})
 endif()
 
-add_test(NAME datacrumbs_start COMMAND ${DATACRUMBS_PATH}/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_start COMMAND ${DATACRUMBCMAKE_RUNTIME_OUTPUT_DIRECTORYS_PATH}/datacrumbs start ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_start PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_run COMMAND ${DATACRUMBS_PATH}/datacrumbs run ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_run COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs run ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_run PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_run PROPERTIES DEPENDS ${PROJECT_NAME})
 
-add_test(NAME datacrumbs_stop COMMAND ${DATACRUMBS_PATH}/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
+add_test(NAME datacrumbs_stop COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/datacrumbs stop ${DATACRUMBS_HOST} ${DATACRUMBS_VARS})
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS datacrumbs_pretest)
 set_tests_properties(datacrumbs_stop PROPERTIES DEPENDS ${PROJECT_NAME})
 

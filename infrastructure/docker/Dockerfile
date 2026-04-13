@@ -13,6 +13,7 @@ RUN . /opt/rh/gcc-toolset-11/enable && \
           -DDATACRUMBS_KERNEL_HEADERS_PATH=/usr/src/kernels/4.18.0-348.7.1.el8_5.x86_64 \
           -DCMAKE_PREFIX_PATH=/usr/lib64/openmpi \
           -DCMAKE_INSTALL_PREFIX=/opt/datacrumbs-install \
+          -DDATACRUMBS_CONFIGURED_RUN_DIR=/tmp \
           /opt/datacrumbs/ && \
     make -j $(nproc) && \
     make install

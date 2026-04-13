@@ -10,21 +10,84 @@
 #include <datacrumbs/common/logging.h>  // Logging header
 #include <datacrumbs/common/singleton.h>
 // std headers
+#include <errno.h>
 #include <pwd.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <atomic>
 #include <condition_variable>
+#include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
 #include <thread>
-#include <unordered_set>
 #include <vector>
+
 namespace datacrumbs {
+
+// Function to pretty print invalid probes categorized by probe name
+void prettyPrintInvalidProbes(
+    const std::unordered_map<std::string, std::vector<std::string>>& invalid_function_names,
+    size_t total_probes, size_t invalid_probes) {
+  std::cout << "\n";
+  std::cout << "╔════════════════════════════════════════════════════════════════════════════╗\n";
+  std::cout << "║                     PROBE VALIDATION SUMMARY                               ║\n";
+  std::cout << "╠════════════════════════════════════════════════════════════════════════════╣\n";
+  std::cout << "║ Total Probes:   " << std::setw(58) << std::left << total_probes << "║\n";
+  std::cout << "║ Invalid Probes: " << std::setw(58) << std::left << invalid_probes << "║\n";
+  std::cout << "║ Valid Probes:   " << std::setw(58) << std::left << (total_probes - invalid_probes)
+            << "║\n";
+  std::cout << "╚════════════════════════════════════════════════════════════════════════════╝\n";
+
+  if (invalid_function_names.empty()) {
+    std::cout << "\n✅ All probes validated successfully!\n\n";
+    return;
+  }
+
+  std::cout << "\n";
+  std::cout << "╔═══════════════════════════════════════════════════════════════════════════╗\n";
+  std::cout << "║                     INVALID PROBES BY CATEGORY                            ║\n";
+  std::cout << "╚════════════════════════════════════════════════════════════════════════════╝\n";
+
+  for (const auto& [category, functions] : invalid_function_names) {
+    std::cout << "\n┌─ Category: " << category << " (" << functions.size() << " invalid)\n";
+    std::cout << "│\n";
+
+    // Show first 10 invalid functions for each category
+    size_t max_display = std::min<size_t>(10, functions.size());
+    for (size_t i = 0; i < max_display; ++i) {
+      std::cout << "│  ✗ " << functions[i] << "\n";
+    }
+
+    if (functions.size() > max_display) {
+      std::cout << "│  ... and " << (functions.size() - max_display) << " more\n";
+    }
+    std::cout << "└─────────────────────────────────────────────────────────────────────────────\n";
+  }
+
+  std::cout << "\n";
+}
+
+// Function to set memory limit to 2GB
+bool setMemoryLimit(size_t limit_mb = 2048) {
+  struct rlimit limit;
+  limit.rlim_cur = limit_mb * 1024 * 1024;  // 2GB in bytes
+  limit.rlim_max = limit_mb * 1024 * 1024;  // 2GB in bytes
+
+  if (setrlimit(RLIMIT_AS, &limit) != 0) {
+    DC_LOG_ERROR("Failed to set memory limit: %s", strerror(errno));
+    return false;
+  }
+
+  DC_LOG_INFO("Memory limit set to %zu MB", limit_mb);
+  return true;
+}
+
 class ProbeValidator {
  public:
   ProbeValidator(int argc, char** argv) {
@@ -45,6 +108,16 @@ class ProbeValidator {
       DC_LOG_ERROR("Failed to read probes file: %s", probesFile.c_str());
       return invalid_function_names;
     }
+
+    // Use RAII wrapper for automatic cleanup
+    auto json_cleanup = [](struct json_object* ptr) {
+      if (ptr) {
+        json_object_put(ptr);
+      }
+    };
+    std::unique_ptr<struct json_object, decltype(json_cleanup)> json_guard(probesJson,
+                                                                           json_cleanup);
+
     int arr_len = json_object_array_length(probesJson);
     DC_LOG_INFO("[ProbeGenerator] Number of probes: %d", arr_len);
     struct bpf_program* kprobe_prog = bpf_object__find_program_by_name(skel->obj, "kprobe_test");
@@ -70,12 +143,12 @@ class ProbeValidator {
     std::atomic<size_t> atomic_invalid_probes{0};
     std::atomic<size_t> atomic_current_probe{0};
 
-    auto validate_func = [&](const Probe& probe, const std::string& func,
-                             struct json_object* jprobe) {
+    auto validate_func = [&](const std::string& probe_name, ProbeType probe_type,
+                             const std::string& func, struct json_object* jprobe) {
       atomic_current_probe++;
       DC_LOG_PROGRESS("Validating probe", atomic_current_probe.load(), total_probes);
       bool is_invalid = false;
-      if (probe.type == ProbeType::KPROBE) {
+      if (probe_type == ProbeType::KPROBE) {
         struct bpf_kprobe_opts opts = {
             .sz = sizeof(struct bpf_kprobe_opts),
         };
@@ -85,7 +158,7 @@ class ProbeValidator {
         } else {
           bpf_link__destroy(link);
         }
-      } else if (probe.type == ProbeType::UPROBE) {
+      } else if (probe_type == ProbeType::UPROBE) {
         auto uprobe = UProbe::fromJson(jprobe);
         std::string function_name, offset;
         auto pos = func.find(':');
@@ -109,7 +182,7 @@ class ProbeValidator {
         } else {
           bpf_link__destroy(link);
         }
-      } else if (probe.type == ProbeType::SYSCALLS) {
+      } else if (probe_type == ProbeType::SYSCALLS) {
         struct bpf_ksyscall_opts opts = {
             .sz = sizeof(struct bpf_ksyscall_opts),
         };
@@ -123,7 +196,7 @@ class ProbeValidator {
       if (is_invalid) {
         atomic_invalid_probes++;
         std::lock_guard<std::mutex> lock(invalid_mutex);
-        invalid_function_names[probe.name].push_back(func);
+        invalid_function_names[probe_name].push_back(func);
       }
     };
 
@@ -134,7 +207,9 @@ class ProbeValidator {
     std::mutex queue_mutex;
     std::condition_variable cv;
     bool done = false;
-    std::queue<std::tuple<Probe, std::string, struct json_object*>> task_queue;
+
+    // Store probe_name, probe_type, function_name, and json_object
+    std::queue<std::tuple<std::string, ProbeType, std::string, struct json_object*>> task_queue;
 
     // Producer: enqueue all validation tasks
     for (int i = 0; i < arr_len; ++i) {
@@ -143,7 +218,8 @@ class ProbeValidator {
       for (size_t func_index = 0; func_index < probe.functions.size(); ++func_index) {
         const auto& func = probe.functions[func_index];
         std::lock_guard<std::mutex> lock(queue_mutex);
-        task_queue.emplace(probe, func, jprobe);
+        // Store copies of probe.name and probe.type to avoid race conditions
+        task_queue.emplace(probe.name, probe.type, func, jprobe);
       }
     }
 
@@ -151,7 +227,6 @@ class ProbeValidator {
     for (size_t i = 0; i < num_workers; ++i) {
       workers.emplace_back([&]() {
         while (true) {
-          std::tuple<Probe, std::string, struct json_object*> task;
           {
             std::unique_lock<std::mutex> lock(queue_mutex);
             cv.wait(lock, [&]() { return !task_queue.empty() || done; });
@@ -161,10 +236,19 @@ class ProbeValidator {
               else
                 continue;
             }
-            // Move declaration and initialization together to avoid default construction
-            auto task = std::move(task_queue.front());
+            // Extract data from the queue with proper copies
+            auto& front_task = task_queue.front();
+            std::string probe_name = std::get<0>(front_task);
+            ProbeType probe_type = std::get<1>(front_task);
+            std::string func = std::get<2>(front_task);
+            struct json_object* jprobe = std::get<3>(front_task);
             task_queue.pop();
-            validate_func(std::get<0>(task), std::get<1>(task), std::get<2>(task));
+
+            // Release lock before validation (which can be slow)
+            lock.unlock();
+
+            // Now validate with copied data
+            validate_func(probe_name, probe_type, func, jprobe);
           }
         }
       });
@@ -180,6 +264,21 @@ class ProbeValidator {
     for (auto& t : workers) t.join();
 
     invalid_probes = atomic_invalid_probes.load();
+
+    // Verify counts match - diagnostic check
+    size_t total_invalid_stored = 0;
+    for (const auto& [name, functions] : invalid_function_names) {
+      total_invalid_stored += functions.size();
+    }
+
+    if (total_invalid_stored != invalid_probes) {
+      DC_LOG_ERROR("Race condition detected! Invalid probes counted: %zu, but stored: %zu",
+                   invalid_probes, total_invalid_stored);
+    } else {
+      DC_LOG_INFO("Validation counts verified: %zu invalid probes counted and stored",
+                  invalid_probes);
+    }
+
     return invalid_function_names;
   }
   size_t total_probes() const { return configManager_->category_map.size(); }
@@ -191,13 +290,26 @@ class ProbeValidator {
 }  // namespace datacrumbs
 
 int main(int argc, char** argv) {
+  // Set memory limit to 2GB
+  if (!datacrumbs::setMemoryLimit(2048)) {
+    DC_LOG_ERROR("Failed to set memory limit, continuing anyway...");
+  }
+
   auto configManager_ =
       datacrumbs::Singleton<datacrumbs::ConfigurationManager>::get_instance(argc, argv);
+
   struct validator* skel = validator__open_and_load();
   if (!skel) {
     DC_LOG_ERROR("Failed to open and load datacrumbs_validator BPF skeleton");
     return 1;
   }
+
+  // Use RAII for skeleton cleanup
+  auto skel_cleanup = [](struct validator* s) {
+    if (s) validator__destroy(s);
+  };
+  std::unique_ptr<struct validator, decltype(skel_cleanup)> skel_guard(skel, skel_cleanup);
+
   size_t invalid_probes = 0;
   try {
     datacrumbs::ProbeValidator validator(argc, argv);
@@ -206,6 +318,10 @@ int main(int argc, char** argv) {
     invalid_probes = validator.invalid_probes;
     DC_LOG_INFO("\nProbe validation completed: total_probes=%zu, invalid_probes=%zu", total_probes,
                 invalid_probes);
+
+    // Pretty print the invalid probes categorized by category
+    datacrumbs::prettyPrintInvalidProbes(invalid_function_names, total_probes, invalid_probes);
+
     struct json_object* invalid_probesJson =
         json_object_from_file(configManager_->probe_file_path.c_str());
     // Iterate over probesJson array, clear functions attribute for all probes, then add invalid
@@ -249,10 +365,8 @@ int main(int argc, char** argv) {
     chmod(configManager_->probe_invalid_file_path.c_str(), 0640);
   } catch (const std::exception& ex) {
     DC_LOG_ERROR("Exception: %s", ex.what());
-    validator__destroy(skel);
     return -1;
   }
 
-  validator__destroy(skel);
   return invalid_probes > 0 ? -1 : 0;
 }

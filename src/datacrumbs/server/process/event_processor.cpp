@@ -148,9 +148,9 @@ int EventProcessor::handle_event(void* data, size_t data_sz) {
     DC_LOG_WARN("No category found for event_id %llu", event->event_id);
   }
   DC_LOG_TRACE("handle_event: end");
-  std::string progress_msg =
-      "Processed events failed: " + std::to_string(failed_events) + " current:";
-  if (configManager_->mpi_rank == 0) DC_LOG_PROGRESS_SINGLE(progress_msg.c_str(), event_index);
+  // std::string progress_msg =
+  //     "Processed events failed: " + std::to_string(failed_events) + " current:";
+  // if (configManager_->mpi_rank == 0) DC_LOG_PROGRESS_SINGLE(progress_msg.c_str(), event_index);
   return 0;
 }
 int EventProcessor::update_filename(const char* filename, unsigned int hash) {
@@ -158,9 +158,11 @@ int EventProcessor::update_filename(const char* filename, unsigned int hash) {
     DC_LOG_DEBUG("Filename %s with hash %u already processed, skipping", filename, hash);
     return 0;  // Skip if already processed
   }
+  auto file_str = utils::remove_non_utf8(filename);
+
   processed_hashes_.insert(hash);  // Mark this hash as processed
   auto args = new DataCrumbsArgs();
-  args->emplace("value", std::string(filename));
+  args->emplace("value", file_str);
   args->emplace("hash", hash);
   auto event =
       new datacrumbs::EventWithId(METADATA_EVENT, event_index.fetch_add(1), 0, 0, 0, 0, 0, args);
@@ -170,6 +172,7 @@ int EventProcessor::update_filename(const char* filename, unsigned int hash) {
   return 0;
 }
 int EventProcessor::finalize() {
+  DC_LOG_PRINT("Collected %d events and failed %d events", event_index.load(), failed_events);
   auto writer_ = datacrumbs::Singleton<datacrumbs::ChromeWriter>::get_instance();
   if (writer_) {
     writer_->finalize();

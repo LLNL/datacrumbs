@@ -1,0 +1,34 @@
+# Valgrind suppression file for probe_validator
+# This file helps suppress known false positives in BPF/libbpf libraries
+
+{
+   libbpf_allocation
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   fun:*bpf*
+}
+
+{
+   json_c_allocation
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   fun:*json*
+}
+
+{
+   glibc_dl_allocation
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   fun:_dl_*
+}
+
+{
+   pthread_allocation
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   fun:pthread_*
+}

@@ -97,14 +97,14 @@ ArgumentParser::ArgumentParser(int argc, char** argv, ExecutableType exe_type) {
     } else if (arg == "--log_dir" && i + 1 < argc) {
       log_dir = argv[++i];
       DC_LOG_DEBUG("[ArgumentParser] Log directory set to: %s", log_dir->c_str());
-    } else if (arg == "--disable_mpi") {
+    } else if (arg == "--disable-mpi") {
       disable_mpi = true;
       DC_LOG_DEBUG("[ArgumentParser] disable_mpi set to: %s", disable_mpi ? "true" : "false");
     } else if (arg == "--help" || arg == "-h") {
       DC_LOG_PRINT(
           "Usage: %s <config_name> [--run_id <id>] [--trace_log_dir <path>] "
           "[--config_path <path>] [--user <user>] [--data_dir "
-          "<path>] [--inclusion_path <path>] [--log_dir <path>]",
+          "<path>] [--inclusion_path <path>] [--log_dir <path>] [--disable-mpi]",
           argv[0]);
       exit(0);
     } else {
@@ -220,6 +220,8 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
 
           std::shared_ptr<CaptureProbe> probe;
 
+          DC_LOG_DEBUG("[ConfigurationManager] Capture probe enable_explorer set to: %s",
+                       probe->enable_explorer ? "true" : "false");
           // Handle each capture probe type
           switch (type) {
             case CaptureType::HEADER: {
@@ -342,6 +344,11 @@ ConfigurationManager::ConfigurationManager(int argc, char** argv, bool print,
                            probe_node["type"].as<std::string>().c_str());
               throw std::invalid_argument("Unknown CaptureType in configuration: " +
                                           probe_node["type"].as<std::string>());
+          }
+          if (probe_node["enable_explorer"]) {
+            probe->enable_explorer = probe_node["enable_explorer"].as<bool>();
+          } else {
+            probe->enable_explorer = true;  // Default to true if not specified
           }
           // Parse probe type
           if (probe_node["probe"]) {

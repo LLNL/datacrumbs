@@ -1,0 +1,15 @@
+# .shellcheckrc for CMake templates
+# Allow @placeholder@ sourcing
+disable=SC1090,SC1091
+# Allow sed patterns with @ symbols
+disable=SC2001
+# Allow @VAR@ unquoted (will be replaced)
+disable=SC2086
+disable=SC2050
+disable=SC2155
+
+# Enforce style
+# Use [[ ]] consistently
+enable=require-double-brackets
+# Use ${var} consistently
+enable=require-variable-braces
