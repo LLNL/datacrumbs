@@ -51,6 +51,7 @@ class ChromeWriter {
   std::condition_variable queue_cv_;
   std::thread worker_;
   bool stop_flag_;
+  bool finalized_;
   unsigned long index_;
   ZlibCompression* compressor_;
   size_t chunk_size_;
