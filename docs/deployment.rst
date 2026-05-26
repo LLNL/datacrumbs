@@ -15,7 +15,7 @@ At a high level:
 1. install `datacrumbs`
 2. install `datacrumbs-utils` separately into the same prefix
 3. register `datacrumbs@.service` on compute nodes
-4. register `datacrumbs_sign_probes.service` on login nodes
+4. register `datacrumbs_probe_manager.service` on login nodes
 5. install Flux or SLURM prolog and epilog hooks
 6. generate signed probe files with `datacrumbs_probe_configurator`
 7. submit jobs with DataCrumbs metadata containing `probe_file`
@@ -27,7 +27,7 @@ Key files provided by the install:
 
 - `<install-prefix>/sbin/datacrumbs`
 - `<install-prefix>/etc/datacrumbs/systemd/datacrumbs@.service`
-- `<install-prefix>/etc/datacrumbs/systemd/datacrumbs_sign_probes.service`
+- `<install-prefix>/etc/datacrumbs/systemd/datacrumbs_probe_manager.service`
 - `<install-prefix>/sbin/datacrumbs_service_run.sh`
 - `<install-prefix>/sbin/datacrumbs_service_stop.sh`
 - `<install-prefix>/share/datacrumbs/data/system-probe-<install-user>-<host>.sqlite`
@@ -65,14 +65,14 @@ The unit:
 Login-node signing deployment
 =============================
 
-Register the signer service on login nodes:
+Register the manager service on login nodes:
 
 .. code-block:: bash
 
-    sudo ln -sf <install-prefix>/etc/datacrumbs/systemd/datacrumbs_sign_probes.service \
-      /etc/systemd/system/datacrumbs_sign_probes.service
+    sudo ln -sf <install-prefix>/etc/datacrumbs/systemd/datacrumbs_probe_manager.service \
+      /etc/systemd/system/datacrumbs_probe_manager.service
     sudo systemctl daemon-reload
-    sudo systemctl enable --now datacrumbs_sign_probes.service
+    sudo systemctl enable --now datacrumbs_probe_manager.service
 
 This service must be running before users call `datacrumbs_probe_configurator`.
 

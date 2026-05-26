@@ -32,7 +32,7 @@ Installed components
 ====================
 
 - login node:
-  - `<install-prefix>/etc/datacrumbs/systemd/datacrumbs_sign_probes.service`
+  - `<install-prefix>/etc/datacrumbs/systemd/datacrumbs_probe_manager.service`
 - `<install-prefix>/etc/datacrumbs/systemd/datacrumbs@.service`
 - `<install-prefix>/sbin/datacrumbs_service_run.sh`
 - `<install-prefix>/sbin/datacrumbs_service_stop.sh`
@@ -46,10 +46,10 @@ must be running on the login node:
 
 .. code-block:: bash
 
-    sudo ln -sf <install-prefix>/etc/datacrumbs/systemd/datacrumbs_sign_probes.service \
-      /etc/systemd/system/datacrumbs_sign_probes.service
+    sudo ln -sf <install-prefix>/etc/datacrumbs/systemd/datacrumbs_probe_manager.service \
+      /etc/systemd/system/datacrumbs_probe_manager.service
     sudo systemctl daemon-reload
-    sudo systemctl enable --now datacrumbs_sign_probes.service
+    sudo systemctl enable --now datacrumbs_probe_manager.service
 
 Deploying the unit
 ==================

@@ -40,7 +40,7 @@ Those installed files are:
 
 On login nodes, probe generation also depends on:
 
-- `<install-prefix>/etc/datacrumbs/systemd/datacrumbs_sign_probes.service`
+- `<install-prefix>/etc/datacrumbs/systemd/datacrumbs_probe_manager.service`
 
 Direct Runtime Invocation
 =========================
@@ -108,19 +108,19 @@ targets are skipped on later runs, and a later successful attach removes any
 stale failed mark for the same target. This file is written with mode `0600`
 and owned by the datacrumbs install user.
 
-Probe signing service
+Probe manager service
 =====================
 
 `datacrumbs_probe_configurator` no longer signs probe files directly with a
 shared user-readable secret. Instead, it connects to the trusted login-node
-signer service:
+manager service:
 
 .. code-block:: bash
 
-    sudo ln -sf <install-prefix>/etc/datacrumbs/systemd/datacrumbs_sign_probes.service \
-      /etc/systemd/system/datacrumbs_sign_probes.service
+    sudo ln -sf <install-prefix>/etc/datacrumbs/systemd/datacrumbs_probe_manager.service \
+      /etc/systemd/system/datacrumbs_probe_manager.service
     sudo systemctl daemon-reload
-    sudo systemctl enable --now datacrumbs_sign_probes.service
+    sudo systemctl enable --now datacrumbs_probe_manager.service
 
 That service runs as `root`.
 It only accepts local requests from the installed

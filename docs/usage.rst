@@ -16,7 +16,7 @@ Quick Start
 .. code-block:: bash
 
     # login-node prerequisite
-    systemctl status datacrumbs_sign_probes.service
+    systemctl status datacrumbs_probe_manager.service
 
     datacrumbs_probe_configurator \
       <install-prefix>/etc/datacrumbs/configs/<host>.yaml \

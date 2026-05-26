@@ -161,7 +161,7 @@ Edit `my-io.yaml`, then generate probes:
 
 .. code-block:: bash
 
-    systemctl status datacrumbs_sign_probes.service
+    systemctl status datacrumbs_probe_manager.service
     datacrumbs_probe_configurator ./my-io.yaml /tmp/my-io-probes.json.gz
 
 Then run:
@@ -221,6 +221,6 @@ replace them with:
 
 - a YAML file
 - `datacrumbs_probe_configurator`
-- `datacrumbs_sign_probes.service` on the login node
+- `datacrumbs_probe_manager.service` on the login node
 - a signed `probes.json.gz`
 - `datacrumbs <probes.json.gz> [run-id]`

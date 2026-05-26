@@ -1,15 +1,22 @@
+#include <arpa/inet.h>
 #include <datacrumbs/common/logging.h>
 #include <datacrumbs/common/probe_file.h>
 #include <datacrumbs/common/runtime_configuration_manager.h>
 #include <datacrumbs/common/singleton.h>
 #include <json-c/json.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <pwd.h>
 #include <sqlite3.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -25,11 +32,67 @@ namespace {
 
 constexpr uint64_t kRuntimeProbeEventIdBase = 1000;
 constexpr int kSqliteBusyTimeoutMs = 5000;
+constexpr const char* kRpcVersion = "2.0";
+constexpr const char* kReportRuntimeStateMethod = "report_runtime_probe_state";
 
 struct InvalidProbeBucket {
   std::string group;
   std::string scope_key;
 };
+
+bool read_all_from_fd(int fd, std::string* payload) {
+  char buffer[4096];
+  payload->clear();
+  ssize_t read_bytes = 0;
+  for (;;) {
+    read_bytes = read(fd, buffer, sizeof(buffer));
+    if (read_bytes > 0) {
+      payload->append(buffer, static_cast<std::size_t>(read_bytes));
+      continue;
+    }
+    if (read_bytes < 0 && errno == EINTR) {
+      continue;
+    }
+    break;
+  }
+  return read_bytes == 0;
+}
+
+bool write_all_to_fd(int fd, const std::string& payload) {
+  std::size_t total_written = 0;
+  while (total_written < payload.size()) {
+    const ssize_t written =
+        write(fd, payload.data() + total_written, payload.size() - total_written);
+    if (written < 0 && errno == EINTR) {
+      continue;
+    }
+    if (written <= 0) {
+      return false;
+    }
+    total_written += static_cast<std::size_t>(written);
+  }
+  return true;
+}
+
+void append_probe_entries(json_object* output_entries,
+                          const std::unordered_map<std::string, RuntimeProbeScopes>& probe_sets) {
+  for (const auto& group_pair : probe_sets) {
+    const auto& probe_group = group_pair.first;
+    const auto& scopes = group_pair.second;
+    for (const auto& scope_pair : scopes) {
+      const auto& scope_key = scope_pair.first;
+      const auto& functions = scope_pair.second;
+      for (const auto& function_name : functions) {
+        json_object* entry = json_object_new_object();
+        json_object_object_add(entry, "probe_group", json_object_new_string(probe_group.c_str()));
+        json_object_object_add(entry, "scope_key", json_object_new_string(scope_key.c_str()));
+        json_object_object_add(entry, "function_name",
+                               json_object_new_string(function_name.c_str()));
+        json_object_array_add(output_entries, entry);
+      }
+    }
+  }
+}
 
 std::string json_string_or_empty(json_object* root, const char* key) {
   json_object* value = nullptr;
@@ -125,27 +188,10 @@ InvalidProbeBucket invalid_probe_bucket(const std::shared_ptr<Probe>& probe) {
   }
 }
 
-bool sqlite_exec(sqlite3* db, const char* sql, const std::filesystem::path& path,
-                 const char* operation) {
-  char* error_message = nullptr;
-  const int rc = sqlite3_exec(db, sql, nullptr, nullptr, &error_message);
-  if (rc == SQLITE_OK) {
-    return true;
-  }
-
-  const char* sqlite_message = error_message ? error_message : sqlite3_errmsg(db);
-  DC_LOG_WARN("[RuntimeConfigurationManager] Failed to %s %s: %s", operation, path.string().c_str(),
-              sqlite_message ? sqlite_message : "unknown sqlite error");
-  if (error_message) {
-    sqlite3_free(error_message);
-  }
-  return false;
-}
-
 sqlite3* open_runtime_probe_state_database(const std::filesystem::path& database_path, int flags) {
   sqlite3* db = nullptr;
   if (sqlite3_open_v2(database_path.c_str(), &db, flags, nullptr) != SQLITE_OK) {
-    DC_LOG_WARN("[RuntimeConfigurationManager] Failed to open runtime probe state database %s: %s",
+    DC_LOG_WARN("[RuntimeConfigurationManager] Failed to open sqlite database %s: %s",
                 database_path.string().c_str(), db ? sqlite3_errmsg(db) : "sqlite open failed");
     if (db) {
       sqlite3_close(db);
@@ -157,23 +203,168 @@ sqlite3* open_runtime_probe_state_database(const std::filesystem::path& database
   return db;
 }
 
-bool initialize_runtime_probe_state_database(sqlite3* db,
-                                             const std::filesystem::path& database_path) {
-  if (!sqlite_exec(db, "PRAGMA journal_mode=WAL;", database_path, "enable WAL mode")) {
+bool send_runtime_probe_state_to_manager(
+    const std::filesystem::path& database_path, const std::string& node_id,
+    const std::string& run_id,
+    const std::unordered_map<std::string, RuntimeProbeScopes>& invalid_probe_sets,
+    const std::unordered_map<std::string, RuntimeProbeScopes>& successful_probe_sets,
+    std::string* error) {
+  json_object* state_root = json_object_new_object();
+  json_object_object_add(state_root, "database_path",
+                         json_object_new_string(database_path.string().c_str()));
+  json_object_object_add(state_root, "node_id", json_object_new_string(node_id.c_str()));
+  json_object_object_add(state_root, "run_id", json_object_new_string(run_id.c_str()));
+  json_object* invalid_entries = json_object_new_array();
+  json_object* successful_entries = json_object_new_array();
+  append_probe_entries(invalid_entries, invalid_probe_sets);
+  append_probe_entries(successful_entries, successful_probe_sets);
+  json_object_object_add(state_root, "invalid_entries", invalid_entries);
+  json_object_object_add(state_root, "successful_entries", successful_entries);
+
+  const char* state_payload_cstr =
+      json_object_to_json_string_ext(state_root, JSON_C_TO_STRING_PLAIN);
+  const std::string state_payload = state_payload_cstr != nullptr ? state_payload_cstr : "";
+  json_object_put(state_root);
+  if (state_payload.empty()) {
+    if (error != nullptr) {
+      *error = "failed to build runtime state payload";
+    }
     return false;
   }
-  if (!sqlite_exec(db, "PRAGMA synchronous=NORMAL;", database_path, "set synchronous mode")) {
+
+  std::string secret;
+  if (!datacrumbs::probe_file::ensure_probe_secret(&secret)) {
+    if (error != nullptr) {
+      *error = "failed to read manager secret for runtime state report";
+    }
     return false;
   }
-  return sqlite_exec(db,
-                     "CREATE TABLE IF NOT EXISTS runtime_probe_status ("
-                     "probe_group TEXT NOT NULL,"
-                     "scope_key TEXT NOT NULL,"
-                     "function_name TEXT NOT NULL,"
-                     "status TEXT NOT NULL CHECK (status IN ('invalid', 'successful')),"
-                     "PRIMARY KEY (probe_group, scope_key, function_name, status)"
-                     ");",
-                     database_path, "create runtime probe state table");
+  const std::string state_hmac = datacrumbs::probe_file::hmac_sha256_hex(secret, state_payload);
+  if (state_hmac.empty()) {
+    if (error != nullptr) {
+      *error = "failed to compute runtime state payload hmac";
+    }
+    return false;
+  }
+
+  const int client_fd = socket(AF_INET, SOCK_STREAM, 0);
+  if (client_fd < 0) {
+    if (error != nullptr) {
+      *error = "failed to create manager RPC socket";
+    }
+    return false;
+  }
+
+  struct addrinfo hints{};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  struct addrinfo* resolved = nullptr;
+  const std::string port_string = std::to_string(DATACRUMBS_PROBE_MANAGER_TCP_PORT);
+  const int gai_rc =
+      getaddrinfo(DATACRUMBS_PROBE_MANAGER_TCP_HOST, port_string.c_str(), &hints, &resolved);
+  if (gai_rc != 0 || resolved == nullptr) {
+    if (error != nullptr) {
+      *error = "invalid manager TCP host for runtime state report";
+    }
+    if (resolved != nullptr) {
+      freeaddrinfo(resolved);
+    }
+    close(client_fd);
+    return false;
+  }
+
+  bool connected = false;
+  for (struct addrinfo* addr = resolved; addr != nullptr; addr = addr->ai_next) {
+    if (connect(client_fd, addr->ai_addr, addr->ai_addrlen) == 0) {
+      connected = true;
+      break;
+    }
+  }
+  freeaddrinfo(resolved);
+
+  if (!connected) {
+    if (error != nullptr) {
+      *error = "failed to connect to manager for runtime state report";
+    }
+    close(client_fd);
+    return false;
+  }
+
+  json_object* request_root = json_object_new_object();
+  json_object* params = json_object_new_object();
+  json_object_object_add(params, "state_payload", json_object_new_string(state_payload.c_str()));
+  json_object_object_add(params, "state_hmac", json_object_new_string(state_hmac.c_str()));
+  json_object_object_add(request_root, "jsonrpc", json_object_new_string(kRpcVersion));
+  json_object_object_add(request_root, "id", json_object_new_string("runtime-state-1"));
+  json_object_object_add(request_root, "method", json_object_new_string(kReportRuntimeStateMethod));
+  json_object_object_add(request_root, "params", params);
+  const char* request_json = json_object_to_json_string_ext(request_root, JSON_C_TO_STRING_PLAIN);
+  const std::string request_payload = request_json != nullptr ? request_json : "";
+  json_object_put(request_root);
+
+  if (request_payload.empty() || !write_all_to_fd(client_fd, request_payload)) {
+    if (error != nullptr) {
+      *error = "failed to send runtime state report to manager";
+    }
+    close(client_fd);
+    return false;
+  }
+
+  shutdown(client_fd, SHUT_WR);
+  std::string response_payload;
+  const bool response_ok = read_all_from_fd(client_fd, &response_payload);
+  close(client_fd);
+  if (!response_ok || response_payload.empty()) {
+    if (error != nullptr) {
+      *error = "failed to read manager runtime state response";
+    }
+    return false;
+  }
+
+  json_object* response_root = json_tokener_parse(response_payload.c_str());
+  if (response_root == nullptr || json_object_get_type(response_root) != json_type_object) {
+    if (response_root != nullptr) {
+      json_object_put(response_root);
+    }
+    if (error != nullptr) {
+      *error = "invalid manager response for runtime state report";
+    }
+    return false;
+  }
+
+  json_object* error_obj = nullptr;
+  if (json_object_object_get_ex(response_root, "error", &error_obj) && error_obj != nullptr) {
+    if (error != nullptr) {
+      *error = json_string_or_empty(error_obj, "message");
+      if (error->empty()) {
+        *error = "manager rejected runtime state report";
+      }
+    }
+    json_object_put(response_root);
+    return false;
+  }
+
+  json_object* result_obj = nullptr;
+  if (!json_object_object_get_ex(response_root, "result", &result_obj) || result_obj == nullptr ||
+      json_object_get_type(result_obj) != json_type_object) {
+    json_object_put(response_root);
+    if (error != nullptr) {
+      *error = "manager response missing runtime state result";
+    }
+    return false;
+  }
+
+  const std::string checksum = json_string_or_empty(result_obj, "checksum");
+  json_object_put(response_root);
+  if (checksum != "accepted") {
+    if (error != nullptr) {
+      *error = "manager did not accept runtime state report";
+    }
+    return false;
+  }
+
+  return true;
 }
 
 void ensure_directory_owned_by_install_user(const std::filesystem::path& directory) {
@@ -356,8 +547,11 @@ void RuntimeConfigurationManager::derive_configurations() {
 void RuntimeConfigurationManager::load_runtime_system_configuration() {
   sqlite3* db = open_runtime_probe_state_database(system_probe_path, SQLITE_OPEN_READONLY);
   if (!db) {
-    throw std::runtime_error("Failed to open system configuration database: " +
-                             system_probe_path.string());
+    DC_LOG_WARN(
+        "[RuntimeConfigurationManager] System configuration database unavailable at %s; "
+        "continuing with compiled runtime defaults",
+        system_probe_path.string().c_str());
+    return;
   }
 
   const auto summary = load_sqlite_kv_table(db, "summary", system_probe_path);
@@ -580,103 +774,17 @@ void RuntimeConfigurationManager::persist_runtime_probe_state() const {
   std::error_code ec;
   std::filesystem::create_directories(runtime_probe_state_db_path.parent_path(), ec);
 
-  sqlite3* db = open_runtime_probe_state_database(runtime_probe_state_db_path,
-                                                  SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
-  if (!db) {
+  std::string rpc_error;
+  if (!send_runtime_probe_state_to_manager(runtime_probe_state_db_path, hostname, run_id,
+                                           invalid_runtime_probes, successful_runtime_probes,
+                                           &rpc_error)) {
+    DC_LOG_WARN("[RuntimeConfigurationManager] Failed to report runtime probe state to manager: %s",
+                rpc_error.c_str());
     return;
   }
 
-  if (!initialize_runtime_probe_state_database(db, runtime_probe_state_db_path)) {
-    sqlite3_close(db);
-    return;
-  }
-  if (!sqlite_exec(db, "BEGIN IMMEDIATE TRANSACTION;", runtime_probe_state_db_path,
-                   "begin transaction")) {
-    sqlite3_close(db);
-    return;
-  }
-
-  sqlite3_stmt* insert_statement = nullptr;
-  const char* insert_sql =
-      "INSERT OR IGNORE INTO runtime_probe_status "
-      "(probe_group, scope_key, function_name, status) VALUES (?, ?, ?, ?);";
-  if (sqlite3_prepare_v2(db, insert_sql, -1, &insert_statement, nullptr) != SQLITE_OK) {
-    DC_LOG_WARN(
-        "[RuntimeConfigurationManager] Failed to prepare runtime probe state insert for %s: %s",
-        runtime_probe_state_db_path.string().c_str(), sqlite3_errmsg(db));
-    sqlite_exec(db, "ROLLBACK;", runtime_probe_state_db_path, "rollback transaction");
-    sqlite3_close(db);
-    return;
-  }
-
-  sqlite3_stmt* delete_invalid_statement = nullptr;
-  const char* delete_invalid_sql =
-      "DELETE FROM runtime_probe_status WHERE probe_group = ? AND scope_key = ? "
-      "AND function_name = ? AND status = 'invalid';";
-  if (sqlite3_prepare_v2(db, delete_invalid_sql, -1, &delete_invalid_statement, nullptr) !=
-      SQLITE_OK) {
-    DC_LOG_WARN(
-        "[RuntimeConfigurationManager] Failed to prepare runtime probe state cleanup for %s: %s",
-        runtime_probe_state_db_path.string().c_str(), sqlite3_errmsg(db));
-    sqlite3_finalize(insert_statement);
-    sqlite_exec(db, "ROLLBACK;", runtime_probe_state_db_path, "rollback transaction");
-    sqlite3_close(db);
-    return;
-  }
-
-  const auto insert_entries = [&](const auto& probe_sets, const char* status) {
-    for (const auto& [probe_group, scopes] : probe_sets) {
-      for (const auto& [scope_key, functions] : scopes) {
-        for (const auto& function_name : functions) {
-          sqlite3_reset(insert_statement);
-          sqlite3_clear_bindings(insert_statement);
-          sqlite3_bind_text(insert_statement, 1, probe_group.c_str(), -1, SQLITE_TRANSIENT);
-          sqlite3_bind_text(insert_statement, 2, scope_key.c_str(), -1, SQLITE_TRANSIENT);
-          sqlite3_bind_text(insert_statement, 3, function_name.c_str(), -1, SQLITE_TRANSIENT);
-          sqlite3_bind_text(insert_statement, 4, status, -1, SQLITE_STATIC);
-          if (sqlite3_step(insert_statement) != SQLITE_DONE) {
-            DC_LOG_WARN(
-                "[RuntimeConfigurationManager] Failed to persist %s runtime probe entry to %s: %s",
-                status, runtime_probe_state_db_path.string().c_str(), sqlite3_errmsg(db));
-          }
-        }
-      }
-    }
-  };
-
-  for (const auto& [probe_group, scopes] : successful_runtime_probes) {
-    for (const auto& [scope_key, functions] : scopes) {
-      for (const auto& function_name : functions) {
-        sqlite3_reset(delete_invalid_statement);
-        sqlite3_clear_bindings(delete_invalid_statement);
-        sqlite3_bind_text(delete_invalid_statement, 1, probe_group.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_text(delete_invalid_statement, 2, scope_key.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_text(delete_invalid_statement, 3, function_name.c_str(), -1, SQLITE_TRANSIENT);
-        if (sqlite3_step(delete_invalid_statement) != SQLITE_DONE) {
-          DC_LOG_WARN(
-              "[RuntimeConfigurationManager] Failed to clear stale invalid runtime probe entry "
-              "from %s: %s",
-              runtime_probe_state_db_path.string().c_str(), sqlite3_errmsg(db));
-        }
-      }
-    }
-  }
-
-  insert_entries(successful_runtime_probes, "successful");
-  insert_entries(invalid_runtime_probes, "invalid");
-
-  sqlite3_finalize(delete_invalid_statement);
-  sqlite3_finalize(insert_statement);
-  if (!sqlite_exec(db, "COMMIT;", runtime_probe_state_db_path, "commit transaction")) {
-    sqlite3_close(db);
-    return;
-  }
-  sqlite3_close(db);
-
-  if (struct passwd* pwd = getpwnam(DATACRUMBS_INSTALL_USER); pwd != nullptr) {
-    chown(runtime_probe_state_db_path.c_str(), pwd->pw_uid, pwd->pw_gid);
-  }
-  chmod(runtime_probe_state_db_path.c_str(), S_IRUSR | S_IWUSR);
+  DC_LOG_INFO("[RuntimeConfigurationManager] Reported runtime probe state to manager for node %s",
+              hostname.c_str());
 }
 
 std::optional<uint64_t> RuntimeConfigurationManager::get_runtime_event_id(
@@ -712,9 +820,6 @@ void RuntimeConfigurationManager::validate_configurations() const {
   }
   if (trace_log_dir.empty() || !std::filesystem::exists(trace_log_dir)) {
     throw std::runtime_error("Trace log directory does not exist: " + trace_log_dir.string());
-  }
-  if (system_probe_path.empty() || !std::filesystem::exists(system_probe_path)) {
-    throw std::runtime_error("System probe file does not exist: " + system_probe_path.string());
   }
   if (server_run_id_file.empty()) {
     throw std::runtime_error("Run-id file path is empty.");

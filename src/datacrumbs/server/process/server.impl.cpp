@@ -64,6 +64,16 @@ static bool split_uprobe_target(const std::string& symbol_with_offset, std::stri
   return true;
 }
 
+static std::string normalize_syscall_name_for_attach(const std::string& function_name) {
+  if (function_name.rfind("__x64_sys_", 0) == 0) {
+    return function_name.substr(10);
+  }
+  if (function_name.rfind("sys_", 0) == 0) {
+    return function_name.substr(4);
+  }
+  return function_name;
+}
+
 static unsigned int runtime_probe_kind(datacrumbs::ProbeType probe_type) {
   switch (probe_type) {
     case datacrumbs::ProbeType::KPROBE:
@@ -217,6 +227,7 @@ static int attach_runtime_probes(datacrumbs::EventProcessor* event_processor,
         total_attached += 2;
       } else if (probe->type == datacrumbs::ProbeType::SYSCALLS) {
         total_requested += 2;
+        const std::string syscall_name = normalize_syscall_name_for_attach(function_name);
         if (populate_event_arg_config(event_arg_config_fd, current_cookie, *event_id, probe->type,
                                       probe->getArgSpecs(function_name)) != 0) {
           total_failed += 2;
@@ -230,9 +241,9 @@ static int attach_runtime_probes(datacrumbs::EventProcessor* event_processor,
         exit_opts.retprobe = true;
         exit_opts.bpf_cookie = current_cookie;
         auto* entry_link =
-            bpf_program__attach_ksyscall(syscall_entry, function_name.c_str(), &entry_opts);
+            bpf_program__attach_ksyscall(syscall_entry, syscall_name.c_str(), &entry_opts);
         auto* exit_link =
-            bpf_program__attach_ksyscall(syscall_exit, function_name.c_str(), &exit_opts);
+            bpf_program__attach_ksyscall(syscall_exit, syscall_name.c_str(), &exit_opts);
         if (libbpf_get_error(entry_link) || libbpf_get_error(exit_link)) {
           config_manager->record_invalid_runtime_probe(probe, function_name);
           runtime_probe_state_updated = true;

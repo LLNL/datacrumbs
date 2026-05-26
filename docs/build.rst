@@ -70,40 +70,35 @@ Example:
       -DDATACRUMBS_USER=root \
       -DDATACRUMBS_INSTALL_USER=haridev
 
-Install-Time System Configuration
-=================================
+Install-Time Configuration
+==========================
 
-The system configurator moved from `datacrumbs-utils` into `datacrumbs`.
+`datacrumbs` and `datacrumbs-utils` now consume configure-time values directly
+from installed headers and exported environment variables.
 
-During the `datacrumbs` build/install flow:
+There is no separate system configurator executable in the install flow.
 
-- `datacrumbs_system_configurator` is built from the `datacrumbs` tree
-- it writes the install-time system configuration and probe secret if they are
-  missing
-- it does not recreate them on every build
+Generated file:
 
-Generated files:
-
-- `<install-prefix>/share/datacrumbs/data/system-probe-<install-user>-<host>.json.gz`
 - `<install-prefix>/share/datacrumbs/data/.datacrumbs-probe-secret`
 
 The secret is stored in `share/datacrumbs/data`, not under `etc`.
 It is intended to be readable only by `root`.
 
-Login-node signing service
+Login-node manager service
 ==========================
 
-Probe generation now relies on a trusted signer service on the login node:
+Probe generation now relies on a trusted manager service on the login node:
 
-- executable: `<install-prefix>/bin/datacrumbs_sign_probes`
-- unit: `<install-prefix>/etc/datacrumbs/systemd/datacrumbs_sign_probes.service`
+- executable: `<install-prefix>/sbin/datacrumbs_probe_manager`
+- unit: `<install-prefix>/etc/datacrumbs/systemd/datacrumbs_probe_manager.service`
 
 That service runs as `root`, owns the secret, and signs probe
 documents on behalf of `datacrumbs_probe_configurator`.
 It only accepts requests from the installed `datacrumbs_probe_configurator_exec`
 binary, and the HMAC covers the signed probe document metadata plus the
 categories payload so post-sign tampering is detected. The configurator sends
-only the canonical signing payload to the signer service and writes the final
+only the canonical signing payload to the manager service and writes the final
 probe document locally.
 
 Dependencies

@@ -220,10 +220,6 @@ inline json_object* verified_categories_from_root(json_object* root, const std::
     return nullptr;
   }
 
-#ifdef DATACRUMBS_DISABLE_PROBE_SIGNING
-  (void)secret;
-  return json_object_get(categories);
-#else
   if (!json_object_object_get_ex(root, "checksum", &checksum_obj) ||
       json_object_get_type(checksum_obj) != json_type_string) {
     if (error != nullptr) {
@@ -251,32 +247,10 @@ inline json_object* verified_categories_from_root(json_object* root, const std::
   }
 
   return json_object_get(categories);
-#endif
 }
 
 inline json_object* load_verified_categories_from_file(const std::filesystem::path& path,
                                                        std::string* error = nullptr) {
-#ifdef DATACRUMBS_DISABLE_PROBE_SIGNING
-  const std::string payload = read_probe_payload(path);
-  if (payload.empty()) {
-    if (error != nullptr) {
-      *error = "failed to read probe file";
-    }
-    return nullptr;
-  }
-
-  json_object* root = json_tokener_parse(payload.c_str());
-  if (root == nullptr) {
-    if (error != nullptr) {
-      *error = "failed to parse probe file";
-    }
-    return nullptr;
-  }
-
-  json_object* categories = verified_categories_from_root(root, "", error);
-  json_object_put(root);
-  return categories;
-#else
   std::string secret;
   if (!ensure_probe_secret(&secret)) {
     if (error != nullptr) {
@@ -304,7 +278,6 @@ inline json_object* load_verified_categories_from_file(const std::filesystem::pa
   json_object* categories = verified_categories_from_root(root, secret, error);
   json_object_put(root);
   return categories;
-#endif
 }
 
 }  // namespace datacrumbs::probe_file

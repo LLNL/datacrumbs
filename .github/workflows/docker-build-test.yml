@@ -31,23 +31,11 @@ jobs:
           - os_name: ubuntu-22.04
             runner: ubuntu-22.04
             flow_name: Build and Flow Test
-            flow_id: signed
-            disable_signing: "false"
-          - os_name: ubuntu-22.04
-            runner: ubuntu-22.04
-            flow_name: Disabled Signing Flow Test
-            flow_id: disabled-signing
-            disable_signing: "true"
+            flow_id: manager
           - os_name: ubuntu-24.04
             runner: ubuntu-24.04
             flow_name: Build and Flow Test
-            flow_id: signed
-            disable_signing: "false"
-          - os_name: ubuntu-24.04
-            runner: ubuntu-24.04
-            flow_name: Disabled Signing Flow Test
-            flow_id: disabled-signing
-            disable_signing: "true"
+            flow_id: manager
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -193,11 +181,6 @@ jobs:
       - name: Configure datacrumbs
         run: |
           set -euo pipefail
-          extra_cmake_args=()
-          if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
-            extra_cmake_args+=("-DDATACRUMBS_DISABLE_PROBE_SIGNING=ON")
-          fi
-
           cmake -S "${GITHUB_WORKSPACE}/datacrumbs" -B "${BUILD_DIR}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
@@ -208,8 +191,7 @@ jobs:
             -DDATACRUMBS_INSTALL_USER="${USER}" \
             -DDATACRUMBS_CONFIGURED_LOG_DIR="${LOG_DIR}" \
             -DDATACRUMBS_CONFIGURED_TRACE_DIR="${TRACE_DIR}" \
-            -DDATACRUMBS_KERNEL_HEADERS_PATH="/usr/src/linux-headers-$(uname -r)" \
-            "${extra_cmake_args[@]}"
+            -DDATACRUMBS_KERNEL_HEADERS_PATH="/usr/src/linux-headers-$(uname -r)"
 
       - name: Build datacrumbs
         run: |
@@ -224,16 +206,11 @@ jobs:
       - name: Configure compatible datacrumbs-utils
         run: |
           set -euo pipefail
-          utils_extra_cmake_args=()
-          if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
-            utils_extra_cmake_args+=("-DDATACRUMBS_DISABLE_PROBE_SIGNING=ON")
-          fi
-
           cmake -S "${GITHUB_WORKSPACE}/datacrumbs-utils" -B "${UTILS_BUILD_DIR}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
             -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX};${CMAKE_PREFIX_PATH:-}" \
-            "${utils_extra_cmake_args[@]}"
+            -DDATACRUMBS_KERNEL_HEADERS_PATH="/usr/src/linux-headers-$(uname -r)"
 
       - name: Build datacrumbs-utils
         run: |
@@ -266,27 +243,14 @@ jobs:
           ! ldd "${probe_exec}" | grep -q "not found"
           ldd "${probe_exec}" | grep -q "libclang"
 
-      - name: Run system configurator explicitly
+      - name: Install and start runtime systemd units
         run: |
           set -euo pipefail
-          sudo "${INSTALL_PREFIX}/bin/datacrumbs_system_configurator"
-
-      - name: Install and start signing-enabled systemd units
-        if: matrix.disable_signing == 'false'
-        run: |
-          set -euo pipefail
-          sudo ln -sf "${INSTALL_PREFIX}/etc/datacrumbs/systemd/datacrumbs_sign_probes.service" /etc/systemd/system/datacrumbs_sign_probes.service
+          sudo ln -sf "${INSTALL_PREFIX}/etc/datacrumbs/systemd/datacrumbs_probe_manager.service" /etc/systemd/system/datacrumbs_probe_manager.service
           sudo ln -sf "${INSTALL_PREFIX}/etc/datacrumbs/systemd/datacrumbs@.service" /etc/systemd/system/datacrumbs@.service
           sudo systemctl daemon-reload
-          sudo systemctl enable --now datacrumbs_sign_probes.service
-          sudo systemctl status --no-pager datacrumbs_sign_probes.service
-
-      - name: Install disabled-signing runtime systemd unit
-        if: matrix.disable_signing == 'true'
-        run: |
-          set -euo pipefail
-          sudo ln -sf "${INSTALL_PREFIX}/etc/datacrumbs/systemd/datacrumbs@.service" /etc/systemd/system/datacrumbs@.service
-          sudo systemctl daemon-reload
+          sudo systemctl enable --now datacrumbs_probe_manager.service
+          sudo systemctl status --no-pager datacrumbs_probe_manager.service
 
       - name: Generate probes
         run: |
@@ -346,11 +310,6 @@ jobs:
 
           set +x
 
-          if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
-            grep -q "Probe signing is disabled" <<<"${probe_output}"
-            python3 -c 'import gzip, json, os; from pathlib import Path; probe_file = Path(os.environ["PROBE_FILE"]); payload = json.load(gzip.open(probe_file, "rt", encoding="utf-8")); assert "checksum" not in payload, payload; assert "checksum_algorithm" not in payload, payload; assert isinstance(payload.get("categories"), list) and payload["categories"], payload'
-          fi
-
       - name: Run datacrumbs wrapper flow and verify logs
         run: |
           set -euo pipefail
@@ -361,18 +320,65 @@ jobs:
             "${INSTALL_PREFIX}/bin/datacrumbs_service_wrapper" stop "${JOB_ID}" "${service_user}" "${PROBE_FILE}" || true
             sudo systemctl status --no-pager "datacrumbs@${JOB_ID}.service" || true
             sudo journalctl -u "datacrumbs@${JOB_ID}.service" --no-pager -n 200 || true
-            if [[ "${{ matrix.disable_signing }}" == "false" ]]; then
-              sudo journalctl -u datacrumbs_sign_probes.service --no-pager -n 200 || true
-            fi
+            sudo journalctl -u datacrumbs_probe_manager.service --no-pager -n 200 || true
           }
           trap cleanup EXIT
 
           rm -f "${OUT_FILE}"
-          "${INSTALL_PREFIX}/bin/datacrumbs_service_wrapper" start "${JOB_ID}" "${service_user}" "${PROBE_FILE}"
+          set +e
+          timeout --signal=TERM --kill-after=10s 60s \
+            "${INSTALL_PREFIX}/bin/datacrumbs_service_wrapper" start "${JOB_ID}" "${service_user}" "${PROBE_FILE}"
+          start_status=$?
+          set -e
+
+          if [[ "${start_status}" -eq 124 ]]; then
+            echo "datacrumbs_service_wrapper start timed out after 60s; dumping diagnostics"
+            if [[ -f "${log_file}" ]]; then
+              echo "---- datacrumbs log (tail -n 200): ${log_file} ----"
+              tail -n 200 "${log_file}" || true
+            fi
+            sudo systemctl status --no-pager "datacrumbs@${JOB_ID}.service" || true
+            sudo journalctl -u "datacrumbs@${JOB_ID}.service" --no-pager -n 200 || true
+            sudo journalctl -u datacrumbs_probe_manager.service --no-pager -n 200 || true
+            exit 124
+          fi
+
+          if [[ "${start_status}" -ne 0 ]]; then
+            echo "datacrumbs_service_wrapper start failed with status ${start_status}; dumping diagnostics"
+            if [[ -f "${log_file}" ]]; then
+              echo "---- datacrumbs log (tail -n 200): ${log_file} ----"
+              tail -n 200 "${log_file}" || true
+            fi
+            sudo systemctl status --no-pager "datacrumbs@${JOB_ID}.service" || true
+            sudo journalctl -u "datacrumbs@${JOB_ID}.service" --no-pager -n 200 || true
+            sudo journalctl -u datacrumbs_probe_manager.service --no-pager -n 200 || true
+            exit "${start_status}"
+          fi
+
           sudo systemctl is-active --quiet "datacrumbs@${JOB_ID}.service"
 
-          "${INSTALL_PREFIX}/bin/datacrumbs_wrap" \
+          set +e
+          timeout --signal=TERM --kill-after=10s 60s \
+            "${INSTALL_PREFIX}/bin/datacrumbs_wrap" \
             dd if=/dev/zero of="${OUT_FILE}" bs=1M count=16 status=none
+          wrap_status=$?
+          set -e
+
+          if [[ "${wrap_status}" -eq 124 ]]; then
+            echo "datacrumbs_wrap timed out after 60s; dumping diagnostics"
+            sudo systemctl status --no-pager "datacrumbs@${JOB_ID}.service" || true
+            sudo journalctl -u "datacrumbs@${JOB_ID}.service" --no-pager -n 200 || true
+            sudo journalctl -u datacrumbs_probe_manager.service --no-pager -n 200 || true
+            exit 124
+          fi
+
+          if [[ "${wrap_status}" -ne 0 ]]; then
+            echo "datacrumbs_wrap failed with status ${wrap_status}; dumping diagnostics"
+            sudo systemctl status --no-pager "datacrumbs@${JOB_ID}.service" || true
+            sudo journalctl -u "datacrumbs@${JOB_ID}.service" --no-pager -n 200 || true
+            sudo journalctl -u datacrumbs_probe_manager.service --no-pager -n 200 || true
+            exit "${wrap_status}"
+          fi
 
           test -f "${OUT_FILE}"
           test "$(wc -c <"${OUT_FILE}")" = "16777216"
@@ -381,13 +387,26 @@ jobs:
           "${INSTALL_PREFIX}/bin/datacrumbs_service_wrapper" stop "${JOB_ID}" "${service_user}" "${PROBE_FILE}"
           trap - EXIT
 
-          ! sudo systemctl is-active --quiet "datacrumbs@${JOB_ID}.service"
-          test -s "${log_file}"
-          grep -q . "${log_file}"
-          if [[ "${{ matrix.disable_signing }}" == "true" ]]; then
-            grep -q "Probe signing is disabled" "${log_file}"
+          final_log_file="${log_file}"
+          if [[ ! -s "${final_log_file}" ]]; then
+            fallback_log_file="$(find "${LOG_DIR}" -maxdepth 1 -type f -name "datacrumbs_${service_user}_${JOB_ID}_*.log" -print | sort | tail -n 1 || true)"
+            if [[ -n "${fallback_log_file}" ]]; then
+              final_log_file="${fallback_log_file}"
+            fi
           fi
-          tail -n 50 "${log_file}"
+
+          echo "Final datacrumbs log directory snapshot (${LOG_DIR}):"
+          ls -la "${LOG_DIR}" || true
+          if [[ -f "${final_log_file}" ]]; then
+            echo "---- final datacrumbs log (tail -n 200): ${final_log_file} ----"
+            tail -n 200 "${final_log_file}" || true
+          else
+            echo "No datacrumbs log file found to print at end of run."
+          fi
+
+          ! sudo systemctl is-active --quiet "datacrumbs@${JOB_ID}.service"
+          test -s "${final_log_file}"
+          grep -q . "${final_log_file}"
 
       - name: Upload datacrumbs logs
         if: always()

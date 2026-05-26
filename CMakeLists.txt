@@ -67,7 +67,6 @@ option(DATACRUMBS_BPFTIME_COMPATIBLE "Enable compatibility with bpftime" OFF)
 option(DATACRUMBS_ENABLE_OPT "Enable tracing" ON)
 option(DATACRUMBS_TRACE_ALL_PROCESSES_OPT "Trace all processes" OFF)
 option(DATACRUMBS_BPF_PRINT_ENABLE "Enable BPF print" OFF)
-option(DATACRUMBS_DISABLE_PROBE_SIGNING "Disable probe signing and signature verification" OFF)
 set(DATACRUMBS_MODE_STR "TRACE" CACHE STRING "Mode for datacrumbs (TRACE or PROFILE)")
 set_property(CACHE DATACRUMBS_MODE_STR PROPERTY STRINGS TRACE PROFILE)
 
@@ -98,6 +97,9 @@ set(DATACRUMBS_TIME_INTERVAL_NS "1000000" CACHE STRING "Profiling time interval 
 set(DATACRUMBS_LOG_LEVEL_STR "INFO" CACHE STRING "Log Level for compiling ${UPPER_PROJECT_NAME}")
 set_property(CACHE DATACRUMBS_LOG_LEVEL_STR PROPERTY STRINGS ERROR WARN INFO DEBUG TRACE)
 option(DATACRUMBS_BUILD_ONLY "Build only the datacrumbs library without installation" OFF)
+cmake_host_system_information(RESULT DATACRUMBS_DEFAULT_PROBE_MANAGER_TCP_HOST QUERY HOSTNAME)
+set(DATACRUMBS_PROBE_MANAGER_TCP_HOST "${DATACRUMBS_DEFAULT_PROBE_MANAGER_TCP_HOST}" CACHE STRING "Host address for datacrumbs probe manager RPC service")
+set(DATACRUMBS_PROBE_MANAGER_TCP_PORT "43123" CACHE STRING "TCP port for datacrumbs probe manager RPC service")
 
 # ------------------------------------------------------------------------------
 # Derive CMake variables based on options
@@ -123,11 +125,8 @@ set(DATACRUMBS_SYSTEM_PROBE_FILE
 set(DATACRUMBS_PROBE_SECRET_FILE
     "${DATACRUMBS_INSTALL_SHARED_DATA_DIR}/.datacrumbs-probe-secret"
 )
-set(DATACRUMBS_SIGN_PROBES_SOCKET_PATH
-    "${DATACRUMBS_INSTALL_SHARED_DATA_DIR}/datacrumbs-sign-probes.sock"
-)
-set(DATACRUMBS_UTILS_SYSTEM_CONFIGURATION_FILE
-    "${CMAKE_BINARY_DIR}/configs/datacrumbs-system-configuration.sqlite"
+set(DATACRUMBS_PROBE_MANAGER_SOCKET_PATH
+    "${DATACRUMBS_INSTALL_SHARED_DATA_DIR}/datacrumbs-probe-manager.sock"
 )
 set(DATACRUMBS_TRACE_DIR_PATTERN "${DATACRUMBS_CONFIGURED_TRACE_DIR}/%YY%/%MM%/%DD%")
 set(DATACRUMBS_CLIENT_LIB "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libdatacrumbs_client.so")
@@ -163,6 +162,8 @@ set(DATACRUMBS_SYSTEM_CONFIGURATION_DEFINE_KEYS
     DATACRUMBS_KERNEL_UNAME_R
     DATACRUMBS_KERNEL_HEADERS_PATH
     DATACRUMBS_LIBC_SO
+    DATACRUMBS_PROBE_MANAGER_TCP_HOST
+    DATACRUMBS_PROBE_MANAGER_TCP_PORT
 )
 
 set(DATACRUMBS_INSTALL_PREFIX "${DATACRUMBS_INSTALL_PREFIX_PATH}")
@@ -224,6 +225,8 @@ message(STATUS "             - DATACRUMBS_LAUNCHER_TYPE: ${DATACRUMBS_LAUNCHER_T
 message(STATUS "             - DATACRUMBS_SCHEDULER_JOBID_ENV_VAR: ${DATACRUMBS_SCHEDULER_JOBID_ENV_VAR}")
 message(STATUS "             - DATACRUMBS_SYSTEM_PROBE_FILE: ${DATACRUMBS_SYSTEM_PROBE_FILE}")
 message(STATUS "             - DATACRUMBS_PROBE_SECRET_FILE: ${DATACRUMBS_PROBE_SECRET_FILE}")
+message(STATUS "             - DATACRUMBS_PROBE_MANAGER_TCP_HOST: ${DATACRUMBS_PROBE_MANAGER_TCP_HOST}")
+message(STATUS "             - DATACRUMBS_PROBE_MANAGER_TCP_PORT: ${DATACRUMBS_PROBE_MANAGER_TCP_PORT}")
 
 # ------------------------------------------------------------------------------
 # Configure output files for build
@@ -317,52 +320,16 @@ install(
   DESTINATION "${DATACRUMBS_INSTALL_LIB_DIR}/cmake/datacrumbs"
 )
 
-set(DATACRUMBS_SYSTEM_CONFIGURATOR_SRC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/system_configurator/system_configurator_main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/system_configurator/system_configurator.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/system_configurator/system_configurator.h
-)
-set(DATACRUMBS_SIGN_PROBES_SERVICE_SRC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/signer/sign_probes_service_main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/signer/sign_probes_service.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/signer/sign_probes_service.h
+set(DATACRUMBS_PROBE_MANAGER_SERVICE_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/manager/probe_manager_service_main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/manager/probe_manager_service.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datacrumbs/manager/probe_manager_service.h
 )
 
-add_executable(datacrumbs_system_configurator ${DATACRUMBS_SYSTEM_CONFIGURATOR_SRC} ${DATACRUMBS_COMMON_SRC})
-target_link_libraries(datacrumbs_system_configurator ${DEPENDENCY_LIB})
-install(TARGETS datacrumbs_system_configurator
-    RUNTIME DESTINATION "${DATACRUMBS_INSTALL_BINARYDIR}"
-)
-
-add_custom_target(
-    generate_utils_system_configuration
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/configs
-    COMMAND
-      ${CMAKE_COMMAND} -E env
-      DATACRUMBS_SYSTEM_PROBE_FILE_OVERRIDE=${DATACRUMBS_UTILS_SYSTEM_CONFIGURATION_FILE}
-      $<TARGET_FILE:datacrumbs_system_configurator>
-    DEPENDS datacrumbs_system_configurator
-    COMMENT "Generating build-tree system configuration for datacrumbs-utils"
-)
-
-add_executable(datacrumbs_sign_probes ${DATACRUMBS_SIGN_PROBES_SERVICE_SRC} ${DATACRUMBS_COMMON_SRC})
-target_link_libraries(datacrumbs_sign_probes ${DEPENDENCY_LIB})
-add_dependencies(datacrumbs_sign_probes run_system_configurator)
-install(TARGETS datacrumbs_sign_probes
+add_executable(datacrumbs_probe_manager ${DATACRUMBS_PROBE_MANAGER_SERVICE_SRC} ${DATACRUMBS_COMMON_SRC})
+target_link_libraries(datacrumbs_probe_manager ${DEPENDENCY_LIB})
+install(TARGETS datacrumbs_probe_manager
     RUNTIME DESTINATION "${DATACRUMBS_INSTALL_SBINARYDIR}"
-)
-
-add_custom_target(
-    run_system_configurator ALL
-    COMMAND
-    ${CMAKE_COMMAND}
-    -DDATACRUMBS_SYSTEM_PROBE_FILE=${DATACRUMBS_SYSTEM_PROBE_FILE}
-    -DDATACRUMBS_PROBE_SECRET_FILE=${DATACRUMBS_PROBE_SECRET_FILE}
-    -DDATACRUMBS_SYSTEM_CONFIGURATOR_BIN=$<TARGET_FILE:datacrumbs_system_configurator>
-    -P
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_system_configurator_if_missing.cmake
-    DEPENDS datacrumbs_system_configurator
-    COMMENT "Generating install-time system configuration and probe secret"
 )
 
 # Generate vmlinux.h from vmlinux BTF
@@ -505,12 +472,12 @@ target_link_libraries(datacrumbs_obj ${DEPENDENCY_LIB})
 install(TARGETS datacrumbs_obj
     LIBRARY DESTINATION ${DATACRUMBS_INSTALL_LIB_DIR}
 )
-add_dependencies(datacrumbs_obj datacrumbs_bpf_skel run_system_configurator)
+add_dependencies(datacrumbs_obj datacrumbs_bpf_skel)
 
 # Build the final executable by linking server.cpp and the object library
 add_executable(${PROJECT_NAME} ${DATACRUMBS_SERVER_SRC})
 target_link_libraries(${PROJECT_NAME} datacrumbs_obj ${DEPENDENCY_LIB})
-add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel datacrumbs_obj run_system_configurator)
+add_dependencies(${PROJECT_NAME} datacrumbs_bpf_skel datacrumbs_obj)
 
 # Install the main processing executable into DATACRUMBS_INSTALL_BINARYDIR
 install(TARGETS ${PROJECT_NAME}
@@ -549,10 +516,10 @@ install(
     ${DATACRUMBS_INSTALL_ETC_SYSTEMD}
 )
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/systemd/datacrumbs_sign_probes.service.in ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs_sign_probes.service @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/datacrumbs/systemd/datacrumbs_probe_manager.service.in ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs_probe_manager.service @ONLY)
 install(
     PROGRAMS
-    ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs_sign_probes.service
+    ${CMAKE_SYSTEMD_OUTPUT_DIRECTORY}/datacrumbs_probe_manager.service
     DESTINATION
     ${DATACRUMBS_INSTALL_ETC_SYSTEMD}
 )
